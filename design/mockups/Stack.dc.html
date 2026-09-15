@@ -1,0 +1,172 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Roboto:wght@400;500;700&display=swap">
+  <style>
+    body { margin: 0; font-family: "Roboto", "Helvetica Neue", Arial, sans-serif; }
+    a { color: #00693E; } a:hover { color: #005432; }
+    .mono { font-family: "Roboto", Arial, sans-serif; }
+    .disp { font-family: "Barlow Semi Condensed", "Roboto Condensed", Arial Narrow, sans-serif; }
+    .sheet { width: 1320px; height: 1400px; box-sizing: border-box; background: #FAFAF7; color: #111A15; padding: 40px 44px; display: flex; flex-direction: column; gap: 26px; }
+    .head { display: flex; flex-direction: column; gap: 8px; }
+    .rows { display: flex; flex-direction: column; border-top: 2px solid #111A15; background: #FFFFFF; }
+    .r { display: grid; grid-template-columns: 150px 232px minmax(0,1fr) 176px; gap: 18px; padding: 14px 16px; border-bottom: 1px solid #E2E6DF; align-items: baseline; }
+    .r.h { border-bottom: 1px solid #C9D1C8; padding-bottom: 10px; }
+    .r.h span { font-size: 11.5px; font-weight: 500; letter-spacing: .1em; color: #5E6F66; text-transform: uppercase; }
+    .layer { font-size: 12px; font-weight: 500; letter-spacing: .06em; color: #5E6F66; text-transform: uppercase; }
+    .pick { font-size: 15px; font-weight: 500; color: #111A15; }
+    .pick em { font-style: normal; font-weight: 700; color: #00693E; }
+    .why { font-size: 13px; color: #3F4E46; line-height: 1.5; }
+    .not { font-size: 12.5px; color: #5E6F66; line-height: 1.45; }
+    .phases { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 12px; }
+    .ph { background: #FFFFFF; border: 1px solid #E2E6DF; border-top: 3px solid #C9D1C8; border-radius: 9px; padding: 15px; display: flex; flex-direction: column; gap: 7px; }
+    .ph.now { border-top-color: #00693E; background: #F3F9F5; }
+    .ph b { font-size: 15px; font-weight: 700; }
+    .ph .w { font-size: 11.5px; font-weight: 500; letter-spacing: .08em; color: #5E6F66; }
+    .ph p { margin: 0; font-size: 12.5px; color: #3F4E46; line-height: 1.5; }
+  </style>
+</helmet>
+
+<div class="sheet">
+
+  <div class="head">
+    <span class="mono" style="font-size: 12px; font-weight: 500; letter-spacing: .12em; color: #00693E">BUILD STACK</span>
+    <span class="disp" style="font-size: 30px; font-weight: 700; letter-spacing: -.01em">What we build it with, and what we deliberately don't</span>
+    <span style="font-size: 13px; color: #3F4E46; max-width: 70ch">Chosen for two constraints that outrank everything else: it must run on a cheap Android over 3G, and it must not bill in dollars per trip while earning 250 FCFA.</span>
+  </div>
+
+  <div class="rows">
+    <div class="r h"><span>Layer</span><span>Choice</span><span>Why this one</span><span>Not this</span></div>
+
+    <div class="r">
+      <span class="layer">Rider &amp; driver apps</span>
+      <span class="pick"><em>React Native</em> + Expo (EAS)</span>
+      <span class="why">One TypeScript codebase for both apps, on the React you already write daily. EAS ships signed APKs and over-the-air updates that land without a Play Store round trip.</span>
+      <span class="not">Flutter &mdash; a second language to learn for no gain here</span>
+    </div>
+
+    <div class="r">
+      <span class="layer">Maps</span>
+      <span class="pick"><em>MapLibre GL</em> + OpenStreetMap</span>
+      <span class="why">Open tiles, vector rendering, offline-capable style. Buea's OSM coverage is workable and anything missing we add ourselves.</span>
+      <span class="not">Google Maps SDK &mdash; billed in USD per load</span>
+    </div>
+
+    <div class="r">
+      <span class="layer">Routing &amp; ETA</span>
+      <span class="pick"><em>OSRM</em> on the Cameroon extract</span>
+      <span class="why">Self-hosted on one small box. Unlimited route calls at a fixed monthly cost, which is the only way per-trip routing survives at this fare.</span>
+      <span class="not">Google Directions API &mdash; cost scales with trips</span>
+    </div>
+
+    <div class="r">
+      <span class="layer">Places</span>
+      <span class="pick"><em>Our own Fako gazetteer</em></span>
+      <span class="why">A few hundred hand-seeded landmarks and zone polygons in PostGIS. Nobody navigates Buea by street name, and no geocoder knows Malingo Junction better than we will.</span>
+      <span class="not">Any third-party geocoder as the primary</span>
+    </div>
+
+    <div class="r">
+      <span class="layer">API</span>
+      <span class="pick"><em>Node + Express + Prisma</em>, TypeScript</span>
+      <span class="why">The exact stack running StudyHub. Day-one productivity matters more than novelty for a two-month build.</span>
+      <span class="not">NestJS, Go &mdash; new idioms, same result</span>
+    </div>
+
+    <div class="r">
+      <span class="layer">Database</span>
+      <span class="pick"><em>PostgreSQL</em> (Neon) + PostGIS</span>
+      <span class="why">Zone polygons, point-in-polygon fare lookup and the trip ledger in one place. Branching databases make migrations safe to rehearse.</span>
+      <span class="not">MongoDB &mdash; no geometry, no ledger guarantees</span>
+    </div>
+
+    <div class="r">
+      <span class="layer">Dispatch &amp; realtime</span>
+      <span class="pick"><em>Socket.IO</em> + Redis (Upstash)</span>
+      <span class="why">Driver positions and the 12-second offer queue live in Redis; sockets push offers and trip state. Reconnect logic is the hard part, not the transport.</span>
+      <span class="not">Polling &mdash; burns the driver's data bundle</span>
+    </div>
+
+    <div class="r">
+      <span class="layer">Payments</span>
+      <span class="pick"><em>Fapshi</em>, CamPay as fallback</span>
+      <span class="why">MTN MoMo and Orange Money through one API, with sandboxes. Fapshi is Cameroonian; CamPay's flat 2% is the benchmark to hold them to.</span>
+      <span class="not">Stripe, PayPal &mdash; irrelevant to this market</span>
+    </div>
+
+    <div class="r">
+      <span class="layer">OTP &amp; alerts</span>
+      <span class="pick"><em>Local SMS aggregator</em></span>
+      <span class="why">Phone-number login is the only login that works here. Price per SMS against local providers before committing &mdash; it is a recurring cost per signup.</span>
+      <span class="not">Twilio &mdash; international rates into Cameroon</span>
+    </div>
+
+    <div class="r">
+      <span class="layer">Notifications</span>
+      <span class="pick"><em>FCM</em> via Expo push</span>
+      <span class="why">Free, and it wakes the driver app when a ride offer arrives with the screen off.</span>
+      <span class="not">&mdash;</span>
+    </div>
+
+    <div class="r">
+      <span class="layer">Ops console</span>
+      <span class="pick"><em>React + Vite</em> on Vercel</span>
+      <span class="why">Driver verification queue, live trip board, fare-table editor, complaints. Same frontend stack as StudyHub, so it costs days not weeks.</span>
+      <span class="not">An admin framework &mdash; we need three screens</span>
+    </div>
+
+    <div class="r">
+      <span class="layer">Hosting</span>
+      <span class="pick"><em>Render</em> &middot; Neon &middot; Upstash &middot; R2</span>
+      <span class="why">The deployment shape you already run, plus Cloudflare R2 for driver documents &mdash; CNI photos and licence scans, which need storage that is cheap and access-controlled.</span>
+      <span class="not">Self-managed VPS for everything</span>
+    </div>
+
+    <div class="r">
+      <span class="layer">Watching it</span>
+      <span class="pick"><em>Sentry</em> + PostHog</span>
+      <span class="why">One crash on a driver's phone mid-trip costs a driver. Session data also answers the only question that matters early: where people drop out of booking.</span>
+      <span class="not">Nothing &mdash; flying blind on a two-sided app</span>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 12px">
+    <span class="mono" style="font-size: 12px; font-weight: 500; letter-spacing: .1em; color: #5E6F66">SEQUENCE</span>
+    <div class="phases">
+      <div class="ph now">
+        <span class="w">NEXT &middot; 2 WEEKS</span>
+        <b>Field work</b>
+        <p>Count trips, interview 30 drivers and 50 students, walk the zone table, check the S10 paperwork. No code.</p>
+      </div>
+      <div class="ph">
+        <span class="w">WEEKS 3&ndash;5</span>
+        <b>Spine</b>
+        <p>Schema, gazetteer, zone fare table, auth by phone, driver onboarding and the ops console. Dispatch as an API before it is a screen.</p>
+      </div>
+      <div class="ph">
+        <span class="w">WEEKS 6&ndash;8</span>
+        <b>Driver app</b>
+        <p>Online toggle, offers, PIN, trip lifecycle, earnings. Tested on real bikes on the real corridor before riders exist.</p>
+      </div>
+      <div class="ph">
+        <span class="w">WEEKS 9&ndash;10</span>
+        <b>Rider app</b>
+        <p>Book, track, pay, rate, share trip, SOS. Cash first; MoMo behind it.</p>
+      </div>
+      <div class="ph">
+        <span class="w">WEEK 11+</span>
+        <b>One corridor</b>
+        <p>Mile 17 to Molyko only, 40&ndash;60 signed drivers, free for everyone. Widen only when the wait is under five minutes.</p>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

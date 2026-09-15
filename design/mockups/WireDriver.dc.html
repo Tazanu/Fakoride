@@ -1,0 +1,135 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Chivo:wght@400;700;900&family=Chivo+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; font-family: "Chivo", "Segoe UI", system-ui, sans-serif; color: #2B2B28; }
+    a { color: #B8770C; } a:hover { color: #8A5908; }
+    .sheet { width: 1420px; height: 880px; background: #F7F6F1; padding: 34px 40px; box-sizing: border-box; display: flex; flex-direction: column; gap: 22px; }
+    .sheet-head { display: flex; align-items: baseline; gap: 16px; }
+    .sheet-title { font-size: 22px; font-weight: 900; letter-spacing: -.01em; }
+    .sheet-sub { font-family: "Chivo Mono", monospace; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #8A8A80; }
+    .frames { display: flex; gap: 40px; }
+    .col { display: flex; flex-direction: column; gap: 12px; width: 300px; }
+    .step { display: flex; align-items: center; gap: 9px; }
+    .step-n { font-family: "Chivo Mono", monospace; font-size: 11px; font-weight: 500; color: #F7F6F1; background: #2B2B28; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 3px; }
+    .step-t { font-size: 14px; font-weight: 700; }
+    .frame { width: 300px; height: 600px; border: 2px solid #2B2B28; border-radius: 14px; background: #FFF; padding: 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; }
+    .bar { height: 30px; background: #E6E5DE; border-radius: 4px; display: flex; align-items: center; padding: 0 10px; font-family: "Chivo Mono", monospace; font-size: 10px; letter-spacing: .1em; color: #6E6E66; }
+    .map { border: 1.5px dashed #B9B8AF; border-radius: 6px; display: grid; place-items: center; font-family: "Chivo Mono", monospace; font-size: 10.5px; letter-spacing: .12em; color: #9C9B92; background: repeating-linear-gradient(45deg, #FBFBF8, #FBFBF8 9px, #F2F1EB 9px, #F2F1EB 18px); }
+    .box { border: 1.5px solid #C9C8BF; border-radius: 5px; padding: 9px 10px; display: flex; flex-direction: column; gap: 5px; }
+    .box.key { border-color: #D4880E; border-width: 2px; background: #FDF6E7; }
+    .lbl { font-family: "Chivo Mono", monospace; font-size: 8.5px; letter-spacing: .12em; color: #9C9B92; }
+    .ln { height: 8px; border-radius: 2px; background: #DEDDD4; }
+    .ln.s { width: 45%; } .ln.m { width: 70%; } .ln.l { width: 92%; }
+    .ln.dark { background: #B4B3A9; }
+    .row { display: flex; align-items: center; gap: 8px; }
+    .grow { flex-grow: 1; }
+    .price { font-family: "Chivo Mono", monospace; font-size: 13px; font-weight: 500; }
+    .big { font-size: 30px; font-weight: 900; letter-spacing: -.02em; }
+    .btn { height: 42px; border-radius: 6px; background: #2B2B28; color: #F7F6F1; display: grid; place-items: center; font-size: 12.5px; font-weight: 700; letter-spacing: .04em; }
+    .btn.ghost { background: transparent; border: 1.5px solid #C9C8BF; color: #6E6E66; }
+    .toggle { width: 54px; height: 28px; border-radius: 999px; border: 2px solid #2B2B28; display: flex; align-items: center; padding: 3px; box-sizing: border-box; }
+    .toggle span { width: 18px; height: 18px; border-radius: 50%; background: #2B2B28; }
+    .toggle.on { justify-content: flex-end; background: #FDF6E7; border-color: #D4880E; }
+    .toggle.on span { background: #D4880E; }
+    .stat { flex-grow: 1; border: 1.5px solid #C9C8BF; border-radius: 5px; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+    .stat b { font-size: 17px; font-weight: 900; }
+    .bars { display: flex; align-items: flex-end; gap: 7px; height: 90px; }
+    .bars i { flex-grow: 1; background: #DEDDD4; border-radius: 2px; }
+    .bars i.on { background: #D4880E; }
+    .note { font-family: "Caveat", cursive; font-size: 17px; line-height: 1.3; color: #B8770C; display: flex; gap: 7px; }
+    .note::before { content: "\2937"; font-family: "Chivo", sans-serif; font-size: 13px; }
+  </style>
+</helmet>
+
+<div class="sheet">
+  <div class="sheet-head">
+    <span class="sheet-title">Driver flow &mdash; wireframe</span>
+    <span class="sheet-sub">Go online &middot; take a trip &middot; get paid &middot; low fidelity</span>
+  </div>
+
+  <div class="frames">
+
+    <div class="col">
+      <div class="step"><span class="step-n">1</span><span class="step-t">Go online</span></div>
+      <div class="frame">
+        <div class="row"><div style="display:flex;flex-direction:column;gap:5px;flex-grow:1"><span class="lbl">DRIVER NAME</span><div class="ln m dark"></div></div><div class="toggle on"><span></span></div></div>
+        <div class="row"><div class="stat"><b>7</b><span class="lbl">TRIPS</span></div><div class="stat"><b>2,150</b><span class="lbl">EARNED</span></div><div class="stat"><b>0</b><span class="lbl">COMMISSION</span></div></div>
+        <div class="map" style="height: 180px">DEMAND BY ZONE</div>
+        <div class="box">
+          <span class="lbl">WHERE RIDERS ARE WAITING</span>
+          <div class="row"><span class="price">12</span><div class="ln m dark"></div></div>
+          <div class="row"><span class="price">4</span><div class="ln s"></div></div>
+          <div class="row"><span class="price">1</span><div class="ln s"></div></div>
+        </div>
+        <span class="grow"></span>
+        <div class="box key"><span class="lbl">TODAY'S ACCESS FEE</span><div class="row"><div class="ln s dark"></div><span class="grow"></span><span class="price">500 PAID</span></div></div>
+      </div>
+      <div class="note">The fee is paid once in the morning, then every trip is 100% his.</div>
+    </div>
+
+    <div class="col">
+      <div class="step"><span class="step-n">2</span><span class="step-t">Trip offer</span></div>
+      <div class="frame">
+        <div class="bar">NEW REQUEST &middot; 12s</div>
+        <div class="box key">
+          <span class="lbl">YOU EARN</span>
+          <div class="row"><span class="big">250</span><span class="grow"></span><span class="price">CASH</span></div>
+          <div class="ln s"></div>
+        </div>
+        <div class="box">
+          <span class="lbl">PICKUP &rarr; DROP-OFF</span>
+          <div class="row"><div class="ln m dark"></div><span class="grow"></span><span class="price">600 m</span></div>
+          <div class="row"><div class="ln m dark"></div><span class="grow"></span><span class="price">1.4 km</span></div>
+        </div>
+        <div class="box"><span class="lbl">RIDER</span><div class="row"><div class="ln s dark"></div><span class="grow"></span><span class="price">4.9</span></div></div>
+        <span class="grow"></span>
+        <div class="row"><div class="btn grow">ACCEPT</div><div class="btn ghost" style="width:90px">Pass</div></div>
+      </div>
+      <div class="note">Fare and distance up front. No blind accepts &mdash; that is how you lose drivers on day two.</div>
+    </div>
+
+    <div class="col">
+      <div class="step"><span class="step-n">3</span><span class="step-t">Pick up &amp; ride</span></div>
+      <div class="frame">
+        <div class="bar">GO TO PICKUP &middot; 600 M</div>
+        <div class="map" style="height: 200px">NAVIGATION</div>
+        <div class="box key"><span class="lbl">ASK FOR THE PIN</span><div class="row"><span class="big">4072</span><span class="grow"></span><span class="price">VERIFY</span></div></div>
+        <div class="box"><span class="lbl">RIDER</span><div class="row"><div class="ln m dark"></div><span class="grow"></span><span class="price">CALL</span></div></div>
+        <span class="grow"></span>
+        <div class="btn">START TRIP</div>
+        <div class="btn ghost">Rider did not show</div>
+      </div>
+      <div class="note">PIN entry is what closes the trip record &mdash; it is also the anti-fraud check.</div>
+    </div>
+
+    <div class="col">
+      <div class="step"><span class="step-n">4</span><span class="step-t">Earnings</span></div>
+      <div class="frame">
+        <div class="bar">THIS WEEK</div>
+        <div class="box key"><span class="lbl">KEPT AFTER FEES</span><div class="row"><span class="big">35,900</span></div></div>
+        <div class="bars"><i style="height:25%"></i><i class="on" style="height:60%"></i><i class="on" style="height:70%"></i><i class="on" style="height:55%"></i><i class="on" style="height:80%"></i><i class="on" style="height:95%"></i><i style="height:45%"></i></div>
+        <div class="box"><span class="lbl">MONDAY IS COUNTED SEPARATELY</span><div class="ln l"></div></div>
+        <div class="box">
+          <span class="lbl">TODAY'S TRIPS</span>
+          <div class="row"><div class="ln m"></div><span class="grow"></span><span class="price">250</span></div>
+          <div class="row"><div class="ln m"></div><span class="grow"></span><span class="price">450</span></div>
+        </div>
+        <span class="grow"></span>
+        <div class="btn">CASH OUT TO MOMO</div>
+      </div>
+      <div class="note">A quiet Monday must never look like a bad driver in the numbers.</div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

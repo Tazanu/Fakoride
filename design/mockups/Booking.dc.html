@@ -1,0 +1,107 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=Roboto:wght@400;500;700&display=swap">
+  <style>
+    body { margin: 0; font-family: "Roboto", "Helvetica Neue", Arial, sans-serif; }
+    a { color: #00693E; } a:hover { color: #005432; }
+    .d { font-family: "Barlow Semi Condensed", "Roboto Condensed", Arial Narrow, sans-serif; }
+    .lbl { font-size: 12px; font-weight: 500; letter-spacing: .07em; text-transform: uppercase; color: #5E6F66; }
+  </style>
+</helmet>
+
+<div style="width: 390px; height: 844px; overflow: hidden; background: #FAFAF7; color: #111A15; display: flex; flex-direction: column">
+
+  <div style="display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 4px; background: #FFFFFF; border-bottom: 1px solid #E2E6DF">
+    <div style="width: 48px; height: 48px; display: grid; place-items: center">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111A15" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 6l-6 6 6 6"></path></svg>
+    </div>
+    <span class="d" style="font-size: 22px; font-weight: 700">Confirm your ride</span>
+  </div>
+
+  <div style="height: 150px; overflow: hidden; border-bottom: 1px solid #E2E6DF">
+    <svg width="390" height="150" viewBox="0 0 390 150" style="display: block">
+      <rect width="390" height="150" fill="#EDEFE8"></rect>
+      <g stroke="#FFFFFF" stroke-width="11" fill="none" stroke-linecap="round">
+        <path d="M-10 112 L130 98 L280 78 L400 62"></path>
+        <path d="M70 150 L112 90 L150 26"></path>
+      </g>
+      <g fill="#C9D1C8"><rect x="250" y="104" width="50" height="24" rx="3"></rect><rect x="24" y="18" width="42" height="20" rx="3"></rect></g>
+      <path d="M92 108 L126 62 L158 20" stroke="#00693E" stroke-width="4" fill="none" stroke-linecap="round"></path>
+      <circle cx="92" cy="108" r="12" fill="#00693E"></circle><circle cx="92" cy="108" r="4" fill="#FFFFFF"></circle>
+      <rect x="150" y="12" width="16" height="16" fill="#111A15" rx="2"></rect>
+    </svg>
+  </div>
+
+  <div style="flex-grow: 1; background: #FFFFFF; padding: 16px; display: flex; flex-direction: column; gap: 14px">
+
+    <div style="display: grid; grid-template-columns: 16px minmax(0,1fr); gap: 0 12px; align-items: center">
+      <span style="width: 12px; height: 12px; border-radius: 50%; background: #00693E"></span>
+      <span style="font-size: 16px; font-weight: 500; padding: 4px 0">Checkpoint, Molyko</span>
+      <span style="border-left: 2px dotted #C9D1C8; height: 18px; margin-left: 5px"></span>
+      <span></span>
+      <span style="width: 12px; height: 12px; background: #111A15"></span>
+      <span style="font-size: 16px; font-weight: 500; padding: 4px 0">UB Main Gate</span>
+    </div>
+
+    <div style="border-top: 1px solid #E2E6DF; border-bottom: 1px solid #E2E6DF; padding: 14px 0; display: flex; align-items: center; justify-content: space-between">
+      <div style="display: flex; flex-direction: column; gap: 3px">
+        <span class="lbl">You pay the rider</span>
+        <div style="display: flex; align-items: baseline; gap: 7px">
+          <span class="d" style="font-size: 46px; font-weight: 700; line-height: 1">250</span>
+          <span style="font-size: 15px; font-weight: 500; color: #5E6F66">FCFA</span>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px">
+        <span style="font-size: 13px; font-weight: 700; color: #00693E; background: #E6F1EB; border-radius: 6px; padding: 6px 10px">FIXED PRICE</span>
+        <span style="font-size: 13px; color: #5E6F66">Never changes on arrival</span>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 9px">
+      <span class="lbl">How you will pay</span>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <div style="display: flex; align-items: center; gap: 12px; border: 2px solid #00693E; background: #F3F9F5; border-radius: 8px; padding: 12px; min-height: 56px">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00693E" stroke-width="2.2" stroke-linecap="round"><rect x="2.5" y="6.5" width="19" height="11" rx="2"></rect><circle cx="12" cy="12" r="2.6"></circle></svg>
+          <span style="font-size: 16px; font-weight: 500; flex-grow: 1">Cash in his hand</span>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00693E" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M8.5 12.3l2.3 2.3 4.7-5"></path></svg>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; border: 1px solid #E2E6DF; border-radius: 8px; padding: 12px; min-height: 56px">
+          <span style="width: 22px; height: 22px; border-radius: 4px; background: #FFCC00; display: grid; place-items: center"><span class="d" style="font-size: 13px; font-weight: 700; color: #111A15">M</span></span>
+          <span style="font-size: 16px; font-weight: 500; flex-grow: 1">MTN MoMo</span>
+          <span class="d" style="font-size: 18px; font-weight: 700; color: #00693E">235</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; border: 1px solid #E2E6DF; border-radius: 8px; padding: 12px; min-height: 56px">
+          <span style="width: 22px; height: 22px; border-radius: 4px; background: #FF7900; display: grid; place-items: center"><span class="d" style="font-size: 13px; font-weight: 700; color: #FFFFFF">O</span></span>
+          <span style="font-size: 16px; font-weight: 500; flex-grow: 1">Orange Money</span>
+          <span class="d" style="font-size: 18px; font-weight: 700; color: #00693E">235</span>
+        </div>
+      </div>
+      <span style="font-size: 13px; color: #5E6F66">Paying by phone saves you 15 FCFA — it costs us less too.</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 9px">
+      <span class="lbl">Anything to add?</span>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap">
+        <span style="font-size: 14px; border: 1px solid #C9D1C8; border-radius: 999px; padding: 11px 16px; min-height: 44px; display: flex; align-items: center">I need a helmet</span>
+        <span style="font-size: 14px; border: 1px solid #C9D1C8; border-radius: 999px; padding: 11px 16px; min-height: 44px; display: flex; align-items: center">Woman rider</span>
+      </div>
+    </div>
+
+    <div style="flex-grow: 1"></div>
+
+    <div style="min-height: 56px; background: #00693E; border-radius: 8px; display: flex; align-items: center; justify-content: center; padding: 8px 14px">
+      <span class="d" style="font-size: 21px; font-weight: 700; color: #FFFFFF">FIND ME A RIDER</span>
+    </div>
+    <span style="font-size: 13px; color: #5E6F66; text-align: center">Usually under 4 minutes on this road</span>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

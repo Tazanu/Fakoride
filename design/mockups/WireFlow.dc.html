@@ -1,0 +1,96 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Chivo:wght@400;700;900&family=Chivo+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; font-family: "Chivo", "Segoe UI", system-ui, sans-serif; color: #2B2B28; }
+    a { color: #B8770C; } a:hover { color: #8A5908; }
+    .sheet { width: 1400px; height: 760px; background: #F7F6F1; padding: 34px 40px; box-sizing: border-box; display: flex; flex-direction: column; gap: 26px; }
+    .sheet-head { display: flex; align-items: baseline; gap: 16px; }
+    .sheet-title { font-size: 22px; font-weight: 900; letter-spacing: -.01em; }
+    .sheet-sub { font-family: "Chivo Mono", monospace; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #8A8A80; }
+    .grid { display: grid; grid-template-columns: 104px repeat(7, minmax(0, 1fr)); gap: 14px 12px; align-items: stretch; }
+    .lane { display: flex; flex-direction: column; justify-content: center; gap: 4px; border-right: 2px solid #2B2B28; padding-right: 12px; }
+    .lane b { font-size: 13.5px; font-weight: 900; }
+    .lane span { font-family: "Chivo Mono", monospace; font-size: 9px; letter-spacing: .1em; color: #9C9B92; }
+    .colhead { font-family: "Chivo Mono", monospace; font-size: 9.5px; letter-spacing: .12em; color: #9C9B92; padding-bottom: 2px; border-bottom: 1px solid #DEDDD4; }
+    .node { border: 1.5px solid #2B2B28; border-radius: 6px; background: #FFF; padding: 11px 11px; display: flex; flex-direction: column; gap: 5px; min-height: 74px; }
+    .node b { font-size: 12.5px; font-weight: 700; line-height: 1.25; }
+    .node span { font-size: 11px; color: #6E6E66; line-height: 1.35; }
+    .node.key { border-color: #D4880E; border-width: 2px; background: #FDF6E7; }
+    .node.sys { background: #EFEEE7; border-style: dashed; }
+    .rail { display: grid; place-items: center; }
+    .rail i { display: block; width: 100%; height: 2px; background: repeating-linear-gradient(90deg, #C9C8BF 0 7px, transparent 7px 13px); }
+    .legend { display: flex; gap: 26px; align-items: center; padding-top: 6px; border-top: 1px solid #DEDDD4; }
+    .lg { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: #6E6E66; }
+    .sw { width: 20px; height: 13px; border-radius: 3px; border: 1.5px solid #2B2B28; background: #FFF; }
+    .sw.key { border-color: #D4880E; background: #FDF6E7; }
+    .sw.sys { background: #EFEEE7; border-style: dashed; }
+    .note { font-family: "Caveat", cursive; font-size: 18px; color: #B8770C; }
+  </style>
+</helmet>
+
+<div class="sheet">
+  <div class="sheet-head">
+    <span class="sheet-title">One trip, end to end</span>
+    <span class="sheet-sub">Rider &middot; platform &middot; driver &mdash; what happens and where the money moves</span>
+  </div>
+
+  <div class="grid">
+    <div></div>
+    <div class="colhead">1 &middot; OPEN</div>
+    <div class="colhead">2 &middot; PRICE</div>
+    <div class="colhead">3 &middot; DISPATCH</div>
+    <div class="colhead">4 &middot; MEET</div>
+    <div class="colhead">5 &middot; RIDE</div>
+    <div class="colhead">6 &middot; PAY</div>
+    <div class="colhead">7 &middot; SETTLE</div>
+
+    <!-- rider lane -->
+    <div class="lane"><b>Rider</b><span>ANDROID</span></div>
+    <div class="node"><b>Opens app</b><span>Pickup zone detected from GPS, corrected by landmark</span></div>
+    <div class="node key"><b>Picks drop-off</b><span>Fare shown before booking &mdash; 250 FCFA fixed</span></div>
+    <div class="node"><b>Requests</b><span>Waits with a live count of bikes nearby</span></div>
+    <div class="node key"><b>Reads PIN</b><span>Checks plate and face against the card</span></div>
+    <div class="node"><b>Shares trip</b><span>Live link to one chosen contact</span></div>
+    <div class="node"><b>Pays cash</b><span>Or MoMo for 15 FCFA less</span></div>
+    <div class="node"><b>Rates</b><span>Receipt kept in Trips</span></div>
+
+    <!-- platform lane -->
+    <div class="lane"><b>Platform</b><span>API &middot; DB &middot; REDIS</span></div>
+    <div class="node sys"><b>Zone lookup</b><span>Point-in-polygon over the Fako gazetteer</span></div>
+    <div class="node sys"><b>Fare table</b><span>Zone pair &rarr; price. No meter, no surge</span></div>
+    <div class="node sys"><b>Match</b><span>Nearest online driver in zone, 12s to accept, then next</span></div>
+    <div class="node sys"><b>Issues PIN</b><span>Four digits, one trip, expires on start</span></div>
+    <div class="node sys"><b>Tracks</b><span>Positions buffered; survives a dropped connection</span></div>
+    <div class="node sys"><b>Ledger entry</b><span>Cash recorded, MoMo captured via Fapshi</span></div>
+    <div class="node key"><b>Daily fee</b><span>One 500 FCFA MoMo debit the next morning</span></div>
+
+    <!-- driver lane -->
+    <div class="lane"><b>Driver</b><span>ANDROID</span></div>
+    <div class="node"><b>Goes online</b><span>Sees where riders are waiting by zone</span></div>
+    <div class="rail"><i></i></div>
+    <div class="node key"><b>Accepts</b><span>Sees full fare and both distances first</span></div>
+    <div class="node"><b>Verifies PIN</b><span>Wrong PIN, no trip &mdash; and no fare dispute</span></div>
+    <div class="node"><b>Rides</b><span>Navigation only when he asks for it</span></div>
+    <div class="node key"><b>Keeps 100%</b><span>Nothing deducted from the fare in his hand</span></div>
+    <div class="node"><b>Cashes out</b><span>MoMo, same day</span></div>
+  </div>
+
+  <div class="legend">
+    <div class="lg"><span class="sw"></span> Screen step</div>
+    <div class="lg"><span class="sw key"></span> Where the product wins or loses</div>
+    <div class="lg"><span class="sw sys"></span> Server-side, no UI</div>
+    <span style="flex-grow: 1"></span>
+    <span class="note">Money never sits with us: the driver holds the cash, we take rent the next morning.</span>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

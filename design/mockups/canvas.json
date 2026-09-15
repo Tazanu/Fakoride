@@ -1,0 +1,27 @@
+{
+  "pages": [
+    { "id": "page-1", "name": "Hi-fi mockups" },
+    { "id": "page-2", "name": "Wireframes & flow" },
+    { "id": "page-3", "name": "System & stack" }
+  ],
+  "artboards": [
+    { "file": "Main.dc.html", "page": "page-1", "x": 0, "y": 0, "w": 390, "h": 844, "title": "Rider — home" },
+    { "file": "Booking.dc.html", "page": "page-1", "x": 490, "y": 0, "w": 390, "h": 844, "title": "Rider — confirm fare" },
+    { "file": "Trip.dc.html", "page": "page-1", "x": 980, "y": 0, "w": 390, "h": 844, "title": "Rider — on the trip" },
+    { "file": "DriverHome.dc.html", "page": "page-1", "x": 1470, "y": 0, "w": 390, "h": 844, "title": "Driver — online & offer" },
+    { "file": "Earnings.dc.html", "page": "page-1", "x": 1960, "y": 0, "w": 390, "h": 844, "title": "Driver — earnings" },
+    { "file": "Tokens.dc.html", "page": "page-1", "x": 0, "y": 1000, "w": 1120, "h": 700, "title": "Design system" },
+
+    { "file": "WireRider.dc.html", "page": "page-2", "x": 0, "y": 0, "w": 1740, "h": 880, "title": "Rider flow" },
+    { "file": "WireDriver.dc.html", "page": "page-2", "x": 0, "y": 1040, "w": 1420, "h": 880, "title": "Driver flow" },
+
+    { "file": "WireFlow.dc.html", "page": "page-3", "x": 0, "y": 0, "w": 1400, "h": 760, "title": "One trip, end to end" },
+    { "file": "Stack.dc.html", "page": "page-3", "x": 0, "y": 920, "w": 1320, "h": 1400, "title": "Build stack & sequence" }
+  ],
+  "annotations": [
+    { "id": "mock-note", "page": "page-1", "x": 0, "y": -190, "w": 700, "text": "v0.2 — Daylight. Rebuilt from research, not taste.\n\nLight ground because this app is used in equatorial sun, where light mode tests 5.78 against dark mode's 4.29 for readability. The phone's own font for the interface, because our riders are on Android Go handsets paying by the megabyte. Green for actions, because MTN yellow and Orange orange already sit on the payment screen. 48dp targets and 14sp minimum type, because the first version had 9px labels.\n\nSample data throughout: fares, names and plates are placeholders until the corridor is priced by hand." },
+    { "id": "wire-note", "page": "page-2", "x": 0, "y": -150, "w": 560, "text": "Low-fi on purpose. Structure and sequence first — argue with these before anything gets styled." },
+    { "id": "flow-note", "page": "page-3", "x": 0, "y": -150, "w": 560, "text": "The amber boxes are where this business is won or lost: price shown before booking, PIN at the meeting point, and the driver keeping the whole fare." }
+  ],
+  "launch": { "view": "canvas", "page": "page-1" }
+}

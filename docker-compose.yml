@@ -1,0 +1,48 @@
+# The two services the API cannot run without, for local development only.
+#
+# Production is Neon and Upstash — see the build stack sheet. This file exists so
+# that a fresh clone can run migrations and the seed without anyone signing up
+# for anything first.
+#
+#   docker compose up -d
+#   cd api && npx prisma migrate dev && npm run seed
+#
+# Postgres is on 5433, not 5432. A developer machine here already has a local
+# PostgreSQL service on the default port, and the one thing worse than no
+# database is silently migrating the wrong one.
+
+services:
+  postgres:
+    # PostGIS, not plain Postgres: zone boundaries are geography columns and the
+    # point-in-polygon zone lookup is ST_Contains.
+    image: postgis/postgis:16-3.4
+    container_name: fako-postgres
+    environment:
+      POSTGRES_USER: fako
+      POSTGRES_PASSWORD: fako
+      POSTGRES_DB: fako_ride
+    ports:
+      - "5433:5432"
+    volumes:
+      - fako-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fako -d fako_ride"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    # Driver positions and the offer clock. Nothing here needs to survive a
+    # restart, so there is no volume and that is deliberate.
+    image: redis:7-alpine
+    container_name: fako-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  fako-pgdata:

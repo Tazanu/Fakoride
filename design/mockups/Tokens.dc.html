@@ -1,0 +1,134 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Roboto:wght@400;500;700&display=swap">
+  <style>
+    body { margin: 0; font-family: "Roboto", "Helvetica Neue", Arial, sans-serif; color: #111A15; }
+    a { color: #00693E; } a:hover { color: #005432; }
+    .d { font-family: "Barlow Semi Condensed", "Roboto Condensed", Arial Narrow, sans-serif; }
+    .sheet { width: 1240px; height: 1000px; box-sizing: border-box; background: #FAFAF7; padding: 40px 44px; display: flex; flex-direction: column; gap: 26px; }
+    .cap { font-size: 12px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: #5E6F66; }
+    .rule { background: #FFFFFF; border: 1px solid #E2E6DF; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+    .rule b { font-size: 16px; font-weight: 700; line-height: 1.25; }
+    .rule p { margin: 0; font-size: 13.5px; line-height: 1.5; color: #3F4E46; }
+    .why { font-size: 12px; line-height: 1.45; color: #5E6F66; border-left: 3px solid #00693E; padding-left: 10px; }
+    .sw { display: flex; flex-direction: column; gap: 6px; }
+    .sw i { display: block; height: 54px; border-radius: 8px; border: 1px solid #E2E6DF; }
+    .sw b { font-size: 13px; font-weight: 500; }
+    .sw span { font-size: 11.5px; color: #5E6F66; }
+    .pass { color: #00693E; font-weight: 700; }
+  </style>
+</helmet>
+
+<div class="sheet">
+
+  <div style="display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap">
+    <span class="d" style="font-size: 32px; font-weight: 700">Daylight</span>
+    <span class="cap">The Fako Ride design system &middot; v0.2 &middot; rebuilt from research, 13 Sept 2026</span>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px">
+    <div class="rule">
+      <b>Light ground, not dark</b>
+      <p>Near-white surfaces everywhere. A night variant exists for evening rides, and it is the exception.</p>
+      <p class="why">This app is used standing at Checkpoint at one in the afternoon, two hundred kilometres from the equator. In bright light, readability tests light mode at 5.78 against dark mode's 4.29, and only 35% of people prefer dark outdoors. The first version got this backwards.</p>
+    </div>
+    <div class="rule">
+      <b>The interface ships in the phone's own font</b>
+      <p>Roboto on Android, San Francisco on iOS. No webfont for interface text.</p>
+      <p class="why">Our riders are on Tecno, Infinix and itel handsets running Android Go with 2 GB of memory, paying by the megabyte. A bundled UI font costs APK weight and a flash of invisible text on exactly those devices. Roboto is already on the phone, already tuned for small sizes, and costs nothing.</p>
+    </div>
+    <div class="rule">
+      <b>One condensed face, for money and names only</b>
+      <p>Barlow Semi Condensed, two weights, subset. Fares, headings and the wordmark. Nothing else.</p>
+      <p class="why">French runs 20&ndash;25% longer than English, and short button labels expand the most. A semi-condensed display face absorbs that, and a transit-signage grotesque suits a mobility product. Roughly 20 KB, spent deliberately.</p>
+    </div>
+    <div class="rule">
+      <b>Green is the action colour, and it had to be</b>
+      <p>Deep green for every primary action, verified badge and confirmed state.</p>
+      <p class="why">MTN MoMo is yellow and Orange Money is orange, and both sit on the payment screen as brand chips. An amber or yellow call-to-action &mdash; which is what the first version used &mdash; competes with a payment brand the user is trying to choose between. Green is the only strong colour left that means nothing else here.</p>
+    </div>
+    <div class="rule">
+      <b>Thumbs, not cursors</b>
+      <p>Every target at least 48&times;48dp with 8dp between. Body text never below 14sp. Labels never below 12px.</p>
+      <p class="why">Material's Android minimum, and the thing the first version broke worst: it had 9px navigation labels and 11.5px body copy, unreadable one-handed in sun on a 5-inch screen.</p>
+    </div>
+    <div class="rule">
+      <b>Dense with facts, single in action</b>
+      <p>Show prices, distances, driver history and demand up front. One primary button per screen.</p>
+      <p class="why">Google's work on the next billion users found Western minimalism loses against the sensory density people here live in &mdash; sparse screens read as empty, not calm. But ride-hailing rewards the shortest possible booking flow. So: crowd the screen with information that removes a step, never with decoration.</p>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 34px">
+
+    <div style="display: flex; flex-direction: column; gap: 13px">
+      <span class="cap">Palette &mdash; every pair measured, not eyeballed</span>
+      <div style="display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 12px">
+        <div class="sw"><i style="background: #FAFAF7"></i><b>Paper</b><span>#FAFAF7</span></div>
+        <div class="sw"><i style="background: #FFFFFF"></i><b>Card</b><span>#FFFFFF</span></div>
+        <div class="sw"><i style="background: #111A15; border-color: #111A15"></i><b>Ink</b><span>17.0:1</span></div>
+        <div class="sw"><i style="background: #5E6F66; border-color: #5E6F66"></i><b>Muted</b><span>5.1:1</span></div>
+        <div class="sw"><i style="background: #00693E; border-color: #00693E"></i><b>Green</b><span>6.8:1</span></div>
+        <div class="sw"><i style="background: #C0102E; border-color: #C0102E"></i><b>Help red</b><span>6.3:1</span></div>
+      </div>
+      <p style="margin: 0; font-size: 13px; line-height: 1.55; color: #3F4E46">
+        Ratios are against white, computed rather than guessed. Everything clears the 4.5:1 WCAG floor for body text with room to spare, which is what daylight on a cheap LCD actually demands. The muted grey started at #6B7C73 and failed at 4.42:1, so it was darkened until it passed. Hill-rate amber (#8A5200, 6.4:1) appears as text only, never as a surface, so it can never be mistaken for an MTN chip.
+      </p>
+      <span class="cap" style="margin-top: 4px">Night variant &mdash; after dark only</span>
+      <div style="display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 12px">
+        <div class="sw"><i style="background: #101714; border-color: #101714"></i><b>Night</b><span>ground</span></div>
+        <div class="sw"><i style="background: #1A231E; border-color: #1A231E"></i><b>Card</b><span>surface</span></div>
+        <div class="sw"><i style="background: #E8EDE9"></i><b>Ink</b><span>15.4:1</span></div>
+        <div class="sw"><i style="background: #9FB0A6"></i><b>Muted</b><span>7.1:1</span></div>
+        <div class="sw"><i style="background: #35C47A; border-color: #35C47A"></i><b>Green</b><span>7.2:1</span></div>
+        <div class="sw"><i style="background: #FF6B6B; border-color: #FF6B6B"></i><b>Help red</b><span>5.8:1</span></div>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 13px">
+      <span class="cap">Type &mdash; two families, six sizes</span>
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; align-items: baseline; gap: 14px; border-bottom: 1px solid #E2E6DF; padding-bottom: 9px">
+          <span style="font-size: 11.5px; color: #5E6F66; width: 96px; flex-shrink: 0">Barlow SC 700 / 46</span>
+          <span class="d" style="font-size: 42px; font-weight: 700; line-height: 1">250 <span style="font-size: 15px; font-weight: 500; color: #5E6F66; font-family: Roboto, Arial">FCFA</span></span>
+        </div>
+        <div style="display: flex; align-items: baseline; gap: 14px; border-bottom: 1px solid #E2E6DF; padding-bottom: 9px">
+          <span style="font-size: 11.5px; color: #5E6F66; width: 96px; flex-shrink: 0">Barlow SC 700 / 26</span>
+          <span class="d" style="font-size: 26px; font-weight: 700">Where are you going?</span>
+        </div>
+        <div style="display: flex; align-items: baseline; gap: 14px; border-bottom: 1px solid #E2E6DF; padding-bottom: 9px">
+          <span style="font-size: 11.5px; color: #5E6F66; width: 96px; flex-shrink: 0">Roboto 500 / 16</span>
+          <span style="font-size: 16px; font-weight: 500">UB Main Gate</span>
+        </div>
+        <div style="display: flex; align-items: baseline; gap: 14px; border-bottom: 1px solid #E2E6DF; padding-bottom: 9px">
+          <span style="font-size: 11.5px; color: #5E6F66; width: 96px; flex-shrink: 0">Roboto 400 / 14</span>
+          <span style="font-size: 14px; color: #3F4E46">1.4 km &middot; about 5 minutes</span>
+        </div>
+        <div style="display: flex; align-items: baseline; gap: 14px">
+          <span style="font-size: 11.5px; color: #5E6F66; width: 96px; flex-shrink: 0">Roboto 500 / 12 caps</span>
+          <span class="cap">Pick-up</span>
+        </div>
+      </div>
+
+      <span class="cap" style="margin-top: 6px">Controls at real size</span>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center">
+        <span class="d" style="min-height: 56px; background: #00693E; color: #FFFFFF; font-size: 20px; font-weight: 700; border-radius: 8px; padding: 0 22px; display: flex; align-items: center">BOOK THIS BIKE</span>
+        <span style="min-height: 56px; border: 1px solid #C9D1C8; border-radius: 8px; padding: 0 22px; font-size: 16px; font-weight: 500; color: #3F4E46; display: flex; align-items: center">Leave it</span>
+        <span class="d" style="min-height: 56px; background: #C0102E; color: #FFFFFF; font-size: 20px; font-weight: 700; border-radius: 8px; padding: 0 22px; display: flex; align-items: center">GET HELP</span>
+      </div>
+      <p style="margin: 0; font-size: 12.5px; line-height: 1.5; color: #5E6F66">
+        Buttons are min-height with padding, never fixed width or height &mdash; &ldquo;Book this bike&rdquo; becomes &ldquo;R&eacute;server cette moto&rdquo; and has to wrap without breaking the row.
+      </p>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

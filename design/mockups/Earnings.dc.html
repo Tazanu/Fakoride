@@ -1,0 +1,120 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=Roboto:wght@400;500;700&display=swap">
+  <style>
+    body { margin: 0; font-family: "Roboto", "Helvetica Neue", Arial, sans-serif; }
+    a { color: #00693E; } a:hover { color: #005432; }
+    .d { font-family: "Barlow Semi Condensed", "Roboto Condensed", Arial Narrow, sans-serif; }
+    .lbl { font-size: 12px; font-weight: 500; letter-spacing: .07em; text-transform: uppercase; color: #5E6F66; }
+  </style>
+</helmet>
+
+<div style="width: 390px; height: 844px; overflow: hidden; background: #FAFAF7; color: #111A15; display: flex; flex-direction: column">
+
+  <div style="display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 4px; background: #FFFFFF; border-bottom: 1px solid #E2E6DF">
+    <div style="width: 48px; height: 48px; display: grid; place-items: center">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111A15" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 6l-6 6 6 6"></path></svg>
+    </div>
+    <span class="d" style="font-size: 22px; font-weight: 700">My money</span>
+  </div>
+
+  <div style="background: #FFFFFF; padding: 16px; display: flex; flex-direction: column; gap: 5px; border-bottom: 1px solid #E2E6DF">
+    <span class="lbl">This week &middot; Mon 7 to Sun 13 Sept</span>
+    <div style="display: flex; align-items: baseline; gap: 8px">
+      <span class="d" style="font-size: 52px; font-weight: 700; line-height: 1">38,400</span>
+      <span style="font-size: 16px; font-weight: 500; color: #5E6F66">FCFA</span>
+    </div>
+    <span style="font-size: 14px; font-weight: 500; color: #00693E">6,200 more than last week</span>
+  </div>
+
+  <div style="padding: 16px; display: flex; flex-direction: column; gap: 16px; flex-grow: 1">
+
+    <div style="background: #FFFFFF; border: 1px solid #E2E6DF; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+      <svg width="318" height="146" viewBox="0 0 318 146" style="display: block; max-width: 100%">
+        <g stroke="#E2E6DF" stroke-width="1">
+          <line x1="26" y1="8" x2="318" y2="8"></line>
+          <line x1="26" y1="52" x2="318" y2="52"></line>
+          <line x1="26" y1="96" x2="318" y2="96"></line>
+        </g>
+        <g fill="#5E6F66" font-family="Roboto, Arial" font-size="11">
+          <text x="0" y="12">10k</text><text x="0" y="56">5k</text><text x="0" y="100">0</text>
+        </g>
+        <g>
+          <rect x="34" y="74" width="30" height="22" fill="#C9D1C8" rx="2"></rect>
+          <rect x="76" y="50" width="30" height="46" fill="#00693E" rx="2"></rect>
+          <rect x="118" y="42" width="30" height="54" fill="#00693E" rx="2"></rect>
+          <rect x="160" y="56" width="30" height="40" fill="#00693E" rx="2"></rect>
+          <rect x="202" y="34" width="30" height="62" fill="#00693E" rx="2"></rect>
+          <rect x="244" y="20" width="30" height="76" fill="#00693E" rx="2"></rect>
+          <rect x="286" y="66" width="30" height="30" fill="#9EBCAB" rx="2"></rect>
+        </g>
+        <g fill="#3F4E46" font-family="Roboto, Arial" font-size="12" text-anchor="middle">
+          <text x="49" y="116">Mon</text><text x="91" y="116">Tue</text><text x="133" y="116">Wed</text>
+          <text x="175" y="116">Thu</text><text x="217" y="116">Fri</text><text x="259" y="116">Sat</text><text x="301" y="116">Sun</text>
+        </g>
+        <text x="49" y="134" fill="#5E6F66" font-family="Roboto, Arial" font-size="11" text-anchor="middle">ghost town</text>
+        <text x="301" y="134" fill="#5E6F66" font-family="Roboto, Arial" font-size="11" text-anchor="middle">today</text>
+      </svg>
+      <div style="display: flex; align-items: center; gap: 9px; border-top: 1px solid #E2E6DF; padding-top: 12px">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#5E6F66" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v.01M12 11v5"></path></svg>
+        <span style="font-size: 13px; color: #3F4E46; flex-grow: 1">A quiet Monday never counts against you.</span>
+      </div>
+    </div>
+
+    <div style="background: #FFFFFF; border: 1px solid #E2E6DF; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px">
+        <div style="display: flex; flex-direction: column; gap: 3px">
+          <span style="font-size: 16px; font-weight: 500">500 FCFA a day, nothing per ride</span>
+          <span style="font-size: 13px; color: #5E6F66">Taken from MoMo each morning you work</span>
+        </div>
+        <span style="font-size: 13px; font-weight: 700; color: #00693E; background: #E6F1EB; border-radius: 6px; padding: 6px 10px; white-space: nowrap">PAID</span>
+      </div>
+      <div style="display: flex; gap: 6px">
+        <span style="flex-grow: 1; height: 7px; border-radius: 4px; background: #00693E"></span>
+        <span style="flex-grow: 1; height: 7px; border-radius: 4px; background: #00693E"></span>
+        <span style="flex-grow: 1; height: 7px; border-radius: 4px; background: #00693E"></span>
+        <span style="flex-grow: 1; height: 7px; border-radius: 4px; background: #00693E"></span>
+        <span style="flex-grow: 1; height: 7px; border-radius: 4px; background: #00693E"></span>
+        <span style="flex-grow: 1; height: 7px; border-radius: 4px; background: #E2E6DF"></span>
+      </div>
+      <span style="font-size: 14px; color: #3F4E46">5 days of 6 paid &mdash; 2,500 FCFA. You kept <span style="font-weight: 700; color: #00693E">35,900 FCFA</span>.</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <span class="lbl">Today</span>
+      <div style="background: #FFFFFF; border: 1px solid #E2E6DF; border-radius: 10px; padding: 4px 14px">
+        <div style="display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #E2E6DF; min-height: 48px">
+          <span style="font-size: 13px; color: #5E6F66; width: 46px">17:42</span>
+          <span style="font-size: 15px; flex-grow: 1">Checkpoint &rarr; UB gate</span>
+          <span class="d" style="font-size: 19px; font-weight: 700">250</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #E2E6DF; min-height: 48px">
+          <span style="font-size: 13px; color: #5E6F66; width: 46px">17:10</span>
+          <span style="font-size: 15px; flex-grow: 1">Malingo &rarr; Great Soppo</span>
+          <span class="d" style="font-size: 19px; font-weight: 700">450</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; padding: 12px 0; min-height: 48px">
+          <span style="font-size: 13px; color: #5E6F66; width: 46px">16:35</span>
+          <span style="font-size: 15px; flex-grow: 1">Mile 17 &rarr; Molyko</span>
+          <span class="d" style="font-size: 19px; font-weight: 700">300</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding: 12px 16px 18px; background: #FFFFFF; border-top: 1px solid #E2E6DF">
+    <div style="min-height: 56px; background: #00693E; border-radius: 8px; display: flex; align-items: center; justify-content: center; padding: 8px 14px">
+      <span class="d" style="font-size: 21px; font-weight: 700; color: #FFFFFF">SEND IT TO MY MOMO</span>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

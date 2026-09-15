@@ -1,0 +1,146 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=Roboto:wght@400;500;700&display=swap">
+  <style>
+    body { margin: 0; font-family: "Roboto", "Helvetica Neue", Arial, sans-serif; }
+    a { color: #00693E; } a:hover { color: #005432; }
+    .d { font-family: "Barlow Semi Condensed", "Roboto Condensed", Arial Narrow, sans-serif; }
+    .lbl { font-size: 12px; font-weight: 500; letter-spacing: .07em; text-transform: uppercase; color: #5E6F66; }
+  </style>
+</helmet>
+
+<div style="width: 390px; height: 844px; overflow: hidden; background: #FAFAF7; color: #111A15; display: flex; flex-direction: column">
+
+  <!-- header · 48px touch targets -->
+  <div style="display: flex; align-items: center; gap: 12px; padding: 14px 16px 10px; background: #FFFFFF; border-bottom: 1px solid #E2E6DF">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#00693E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17h3l2-5h7l3 5h2"></path><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle><path d="M12 12V7h4"></path></svg>
+    <span class="d" style="font-size: 21px; font-weight: 700; letter-spacing: .01em; flex-grow: 1">FAKO RIDE</span>
+    <div style="display: flex; height: 48px; align-items: center">
+      <span style="font-size: 14px; font-weight: 700; color: #00693E; padding: 6px 10px; background: #E6F1EB; border-radius: 6px 0 0 6px">EN</span>
+      <span style="font-size: 14px; font-weight: 500; color: #5E6F66; padding: 6px 10px; background: #F0F2EE; border-radius: 0 6px 6px 0">FR</span>
+    </div>
+    <div style="width: 48px; height: 48px; display: grid; place-items: center">
+      <div style="width: 38px; height: 38px; border-radius: 50%; background: #E6F1EB; display: grid; place-items: center">
+        <span class="d" style="font-size: 17px; font-weight: 700; color: #00693E">M</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- service status -->
+  <div style="display: flex; align-items: center; gap: 9px; padding: 11px 16px; background: #E6F1EB">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#00693E" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M8.5 12.3l2.3 2.3 4.7-5"></path></svg>
+    <span style="font-size: 14px; color: #14372A; flex-grow: 1">Bikes running normally in Buea today</span>
+    <span class="d" style="font-size: 17px; font-weight: 700; color: #00693E">7 near</span>
+  </div>
+
+  <!-- map -->
+  <div style="height: 176px; position: relative; overflow: hidden; border-bottom: 1px solid #E2E6DF">
+    <svg width="390" height="176" viewBox="0 0 390 176" style="display: block">
+      <rect width="390" height="176" fill="#EDEFE8"></rect>
+      <g stroke="#FFFFFF" stroke-width="11" fill="none" stroke-linecap="round">
+        <path d="M-10 128 L120 114 L250 104 L400 86"></path>
+        <path d="M46 176 L86 124 L124 74 L168 22"></path>
+        <path d="M244 176 L288 122 L312 82"></path>
+      </g>
+      <g stroke="#DDE2D8" stroke-width="4" fill="none">
+        <path d="M0 50 L390 40"></path><path d="M0 84 L390 70"></path><path d="M160 176 L182 106 L390 100"></path>
+      </g>
+      <g fill="#C9D1C8"><rect x="20" y="12" width="46" height="22" rx="3"></rect><rect x="300" y="130" width="54" height="26" rx="3"></rect><rect x="210" y="140" width="40" height="20" rx="3"></rect></g>
+      <path d="M88 124 L112 78 L148 28" stroke="#00693E" stroke-width="4" fill="none" stroke-linecap="round"></path>
+      <g fill="#111A15"><circle cx="62" cy="136" r="5"></circle><circle cx="134" cy="106" r="5"></circle><circle cx="222" cy="92" r="5"></circle></g>
+      <circle cx="88" cy="124" r="13" fill="#00693E"></circle><circle cx="88" cy="124" r="4.5" fill="#FFFFFF"></circle>
+    </svg>
+    <div style="position: absolute; top: 12px; right: 12px; background: #FFFFFF; border: 1px solid #C9D1C8; border-radius: 6px; padding: 7px 10px">
+      <span class="lbl" style="color: #111A15">Molyko</span>
+    </div>
+  </div>
+
+  <!-- booking sheet -->
+  <div style="flex-grow: 1; background: #FFFFFF; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+
+    <span class="d" style="font-size: 26px; font-weight: 700; letter-spacing: -.005em; line-height: 1.1">Where are you going?</span>
+
+    <!-- one-tap repeats: density that removes steps rather than adding them -->
+    <div style="display: flex; gap: 8px">
+      <div style="flex-grow: 1; height: 48px; border: 1px solid #C9D1C8; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 10px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5E6F66" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg>
+        <span style="font-size: 14px; font-weight: 500">UB gate</span>
+        <span class="d" style="font-size: 16px; font-weight: 700; color: #00693E">250</span>
+      </div>
+      <div style="flex-grow: 1; height: 48px; border: 1px solid #C9D1C8; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 10px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5E6F66" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg>
+        <span style="font-size: 14px; font-weight: 500">Mile 17</span>
+        <span class="d" style="font-size: 16px; font-weight: 700; color: #00693E">300</span>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 12px; border: 1px solid #C9D1C8; border-radius: 8px; padding: 10px 12px; min-height: 56px">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00693E" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg>
+      <div style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1">
+        <span class="lbl">Pick-up</span>
+        <span style="font-size: 16px; font-weight: 500">Checkpoint, Molyko</span>
+      </div>
+      <span style="font-size: 14px; font-weight: 700; color: #00693E">Change</span>
+    </div>
+
+    <span class="lbl">Fixed prices from Checkpoint</span>
+
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <div style="display: flex; align-items: center; gap: 12px; border: 2px solid #00693E; background: #F3F9F5; border-radius: 8px; padding: 10px 12px; min-height: 64px">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00693E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.1 7-11a7 7 0 1 0-14 0c0 4.9 7 11 7 11z"></path><circle cx="12" cy="10" r="2.4"></circle></svg>
+        <div style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1">
+          <span style="font-size: 16px; font-weight: 500">UB Main Gate</span>
+          <span style="font-size: 13px; color: #5E6F66">1.4 km &middot; about 5 min</span>
+        </div>
+        <span class="d" style="font-size: 27px; font-weight: 700; color: #00693E">250</span>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 12px; border: 1px solid #E2E6DF; border-radius: 8px; padding: 10px 12px; min-height: 64px">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5E6F66" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.1 7-11a7 7 0 1 0-14 0c0 4.9 7 11 7 11z"></path><circle cx="12" cy="10" r="2.4"></circle></svg>
+        <div style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1">
+          <span style="font-size: 16px; font-weight: 500">Great Soppo</span>
+          <span style="font-size: 13px; color: #8A5200; font-weight: 500">3.1 km &middot; hill price</span>
+        </div>
+        <span class="d" style="font-size: 27px; font-weight: 700">450</span>
+      </div>
+    </div>
+
+    <div style="flex-grow: 1"></div>
+
+    <!-- one primary action, sized for a French label -->
+    <div style="min-height: 56px; background: #00693E; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 8px 14px">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17h3l2-5h7l3 5h2"></path><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+      <span class="d" style="font-size: 20px; font-weight: 700; color: #FFFFFF; letter-spacing: .01em">BOOK THIS BIKE &middot; 250 FCFA</span>
+    </div>
+  </div>
+
+  <!-- bottom nav · 48px targets, labels never below 12px -->
+  <div style="display: flex; background: #FFFFFF; border-top: 1px solid #E2E6DF; padding: 6px 4px 10px">
+    <div style="flex-grow: 1; min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00693E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7v9H4z"></path></svg>
+      <span style="font-size: 12px; font-weight: 700; color: #00693E">Ride</span>
+    </div>
+    <div style="flex-grow: 1; min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5E6F66" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg>
+      <span style="font-size: 12px; color: #5E6F66">Trips</span>
+    </div>
+    <div style="flex-grow: 1; min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5E6F66" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.2-3 7.4-7 9-4-1.6-7-4.8-7-9V6z"></path></svg>
+      <span style="font-size: 12px; color: #5E6F66">Safety</span>
+    </div>
+    <div style="flex-grow: 1; min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5E6F66" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="8" r="3.4"></circle><path d="M5 20c0-3.6 3.1-5.6 7-5.6s7 2 7 5.6"></path></svg>
+      <span style="font-size: 12px; color: #5E6F66">Account</span>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

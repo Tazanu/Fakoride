@@ -1,0 +1,163 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Chivo:wght@400;700;900&family=Chivo+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; font-family: "Chivo", "Segoe UI", system-ui, sans-serif; color: #2B2B28; }
+    a { color: #B8770C; } a:hover { color: #8A5908; }
+    .sheet { width: 1740px; height: 880px; background: #F7F6F1; padding: 34px 40px; box-sizing: border-box; display: flex; flex-direction: column; gap: 22px; }
+    .sheet-head { display: flex; align-items: baseline; gap: 16px; }
+    .sheet-title { font-size: 22px; font-weight: 900; letter-spacing: -.01em; }
+    .sheet-sub { font-family: "Chivo Mono", monospace; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #8A8A80; }
+    .frames { display: flex; gap: 40px; }
+    .col { display: flex; flex-direction: column; gap: 12px; width: 300px; }
+    .step { display: flex; align-items: center; gap: 9px; }
+    .step-n { font-family: "Chivo Mono", monospace; font-size: 11px; font-weight: 500; color: #F7F6F1; background: #2B2B28; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 3px; }
+    .step-t { font-size: 14px; font-weight: 700; }
+    .frame { width: 300px; height: 600px; border: 2px solid #2B2B28; border-radius: 14px; background: #FFF; padding: 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; }
+    .bar { height: 30px; background: #E6E5DE; border-radius: 4px; display: flex; align-items: center; padding: 0 10px; font-family: "Chivo Mono", monospace; font-size: 10px; letter-spacing: .1em; color: #6E6E66; }
+    .map { flex-grow: 1; border: 1.5px dashed #B9B8AF; border-radius: 6px; display: grid; place-items: center; font-family: "Chivo Mono", monospace; font-size: 10.5px; letter-spacing: .12em; color: #9C9B92; background: repeating-linear-gradient(45deg, #FBFBF8, #FBFBF8 9px, #F2F1EB 9px, #F2F1EB 18px); }
+    .box { border: 1.5px solid #C9C8BF; border-radius: 5px; padding: 9px 10px; display: flex; flex-direction: column; gap: 5px; }
+    .box.key { border-color: #D4880E; border-width: 2px; background: #FDF6E7; }
+    .lbl { font-family: "Chivo Mono", monospace; font-size: 8.5px; letter-spacing: .12em; color: #9C9B92; }
+    .ln { height: 8px; border-radius: 2px; background: #DEDDD4; }
+    .ln.s { width: 45%; } .ln.m { width: 70%; } .ln.l { width: 92%; }
+    .ln.dark { background: #B4B3A9; }
+    .row { display: flex; align-items: center; gap: 8px; }
+    .grow { flex-grow: 1; }
+    .price { font-family: "Chivo Mono", monospace; font-size: 13px; font-weight: 500; color: #2B2B28; }
+    .big { font-size: 30px; font-weight: 900; letter-spacing: -.02em; }
+    .btn { height: 42px; border-radius: 6px; background: #2B2B28; color: #F7F6F1; display: grid; place-items: center; font-size: 12.5px; font-weight: 700; letter-spacing: .04em; }
+    .btn.ghost { background: transparent; border: 1.5px solid #C9C8BF; color: #6E6E66; }
+    .chipset { display: flex; gap: 6px; }
+    .chip { border: 1.5px solid #C9C8BF; border-radius: 999px; padding: 5px 10px; font-size: 10.5px; color: #6E6E66; }
+    .chip.on { border-color: #D4880E; color: #B8770C; background: #FDF6E7; }
+    .circle { width: 44px; height: 44px; border-radius: 50%; border: 1.5px solid #C9C8BF; }
+    .note { font-family: "Caveat", cursive; font-size: 17px; line-height: 1.3; color: #B8770C; display: flex; gap: 7px; }
+    .note::before { content: "\2937"; font-family: "Chivo", sans-serif; font-size: 13px; }
+    .nav { display: flex; justify-content: space-between; padding-top: 4px; }
+    .nav span { width: 34px; height: 14px; border-radius: 3px; background: #E6E5DE; }
+    .nav span.on { background: #D4880E; }
+  </style>
+</helmet>
+
+<div class="sheet">
+  <div class="sheet-head">
+    <span class="sheet-title">Rider flow &mdash; wireframe</span>
+    <span class="sheet-sub">Book a bendskin &middot; 5 screens &middot; low fidelity</span>
+  </div>
+
+  <div class="frames">
+
+    <!-- 1 -->
+    <div class="col">
+      <div class="step"><span class="step-n">1</span><span class="step-t">Home &amp; pickup</span></div>
+      <div class="frame">
+        <div class="bar">SERVICE STATUS &middot; BUEA</div>
+        <div class="map">MAP &middot; BIKES NEARBY</div>
+        <div class="box"><span class="lbl">PICKUP (AUTO-DETECTED)</span><div class="ln m dark"></div></div>
+        <div class="box key">
+          <span class="lbl">COMMON DROP-OFFS</span>
+          <div class="row"><div class="ln m dark"></div><span class="grow"></span><span class="price">250</span></div>
+          <div class="row"><div class="ln s"></div><span class="grow"></span><span class="price">300</span></div>
+          <div class="row"><div class="ln s"></div><span class="grow"></span><span class="price">450</span></div>
+        </div>
+        <div class="btn">BOOK A BENDSKIN</div>
+        <div class="nav"><span class="on"></span><span></span><span></span><span></span></div>
+      </div>
+      <div class="note">Fares are visible before anything is booked &mdash; that is the whole pitch against the roadside.</div>
+    </div>
+
+    <!-- 2 -->
+    <div class="col">
+      <div class="step"><span class="step-n">2</span><span class="step-t">Confirm the fare</span></div>
+      <div class="frame">
+        <div class="map" style="flex-grow: 0; height: 150px">ROUTE PREVIEW</div>
+        <div class="box"><span class="lbl">FROM / TO</span><div class="ln l dark"></div><div class="ln m dark"></div></div>
+        <div class="box key">
+          <span class="lbl">FIXED FARE &middot; ZONE PAIR</span>
+          <div class="row"><span class="big">250</span><span class="grow"></span><span class="chip on">NO SURGE</span></div>
+        </div>
+        <div class="box">
+          <span class="lbl">PAY WITH</span>
+          <div class="chipset"><span class="chip on">Cash</span><span class="chip">MoMo</span><span class="chip">Orange</span></div>
+        </div>
+        <div class="box">
+          <span class="lbl">PREFERENCES</span>
+          <div class="chipset"><span class="chip">Helmet</span><span class="chip">Woman driver</span></div>
+        </div>
+        <span class="grow"></span>
+        <div class="btn">FIND ME A RIDER</div>
+      </div>
+      <div class="note">One price, shown once, never renegotiated at the destination.</div>
+    </div>
+
+    <!-- 3 -->
+    <div class="col">
+      <div class="step"><span class="step-n">3</span><span class="step-t">Matched</span></div>
+      <div class="frame">
+        <div class="bar">SEARCHING &rarr; MATCHED &middot; 0:38</div>
+        <div class="map" style="flex-grow: 0; height: 190px">DRIVER APPROACHING</div>
+        <div class="box">
+          <span class="lbl">YOUR RIDER</span>
+          <div class="row"><span class="circle"></span><div style="display:flex;flex-direction:column;gap:5px;flex-grow:1"><div class="ln m dark"></div><div class="ln s"></div><div class="ln s"></div></div></div>
+        </div>
+        <div class="box key">
+          <span class="lbl">RIDE PIN &mdash; GIVE TO RIDER</span>
+          <div class="row"><span class="big">4072</span></div>
+        </div>
+        <div class="row"><div class="btn ghost grow">Call</div><div class="btn ghost grow">Share</div></div>
+        <span class="grow"></span>
+        <div class="btn ghost">Cancel</div>
+      </div>
+      <div class="note">PIN and plate before the bike arrives. Verification is the product, not a setting.</div>
+    </div>
+
+    <!-- 4 -->
+    <div class="col">
+      <div class="step"><span class="step-n">4</span><span class="step-t">On the trip</span></div>
+      <div class="frame">
+        <div class="bar">IN TRIP &middot; ETA 5 MIN</div>
+        <div class="map">LIVE POSITION</div>
+        <div class="box"><span class="lbl">SHARED WITH</span><div class="row"><div class="ln s dark"></div><span class="grow"></span><span class="chip on">LIVE</span></div></div>
+        <div class="row"><div class="btn ghost grow">Call</div><div class="btn ghost grow">Share</div><div class="btn grow" style="background:#C4462A">SOS</div></div>
+        <div class="box"><span class="lbl">TO PAY &middot; CASH</span><div class="row"><span class="big">250</span></div></div>
+      </div>
+      <div class="note">Works on a dropped connection &mdash; trip state is queued locally and syncs after.</div>
+    </div>
+
+    <!-- 5 -->
+    <div class="col">
+      <div class="step"><span class="step-n">5</span><span class="step-t">Arrived &amp; rate</span></div>
+      <div class="frame">
+        <div class="bar">TRIP COMPLETE</div>
+        <div class="box key">
+          <span class="lbl">PAID IN CASH</span>
+          <div class="row"><span class="big">250</span><span class="grow"></span><span class="chip on">RECEIPT</span></div>
+        </div>
+        <div class="box">
+          <span class="lbl">RATE YOUR RIDER</span>
+          <div class="row"><span class="circle"></span><div style="display:flex;flex-direction:column;gap:5px;flex-grow:1"><div class="ln m dark"></div><div class="ln l"></div></div></div>
+        </div>
+        <div class="box">
+          <span class="lbl">SOMETHING WRONG?</span>
+          <div class="ln l"></div><div class="ln m"></div>
+        </div>
+        <span class="grow"></span>
+        <div class="box"><span class="lbl">RIDE AGAIN</span><div class="row"><div class="ln m dark"></div><span class="grow"></span><span class="price">250</span></div></div>
+        <div class="btn">DONE</div>
+      </div>
+      <div class="note">A complaint a human answers within a day is what a phone call to a bendskin cannot offer.</div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
