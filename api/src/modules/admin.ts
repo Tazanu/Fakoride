@@ -19,6 +19,7 @@ import { ApiError, asyncHandler, param } from "../lib/http";
 import { requireAuth } from "../middleware/auth";
 import { clearDriverPosition } from "../lib/presence";
 import { FARE_ROUNDING_XAF, MIN_FARE_XAF } from "./fare-math";
+import { adminPaymentsRouter } from "./payments/routes";
 import { logger } from "../lib/logger";
 
 // --- the verification queue ------------------------------------------------
@@ -43,6 +44,8 @@ const rejectSchema = z.object({
 export function adminRouter(): Router {
   const router = Router();
   router.use(requireAuth("ADMIN"));
+  // Inherits the ADMIN guard above, so the money views need no guard of their own.
+  router.use(adminPaymentsRouter());
 
   /** The queue. Oldest first — a driver waiting in silence is a driver lost. */
   router.get(

@@ -75,7 +75,30 @@ enum LedgerType {
   FARE_MOBILE
   /// The flat daily access fee. The only thing we actually charge for.
   ACCESS_FEE
+  /// Money sent out to the driver's own MoMo. Reduces what we still owe him.
+  PAYOUT
   ADJUSTMENT
+}
+
+/// What a movement of real money is for.
+enum PaymentPurpose {
+  /// A rider paying a fare by MoMo instead of cash. We hold it until payout.
+  TRIP_FARE
+  /// The daily access fee, debited from the driver.
+  ACCESS_FEE
+  /// Paying a driver what we are holding for him.
+  DRIVER_PAYOUT
+}
+
+/// Fapshi's own status values, kept verbatim rather than translated. A payment
+/// processor's vocabulary is the one place to be literal — inventing our own
+/// names for its states is how reconciliation goes wrong.
+enum PaymentStatus {
+  CREATED
+  PENDING
+  SUCCESSFUL
+  FAILED
+  EXPIRED
 }
 
 /// Every change an admin makes to a driver's standing. Append-only, like trips:
@@ -170,6 +193,7 @@ model Driver {
   ledger     LedgerEntry[]
   accessFees AccessFeeCharge[]
   reviews    DriverReview[]
+  payments   Payment[]
 
   @@index([status, online])
   @@index([plate])
@@ -298,6 +322,7 @@ model Trip {
   shares     TripShare[]
   sosAlerts  SosAlert[]
   complaints Complaint[]
+  payments   Payment[]
 
   @@index([riderId, requestedAt])
   @@index([driverId, requestedAt])
@@ -348,7 +373,8 @@ model AccessFeeCharge {
   providerRef String?
   failureCode String?
 
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
+  payments  Payment[]
 
   @@unique([driverId, serviceDate])
   @@index([paid])
@@ -470,4 +496,50 @@ model DriverReview {
   at     DateTime           @default(now())
 
   @@index([driverId, at])
+}
+
+/// One attempt to move real money, and everything the provider said about it.
+///
+/// Separate from LedgerEntry on purpose. The ledger is what a driver is owed and
+/// owes — our arithmetic, which must always balance. This is what a third party
+/// did with a phone number, which can be PENDING for a minute, fail, be retried,
+/// or arrive twice. Collapsing the two would let a failed MoMo debit silently
+/// change a driver's earnings.
+model Payment {
+  id      String         @id @default(cuid())
+  purpose PaymentPurpose
+  status  PaymentStatus  @default(CREATED)
+
+  /// Always positive. The direction is the purpose, not the sign.
+  amountXaf Int
+  /// The number the money moves to or from, E.164.
+  phone     String
+  /// "mobile money" or "orange money" — Fapshi's spelling, auto-detected if null.
+  medium    String?
+
+  tripId            String?
+  trip              Trip?            @relation(fields: [tripId], references: [id])
+  driverId          String?
+  driver            Driver?          @relation(fields: [driverId], references: [id])
+  /// Set for an ACCESS_FEE payment, so a day is never charged twice.
+  accessFeeChargeId String?
+  accessFeeCharge   AccessFeeCharge? @relation(fields: [accessFeeChargeId], references: [id])
+
+  provider         String  @default("fapshi")
+  /// Fapshi's transId. Unique so a webhook replay cannot create a second row.
+  providerTransId  String? @unique
+  /// The mobile operator's own reference, for when somebody disputes it.
+  financialTransId String?
+  failureReason    String?
+
+  /// Written once the money actually landed, never before.
+  ledgerEntryId String? @unique
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  confirmedAt DateTime?
+
+  @@index([status, createdAt])
+  @@index([driverId, createdAt])
+  @@index([purpose, status])
 }

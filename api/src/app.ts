@@ -14,6 +14,7 @@ import { adminRouter } from "./modules/admin";
 import { demandRouter } from "./modules/demand";
 import { complaintsRouter } from "./modules/safety";
 import { publicShareRouter } from "./modules/share";
+import { driverPaymentsRouter, paymentsWebhookRouter } from "./modules/payments/routes";
 
 export function createApp(): express.Express {
   const app = express();
@@ -31,12 +32,16 @@ export function createApp(): express.Express {
   app.use("/geo", geoRouter());
   app.use("/fares", faresRouter({ mobileDiscountXaf: env.MOBILE_PAYMENT_DISCOUNT_XAF }));
   app.use("/drivers", driversRouter());
+  // Mounted alongside, not inside, so the money routes stay in one file.
+  app.use("/drivers", driverPaymentsRouter());
   app.use("/trips", tripsRouter());
   app.use("/demand", demandRouter());
   app.use("/admin", adminRouter());
   app.use("/complaints", complaintsRouter());
   // Unauthenticated: the person watching a trip opens a link, nothing more.
   app.use("/share", publicShareRouter());
+  // The provider calls this. Authenticated by a shared secret, not a token.
+  app.use("/payments", paymentsWebhookRouter());
 
   app.use(notFoundHandler);
   app.use(errorHandler);

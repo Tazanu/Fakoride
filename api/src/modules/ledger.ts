@@ -21,22 +21,33 @@ export type { EarningsDay, FeeRow, LedgerRow } from "./earnings-math";
 
 const MS_PER_DAY = 86_400_000;
 
-/** Records the completed fare. Cash entries are informational — we held nothing. */
+/**
+ * Record a completed cash fare.
+ *
+ * Informational: the rider put the notes in the driver's hand and we never
+ * touched them. Writing it down is how the earnings screen can show him a week
+ * that matches what is in his pocket.
+ *
+ * Mobile fares are deliberately NOT written here. Money that has only been
+ * *asked* for is not money, and a fare whose MoMo prompt is declined must never
+ * have appeared in his earnings — so a FARE_MOBILE entry is written by the
+ * payment service, and only when the provider confirms it landed.
+ */
 export async function recordFare(tripId: string): Promise<void> {
   const trip = await prisma.trip.findUnique({ where: { id: tripId } });
   if (!trip?.driverId) return;
+  if (trip.paymentMethod !== "CASH") return;
 
-  const type = trip.paymentMethod === "CASH" ? "FARE_CASH" : "FARE_MOBILE";
-  const existing = await prisma.ledgerEntry.findFirst({ where: { tripId, type } });
+  const existing = await prisma.ledgerEntry.findFirst({ where: { tripId, type: "FARE_CASH" } });
   if (existing) return; // completing twice must not pay twice
 
   await prisma.ledgerEntry.create({
     data: {
       driverId: trip.driverId,
       tripId,
-      type,
+      type: "FARE_CASH",
       amountXaf: trip.priceXaf,
-      note: trip.paymentMethod === "CASH" ? "Collected directly by the driver" : "Collected by mobile money",
+      note: "Collected directly by the driver",
     },
   });
 }
@@ -97,9 +108,12 @@ export async function driverBalance(driverId: string, since: Date): Promise<Driv
     if (e.type === "FARE_CASH" || e.type === "FARE_MOBILE") {
       earnedXaf += e.amountXaf;
       tripCount += 1;
-    } else {
+    } else if (e.type === "ACCESS_FEE") {
       feesXaf += Math.abs(e.amountXaf);
     }
+    // A PAYOUT is money reaching him, not money taken from him: it moves what
+    // we are holding into his own MoMo and must never read as a fee. An
+    // ADJUSTMENT is a correction ops made and is not his earnings either.
   }
 
   return { earnedXaf, feesXaf, keptXaf: earnedXaf - feesXaf, tripCount };

@@ -29,7 +29,10 @@ const HEALTH_TIMEOUT_MS = 30_000;
 /** The ops account these suites sign in as. Created before the server starts. */
 const ADMIN_PHONE = "+237600000099";
 
-const SUITES = ["01-one-trip.mjs", "02-driver-cancels.mjs", "03-ops-console.mjs"];
+const SUITES = ["01-one-trip.mjs", "02-driver-cancels.mjs", "03-ops-console.mjs", "04-money.mjs"];
+
+/** Fixed, so the money suite can post a webhook the server will actually trust. */
+const WEBHOOK_SECRET = "integration-webhook-secret";
 
 /**
  * Call the tools by their JS entrypoints rather than through npm or npx.
@@ -123,7 +126,19 @@ const server = spawn(process.execPath, [TSX, "src/server.ts"], {
   stdio: ["ignore", "pipe", "pipe"],
   // The suites read OTP codes back out of the log, the way a person would read
   // them off a phone. The console SMS sender exists precisely for this.
-  env: { ...process.env, SMS_PROVIDER: "console", NODE_ENV: "development" },
+  env: {
+    ...process.env,
+    SMS_PROVIDER: "console",
+    NODE_ENV: "development",
+    // Never the real provider: a test run must not be able to move money.
+    MOMO_PROVIDER: "fake",
+    FAPSHI_WEBHOOK_SECRET: WEBHOOK_SECRET,
+    // In production a payment is given 45 seconds to arrive on its own before
+    // we chase the provider. A test should not sit through that, and the code
+    // path being exercised is identical either way.
+    PAYMENT_RECONCILE_AFTER_SECONDS: "1",
+    PAYMENT_JOB_INTERVAL_SECONDS: "1",
+  },
 });
 server.stdout.pipe(logFile);
 server.stderr.pipe(logFile);
@@ -157,7 +172,10 @@ console.log(`  up at ${API}\n`);
 let failed = 0;
 for (const suite of SUITES) {
   console.log(`\n${"=".repeat(60)}\n${suite}\n${"=".repeat(60)}`);
-  const result = spawn(process.execPath, [join(import.meta.dirname, suite), logPath], { stdio: "inherit" });
+  const result = spawn(process.execPath, [join(import.meta.dirname, suite), logPath], {
+    stdio: "inherit",
+    env: { ...process.env, FAPSHI_WEBHOOK_SECRET: WEBHOOK_SECRET },
+  });
   const code = await new Promise((resolve) => result.on("exit", resolve));
   if (code !== 0) failed += 1;
 }

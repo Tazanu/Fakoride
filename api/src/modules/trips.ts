@@ -23,6 +23,7 @@ import { resolveZoneForPoint, nearestLandmark } from "./geo";
 import { quoteZonePair } from "./fares";
 import { offerToNextDriver } from "./dispatch";
 import { recordFare } from "./ledger";
+import { chargeTripFare } from "./payments/service";
 import { tripShareRouter } from "./share";
 import { tripSosRouter } from "./safety";
 import { emitToDriver, emitToRider, emitToTrip } from "../realtime";
@@ -393,14 +394,29 @@ export function tripsRouter(): Router {
       expectStatus(trip.status, ["IN_PROGRESS"]);
 
       await transition(trip.id, "COMPLETED", driver.id, { completedAt: new Date() });
+      // Cash is already in his hand, so that entry is written now. A mobile
+      // fare only becomes a ledger entry when the provider confirms it landed —
+      // completing the trip must not depend on Fapshi being reachable from the
+      // Soppo climb, and a declined prompt must not show up as earnings.
       await recordFare(trip.id);
+      const fare = await chargeTripFare(trip.id).catch((err) => {
+        logger.error({ tripId: trip.id, err: String(err) }, "could not start the mobile charge");
+        return null;
+      });
       await prisma.driver.update({ where: { id: driver.id }, data: { tripCount: { increment: 1 } } });
       await redis.del(driverActiveTripKey(driver.id));
 
       emitToRider(trip.riderId, "trip:completed", { tripId: trip.id, priceXaf: trip.priceXaf });
       emitToTrip(trip.id, "trip:status", { tripId: trip.id, status: "COMPLETED" });
       logger.info({ tripId: trip.id, driverId: driver.id }, "trip completed");
-      res.json({ status: "COMPLETED", priceXaf: trip.priceXaf, paymentMethod: trip.paymentMethod });
+      res.json({
+        status: "COMPLETED",
+        priceXaf: trip.priceXaf,
+        paymentMethod: trip.paymentMethod,
+        // PENDING means a prompt is on the rider's phone and he should wait for
+        // it; FAILED means take the cash before the rider walks away.
+        payment: fare ? { id: fare.id, status: fare.status } : null,
+      });
     }),
   );
 

@@ -29,7 +29,8 @@ api/
   src/data/fako.ts         the gazetteer — zones, landmarks, elevations
   src/lib/time.ts          service days in Cameroon time — the access fee depends on it
   src/modules/             auth, geo, fares, drivers, dispatch, trips, ledger,
-                           demand, safety (SOS + complaints), share
+                           demand, safety (SOS + complaints), share, admin
+  src/modules/payments/    the provider port, a Fapshi adapter, and a fake one
   src/realtime.ts          socket.io: driver positions, offers, trip state
 design/
   tokens.json              the Daylight design system — source of truth
@@ -66,11 +67,13 @@ screen asks for, it is probably not needed yet.
 | Ops — live trip board | `GET /admin/trips` |
 | Ops — complaints & SOS | `GET /admin/complaints`, `POST /admin/complaints/:id/respond`, `GET /admin/sos`, `POST /admin/sos/:id/resolve` |
 | Ops — service banner | `POST /admin/notices`, `DELETE /admin/notices/:id` |
+| Ops — money | `GET /admin/payments`, `POST /admin/payments/:id/refresh`, `POST /admin/access-fees/collect` |
+| Driver — cash out | `GET /drivers/me/balance`, `POST /drivers/me/cashout`, `GET /drivers/me/payments` |
+| Provider callback | `POST /payments/webhook` |
 
-Two things are deliberately absent. Mobile money is not wired to Fapshi yet, so
-a `MOMO` trip records a `FARE_MOBILE` ledger row without anybody being charged;
-and nothing collects the access fee once it is raised. Both are money, and money
-gets built against a sandbox, not against a guess.
+Still absent: SMS (the `console` sender prints the code to the log, so nobody
+outside your server logs can sign in yet), push notifications, and driver
+document upload. Distances are a haversine estimate until OSRM is wired in.
 
 ## Becoming an admin
 
@@ -127,16 +130,68 @@ npm run test:integration   # real HTTP, real Postgres, real Redis
 demand labels and the weekly earnings fold. No database, no network, under three
 seconds.
 
-`npm run test:integration` walks three stories end to end — one complete trip
-from OTP to complaint, a driver cancelling mid-trip, and the whole ops console —
-and it exists because the bugs worth catching here only live *between*
-processes. It has already caught two: a driver suspended in Postgres but still
-sitting in the Redis geo set, and dispatch giving up with bikes available
-because the one nearest driver was ineligible.
+`npm run test:integration` walks four stories end to end — one complete trip
+from OTP to complaint, a driver cancelling mid-trip, the whole ops console, and
+every way money moves — and it exists because the bugs worth catching here only
+live *between* processes. It has already caught three: a driver suspended in
+Postgres but still sitting in the Redis geo set, dispatch giving up with bikes
+available because the one nearest driver was ineligible, and the daily access
+fee being written to the ledger twice once collection was added.
+
+It runs against the fake payment provider, which fails deterministically on a
+number ending `00`, so the declined-payment branch is reached on purpose rather
+than by luck. The runner forces `MOMO_PROVIDER=fake`: a test run must not be
+able to move real money.
 
 **It resets the database first**, and refuses to run unless `DATABASE_URL`
 points at localhost. Every suite asserts on exact counts, and a suite that only
 passes on a clean database but is run against a dirty one tells you nothing.
+
+## Money
+
+Three movements, and only three. Cash is not one of them — the rider puts notes
+in the driver's hand and we never touch them, which is the whole commercial
+design and the reason `payments/service.ts` is as short as it is.
+
+| | Direction | When |
+| --- | --- | --- |
+| `TRIP_FARE` | rider → us | the trip completes and they chose MoMo over cash |
+| `ACCESS_FEE` | driver → us | the morning after a service day he worked |
+| `DRIVER_PAYOUT` | us → driver | he taps "send it to my MoMo" |
+
+**The ledger is written when money lands, never when it is asked for.** A cash
+fare is credited the moment the trip completes, because he already has it. A
+mobile fare is credited only when the provider confirms it — a declined prompt
+must never show up in a driver's earnings. If the charge fails, both phones are
+told at once, because the driver needs to take the cash before the rider walks
+away, and the trip itself stays `COMPLETED`: the ride happened either way.
+
+The daily fee is an obligation the moment he goes online, so the ledger entry is
+written then and collection is tracked separately on `AccessFeeCharge`. Writing
+a second entry when the debit succeeds would charge him twice on his own
+earnings screen — which it did, until the integration suite caught it.
+
+`GET /drivers/me/balance` is only ever mobile fares minus payouts. Cash is not
+ours to owe.
+
+### Fapshi
+
+`MOMO_PROVIDER=fake` is the default and moves no money. Asking for `fapshi`
+without credentials is a **startup error**, not a quiet fall back — a box that
+silently pretends to take money is worse than one that refuses to boot.
+
+Fapshi needs two approvals from their support before live: Direct Pay for
+collecting, and payouts separately. Both work in sandbox out of the box.
+
+Webhooks are verified by the `x-wh-secret` header against `FAPSHI_WEBHOOK_SECRET`,
+compared in constant time. With no secret set, **every webhook is refused** —
+that is the safe failure, because the reconciler polls the provider anyway.
+Losing webhooks costs a few seconds; accepting forged ones would let a stranger
+mark fares paid.
+
+The reconciler is the mechanism and the webhook is the optimisation, not the
+other way round. A lost webhook means a driver is never paid, so nothing depends
+on one arriving.
 
 ## The fare table is seeded, not decided
 
