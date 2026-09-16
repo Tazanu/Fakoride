@@ -29,7 +29,13 @@ const HEALTH_TIMEOUT_MS = 30_000;
 /** The ops account these suites sign in as. Created before the server starts. */
 const ADMIN_PHONE = "+237600000099";
 
-const SUITES = ["01-one-trip.mjs", "02-driver-cancels.mjs", "03-ops-console.mjs", "04-money.mjs"];
+const SUITES = [
+  "01-one-trip.mjs",
+  "02-driver-cancels.mjs",
+  "03-ops-console.mjs",
+  "04-money.mjs",
+  "05-remaining-surface.mjs",
+];
 
 /** Fixed, so the money suite can post a webhook the server will actually trust. */
 const WEBHOOK_SECRET = "integration-webhook-secret";

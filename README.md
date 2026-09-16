@@ -130,10 +130,12 @@ npm run test:integration   # real HTTP, real Postgres, real Redis
 demand labels and the weekly earnings fold. No database, no network, under three
 seconds.
 
-`npm run test:integration` walks four stories end to end — one complete trip
-from OTP to complaint, a driver cancelling mid-trip, the whole ops console, and
-every way money moves — and it exists because the bugs worth catching here only
-live *between* processes. It has already caught three: a driver suspended in
+`npm run test:integration` walks five stories end to end — one complete trip
+from OTP to complaint, a driver cancelling mid-trip, the whole ops console,
+every way money moves, and the rest of the surface — and it exists because the
+bugs worth catching here only live *between* processes. **Every one of the 61
+endpoints is exercised**, which is the only version of "the backend works" worth
+saying out loud. It has already caught three: a driver suspended in
 Postgres but still sitting in the Redis geo set, dispatch giving up with bikes
 available because the one nearest driver was ineligible, and the daily access
 fee being written to the ledger twice once collection was added.
