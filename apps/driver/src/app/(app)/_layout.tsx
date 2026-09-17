@@ -6,8 +6,11 @@
  * screen quietly failing every request.
  */
 
+import { View } from "react-native";
 import { Redirect, Stack } from "expo-router";
 import { useSession } from "@/session/SessionProvider";
+import { OfferSheet } from "@/realtime/OfferSheet";
+import { RealtimeProvider } from "@/realtime/RealtimeProvider";
 import { palette } from "@/theme";
 
 export default function AppLayout() {
@@ -19,12 +22,24 @@ export default function AppLayout() {
 
   const c = palette("light");
 
+  /**
+   * The offer sits above the stack, not inside it.
+   *
+   * A ride can arrive while he is reading his earnings, and it has to be
+   * answerable there — pushing a screen would throw away whatever he was doing
+   * for something he may well decline.
+   */
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: c.paper },
-      }}
-    />
+    <RealtimeProvider>
+      <View style={{ flex: 1 }}>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: c.paper },
+          }}
+        />
+        <OfferSheet />
+      </View>
+    </RealtimeProvider>
   );
 }

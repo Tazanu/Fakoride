@@ -17,7 +17,6 @@ import { useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -30,6 +29,7 @@ import { useRouter } from "expo-router";
 import { ApiError } from "@/api/client";
 import { auth } from "@/api/driver";
 import { useSession } from "@/session/SessionProvider";
+import { keyboardBehavior, useScrollPastKeyboard } from "@/ui/keyboard";
 import { palette, primaryButton, radius, space, touch, type } from "@/theme";
 
 const c = palette("light");
@@ -60,11 +60,20 @@ export default function SignIn() {
   const { signIn } = useSession();
   const insets = useSafeAreaInsets();
   const codeInput = useRef<TextInput>(null);
+  const scroll = useScrollPastKeyboard();
 
   const [step, setStep] = useState<"phone" | "code">("phone");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
+  /**
+   * The code, when the local API hands it back.
+   *
+   * Development only and only against the console sender — see revealsCode in
+   * the API. On a real build the field is absent and this stays null, so the
+   * hint below never renders.
+   */
+  const [devCode, setDevCode] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,7 +84,8 @@ export default function SignIn() {
     setBusy(true);
     setError(null);
     try {
-      await auth.requestCode(phone);
+      const { devCode: revealed } = await auth.requestCode(phone);
+      setDevCode(revealed ?? null);
       setStep("code");
       // The keypad should already be waiting when the SMS arrives.
       setTimeout(() => codeInput.current?.focus(), 250);
@@ -100,18 +110,16 @@ export default function SignIn() {
     } catch (err) {
       setError(errorFor(err));
       setCode("");
+      setDevCode(null);
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={insets.top}
-    >
+    <KeyboardAvoidingView style={styles.flex} behavior={keyboardBehavior} keyboardVerticalOffset={insets.top}>
       <ScrollView
+        ref={scroll}
         contentContainerStyle={[styles.page, { paddingTop: insets.top + space.xxl, paddingBottom: insets.bottom + space.xl }]}
         keyboardShouldPersistTaps="handled"
       >
@@ -164,6 +172,16 @@ export default function SignIn() {
           <View style={styles.block}>
             <Text style={styles.title}>Type the code</Text>
             <Text style={styles.help}>We sent six digits to {phone}.</Text>
+            {/*
+              No SMS leaves the laptop in development, so the API hands the code
+              back and it goes here — otherwise signing in on a handset means
+              reading the server log on another screen.
+            */}
+            {__DEV__ && devCode ? (
+              <Pressable onPress={() => setCode(devCode)} accessibilityRole="button">
+                <Text style={styles.devCode}>No SMS in development. Tap to fill: {devCode}</Text>
+              </Pressable>
+            ) : null}
 
             <Text style={styles.label}>Code</Text>
             <TextInput
@@ -238,6 +256,17 @@ const styles = StyleSheet.create({
   title: { ...type.heading, color: c.ink },
   help: { ...type.bodyPlain, color: c.inkSoft, marginBottom: space.md },
   label: { ...type.label, color: c.muted, marginTop: space.md },
+  /* Marked as scaffolding, not chrome: the hill colour is the one warning tone
+     in Daylight, and nothing else on this screen uses it. */
+  devCode: {
+    ...type.secondary,
+    color: c.hill,
+    backgroundColor: c.fill,
+    borderRadius: radius.sm,
+    paddingVertical: space.sm,
+    paddingHorizontal: space.md,
+    marginBottom: space.md,
+  },
   input: {
     ...type.body,
     color: c.ink,

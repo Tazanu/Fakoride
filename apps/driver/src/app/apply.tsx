@@ -13,7 +13,6 @@ import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -28,6 +27,7 @@ import { ApiError } from "@/api/client";
 import { onboarding } from "@/api/driver";
 import { useSession } from "@/session/SessionProvider";
 import { palette, primaryButton, radius, space, touch, type } from "@/theme";
+import { keyboardBehavior, useScrollPastKeyboard } from "@/ui/keyboard";
 
 const c = palette("light");
 
@@ -49,6 +49,7 @@ export default function Apply() {
   const router = useRouter();
   const { me, refresh, signOut } = useSession();
   const insets = useSafeAreaInsets();
+  const scroll = useScrollPastKeyboard();
 
   const [name, setName] = useState(me?.name ?? "");
   const [plate, setPlate] = useState("");
@@ -88,8 +89,9 @@ export default function Apply() {
   }
 
   return (
-    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView style={styles.flex} behavior={keyboardBehavior}>
       <ScrollView
+        ref={scroll}
         contentContainerStyle={[
           styles.page,
           { paddingTop: insets.top + space.xl, paddingBottom: insets.bottom + space.xl },
@@ -129,7 +131,7 @@ export default function Apply() {
               accessibilityLabel="Your name"
             />
 
-            <Text style={styles.label}>Plate on the bike</Text>
+            <Text style={styles.label}>Plate on the taxi</Text>
             <TextInput
               style={styles.input}
               value={plate}
@@ -139,9 +141,9 @@ export default function Apply() {
               autoCapitalize="characters"
               autoCorrect={false}
               editable={!busy}
-              accessibilityLabel="Plate number as painted on the bike"
+              accessibilityLabel="Plate number as painted on the taxi"
             />
-            <Text style={styles.hint}>Exactly as it is painted. Riders check it before they climb on.</Text>
+            <Text style={styles.hint}>Exactly as it is painted. Riders check it before they get in.</Text>
 
             <Text style={styles.label}>CNI number</Text>
             <TextInput
