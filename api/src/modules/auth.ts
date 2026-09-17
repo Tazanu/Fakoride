@@ -45,6 +45,25 @@ export const smsSender: SmsSender =
   env.SMS_PROVIDER === "console" ? new ConsoleSmsSender() : new LocalAggregatorSmsSender();
 
 /**
+ * Whether /otp/request hands the code straight back to the caller.
+ *
+ * Only when nothing is sending it anywhere: the console sender is selected AND
+ * we are in development. Both conditions, because either one alone is a way to
+ * ship an OTP oracle by accident — a staging box left on the console sender, or
+ * a developer who points a real aggregator at NODE_ENV=development.
+ *
+ * It exists because the alternative is worse in practice. Without it the only
+ * way to sign in on a handset is to read the API's own log, which means the
+ * phone in your hand is useless unless you can also see the laptop — and the
+ * temptation then is to weaken the real thing to make testing bearable.
+ */
+const revealsCode = env.NODE_ENV === "development" && env.SMS_PROVIDER === "console";
+
+if (revealsCode) {
+  logger.warn("auth: /otp/request returns the code in its response (development, console sender)");
+}
+
+/**
  * Cameroon numbers, normalised to E.164.
  *
  * The parsing lives in lib/phone so the ops scripts can reuse it without
@@ -92,7 +111,13 @@ export function authRouter(): Router {
       await redis.set(otpKey(phone), hashCode(code), "EX", OTP_TTL_SECONDS);
       await smsSender.send(phone, `${code} is your Fako Ride code. It expires in 5 minutes.`);
 
-      res.json({ sent: true, expiresInSeconds: OTP_TTL_SECONDS });
+      // `devCode` is absent in every configuration but the local one — see
+      // revealsCode above. The client treats it as optional for that reason.
+      res.json({
+        sent: true,
+        expiresInSeconds: OTP_TTL_SECONDS,
+        ...(revealsCode ? { devCode: code } : {}),
+      });
     }),
   );
 
