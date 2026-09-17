@@ -285,7 +285,9 @@ export function adminPaymentsRouter(): Router {
       if (!charge) throw new ApiError(404, "no_charge", "No such access fee.");
       if (charge.paid) throw new ApiError(409, "already_paid", "That day is already paid.");
 
-      const payment = await collectAccessFee(chargeId);
+      // force: a person decided to try again, usually with the driver on the
+      // phone saying he has topped up. The backoff is for the automatic sweep.
+      const payment = await collectAccessFee(chargeId, { force: true });
       if (!payment) throw new ApiError(409, "not_collectable", "That fee cannot be collected.");
 
       res.json({

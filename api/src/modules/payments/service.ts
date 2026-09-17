@@ -84,27 +84,83 @@ export async function chargeTripFare(tripId: string): Promise<Payment | null> {
 // --- the daily access fee ---------------------------------------------------
 
 /**
- * Debit one day's access fee from the driver's own MoMo.
+ * What happened when we tried to take a day's fee.
+ *
+ * The sweep has to tell these apart to report honestly. A fee we deferred is
+ * not a fee that is paid, and a driver we have stopped asking needs a person to
+ * call him, not another sweep. Collapsing all of it into `Payment | null` is
+ * what made the run log say drivers were square when they were four refusals
+ * deep — the one number you would actually want to trust.
+ */
+export type AccessFeeOutcome =
+  | { kind: "charged"; payment: Payment }
+  | { kind: "in_flight"; payment: Payment }
+  | { kind: "deferred"; retryAfter: Date }
+  | { kind: "exhausted"; attempts: number }
+  | { kind: "already_paid" }
+  | { kind: "no_charge" }
+  | { kind: "below_floor"; amountXaf: number };
+
+/**
+ * Debit one day's access fee from the driver's own MoMo, and say what happened.
  *
  * The charge row was raised the moment he went online; this is the separate act
  * of actually taking the 500. Never charges a day twice, and never charges a day
  * he did not work, because no charge row exists for one.
  */
-export async function collectAccessFee(accessFeeChargeId: string): Promise<Payment | null> {
+export async function collectAccessFeeOutcome(
+  accessFeeChargeId: string,
+  opts: { force?: boolean } = {},
+): Promise<AccessFeeOutcome> {
   const charge = await prisma.accessFeeCharge.findUnique({
     where: { id: accessFeeChargeId },
     include: { driver: { include: { user: { select: { name: true, phone: true } } } } },
   });
-  if (!charge || charge.paid) return null;
+  if (!charge) return { kind: "no_charge" };
+  if (charge.paid) return { kind: "already_paid" };
 
   const inFlight = await prisma.payment.findFirst({
     where: { accessFeeChargeId, status: { notIn: ["FAILED", "EXPIRED"] } },
   });
-  if (inFlight) return inFlight;
+  if (inFlight) return { kind: "in_flight", payment: inFlight };
+
+  /**
+   * Back off after a refusal.
+   *
+   * Every attempt puts a USSD prompt on a real person's handset. Without this,
+   * a driver whose MoMo is empty gets one every time the sweep runs — every
+   * thirty seconds, all day, for 500 francs he does not have. That is how an
+   * app gets uninstalled.
+   *
+   * `force` is how ops overrides it from the console, which is the right
+   * escape hatch: a person has decided to try again, usually because the driver
+   * is on the phone saying he has topped up.
+   */
+  if (!opts.force) {
+    // Anything not terminal was caught by the in-flight check above, so every
+    // row here is a refusal.
+    const attempts = await prisma.payment.findMany({
+      where: { accessFeeChargeId },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true },
+    });
+
+    if (attempts.length >= env.ACCESS_FEE_MAX_ATTEMPTS) {
+      // Stop asking. Somebody has to talk to him now, and the ops queue shows
+      // the failure with its reason.
+      return { kind: "exhausted", attempts: attempts.length };
+    }
+
+    const last = attempts[0]?.createdAt;
+    const waitMs = env.ACCESS_FEE_RETRY_AFTER_MINUTES * 60_000;
+    if (last && Date.now() - last.getTime() < waitMs) {
+      return { kind: "deferred", retryAfter: new Date(last.getTime() + waitMs) };
+    }
+  }
 
   if (charge.amountXaf < MIN_TRANSFER_XAF) {
     logger.error({ accessFeeChargeId, amountXaf: charge.amountXaf }, "access fee is below the mobile money floor");
-    return null;
+    return { kind: "below_floor", amountXaf: charge.amountXaf };
   }
 
   const payment = await prisma.payment.create({
@@ -118,11 +174,55 @@ export async function collectAccessFee(accessFeeChargeId: string): Promise<Payme
     },
   });
 
-  return initiate(payment, "collect", {
-    message: `Fako Ride access fee for ${serviceDateKey(charge.serviceDate)}`,
-    name: charge.driver.user.name ?? undefined,
-  });
+  return {
+    kind: "charged",
+    payment: await initiate(payment, "collect", {
+      message: `Fako Ride access fee for ${serviceDateKey(charge.serviceDate)}`,
+      name: charge.driver.user.name ?? undefined,
+    }),
+  };
 }
+
+/**
+ * The same thing, for callers that only need the Payment.
+ *
+ * The ops console retries one driver and wants the row back to show him; it has
+ * already checked the charge is unpaid and passes `force`, so the outcomes it
+ * can hit are "charged" or a refusal it renders as one.
+ */
+export async function collectAccessFee(
+  accessFeeChargeId: string,
+  opts: { force?: boolean } = {},
+): Promise<Payment | null> {
+  const outcome = await collectAccessFeeOutcome(accessFeeChargeId, opts);
+  return outcome.kind === "charged" || outcome.kind === "in_flight" ? outcome.payment : null;
+}
+
+/**
+ * What one sweep did.
+ *
+ * Every charge the sweep looked at lands in exactly one of these, and they sum
+ * to `due`. That property is the point: it is what stops a deferred fee from
+ * being quietly counted as a paid one.
+ */
+export type AccessFeeSweep = {
+  /** Charges we put a fresh prompt on. The only number that cost anybody a USSD. */
+  attempted: number;
+  /** A prompt from an earlier run is still outstanding. */
+  inFlight: number;
+  /** Refused recently — waiting out the backoff, and still owed. */
+  deferred: number;
+  /** Out of attempts. These need a person to call the driver. */
+  exhausted: number;
+  /** Paid between the query and the attempt. A race, so normally zero. */
+  alreadyPaid: number;
+  /** Below the mobile money floor. A data problem, not a driver problem. */
+  belowFloor: number;
+  /** Charges that vanished mid-sweep. Normally zero. */
+  missing: number;
+  /** How many unpaid charges the sweep looked at. */
+  due: number;
+};
 
 /**
  * The morning sweep.
@@ -132,10 +232,7 @@ export async function collectAccessFee(accessFeeChargeId: string): Promise<Payme
  * morning, which is what the driver app promises him and gives him the day's
  * takings to pay it from.
  */
-export async function runAccessFeeCollection(now: Date = new Date()): Promise<{
-  attempted: number;
-  alreadyPaid: number;
-}> {
+export async function runAccessFeeCollection(now: Date = new Date()): Promise<AccessFeeSweep> {
   const today = serviceDateKey(now);
   const due = await prisma.accessFeeCharge.findMany({
     where: { paid: false, serviceDate: { lt: new Date(`${today}T00:00:00.000Z`) } },
@@ -144,14 +241,51 @@ export async function runAccessFeeCollection(now: Date = new Date()): Promise<{
     select: { id: true },
   });
 
-  let attempted = 0;
+  const sweep: AccessFeeSweep = {
+    attempted: 0,
+    inFlight: 0,
+    deferred: 0,
+    exhausted: 0,
+    alreadyPaid: 0,
+    belowFloor: 0,
+    missing: 0,
+    due: due.length,
+  };
+
   for (const charge of due) {
-    const payment = await collectAccessFee(charge.id);
-    if (payment) attempted += 1;
+    const outcome = await collectAccessFeeOutcome(charge.id);
+    switch (outcome.kind) {
+      case "charged":
+        sweep.attempted += 1;
+        break;
+      case "in_flight":
+        sweep.inFlight += 1;
+        break;
+      case "deferred":
+        sweep.deferred += 1;
+        break;
+      case "exhausted":
+        sweep.exhausted += 1;
+        break;
+      case "already_paid":
+        sweep.alreadyPaid += 1;
+        break;
+      case "below_floor":
+        sweep.belowFloor += 1;
+        break;
+      case "no_charge":
+        sweep.missing += 1;
+        break;
+    }
   }
 
-  if (due.length > 0) logger.info({ due: due.length, attempted }, "access fee collection run");
-  return { attempted, alreadyPaid: due.length - attempted };
+  // Quiet when the sweep had nothing to do, which is most of the time. Loud
+  // when money moved, and loud when drivers have run out of attempts, because
+  // that is the queue somebody has to work through.
+  if (sweep.attempted > 0 || sweep.exhausted > 0) {
+    logger.info(sweep, "access fee collection run");
+  }
+  return sweep;
 }
 
 // --- paying a driver out ----------------------------------------------------

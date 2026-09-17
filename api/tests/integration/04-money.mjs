@@ -272,6 +272,84 @@ const feeEntries = sql(
 );
 check("one working day, one fee entry — never two", feeEntries === "1", feeEntries);
 
+console.log("\n=== a fee the driver's MoMo refuses ===");
+// A number ending 00 always fails with the fake provider, which is the whole
+// point of it: the refusal path has to be reachable on purpose.
+const BROKE_DRIVER = "+237679000900";
+const BROKE_PLATE = `SW ${nonce} B`;
+const brokeToken2 = await signIn(BROKE_DRIVER, "DRIVER", "Sammy Ekane");
+await call("POST", "/drivers/apply", {
+  token: brokeToken2,
+  body: { name: "Sammy Ekane", plate: BROKE_PLATE, cniNumber: `6${nonce}0003` },
+});
+const brokeQueue = await call("GET", "/admin/drivers", { token: adminToken });
+const brokeDriver = brokeQueue.body.drivers.find((d) => d.plate === BROKE_PLATE);
+await call("POST", `/admin/drivers/${brokeDriver.id}/verify`, {
+  token: adminToken,
+  body: { licenceNumber: `S10-${nonce}-B` },
+});
+await call("POST", "/drivers/online", { token: brokeToken2, body: CHECKPOINT });
+
+// The sweep only touches days that are already over, so age his fee by a day.
+sql(`UPDATE "AccessFeeCharge" SET "serviceDate" = "serviceDate" - INTERVAL '1 day' WHERE "driverId"='${brokeDriver.id}'`);
+const brokeChargeId = sql(`SELECT id FROM "AccessFeeCharge" WHERE "driverId"='${brokeDriver.id}' LIMIT 1`);
+
+const firstSweep = await call("POST", "/admin/access-fees/collect", { token: adminToken });
+check("the sweep picks up a fee due from yesterday", firstSweep.body.attempted >= 1, JSON.stringify(firstSweep.body));
+
+await sleep(1500);
+const attemptsAfterFirst = Number(sql(`SELECT count(*) FROM "Payment" WHERE "accessFeeChargeId"='${brokeChargeId}'`));
+check("one attempt was made", attemptsAfterFirst === 1, `${attemptsAfterFirst}`);
+
+const failedStatus = sql(`SELECT status FROM "Payment" WHERE "accessFeeChargeId"='${brokeChargeId}'`);
+check("and his MoMo refused it", failedStatus === "FAILED", failedStatus);
+
+// The bug this guards: without a backoff the sweep built a fresh payment every
+// thirty seconds, putting a USSD prompt on the handset of a driver who has no
+// money, all day, for 500 francs.
+const secondSweep = await call("POST", "/admin/access-fees/collect", { token: adminToken });
+check("a second sweep does not ask him again", secondSweep.body.attempted === 0, JSON.stringify(secondSweep.body));
+
+// The bug this guards: `alreadyPaid` used to be `due - attempted`, so a fee we
+// had merely deferred was reported as one that had been paid. That is the
+// number ops reads to know who is behind, and it was quietly wrong.
+check(
+  "and reports him as deferred, not as settled",
+  secondSweep.body.deferred >= 1 && secondSweep.body.alreadyPaid === 0,
+  JSON.stringify(secondSweep.body),
+);
+check(
+  "the counts account for every charge the sweep looked at",
+  secondSweep.body.attempted +
+    secondSweep.body.inFlight +
+    secondSweep.body.deferred +
+    secondSweep.body.exhausted +
+    secondSweep.body.alreadyPaid +
+    secondSweep.body.belowFloor +
+    secondSweep.body.missing ===
+    secondSweep.body.due,
+  JSON.stringify(secondSweep.body),
+);
+
+await sleep(1500);
+const attemptsAfterSecond = Number(sql(`SELECT count(*) FROM "Payment" WHERE "accessFeeChargeId"='${brokeChargeId}'`));
+check("still exactly one prompt on his phone", attemptsAfterSecond === 1, `${attemptsAfterSecond}`);
+
+const stillUnpaid = sql(`SELECT paid FROM "AccessFeeCharge" WHERE id='${brokeChargeId}'`);
+check("the day is still owed — backing off is not forgiving it", stillUnpaid === "f", stillUnpaid);
+
+const recordedFailure = sql(`SELECT "failureCode" IS NOT NULL FROM "AccessFeeCharge" WHERE id='${brokeChargeId}'`);
+check("and the reason is on the charge for ops to read", recordedFailure === "t", recordedFailure);
+
+// Ops overriding is the escape hatch — a person decided, usually with the
+// driver on the phone saying he has topped up.
+const forced = await call("POST", `/admin/access-fees/${brokeChargeId}/collect`, { token: adminToken });
+check("ops can still force a retry past the backoff", forced.status === 200, JSON.stringify(forced.body));
+
+await sleep(1500);
+const attemptsAfterForce = Number(sql(`SELECT count(*) FROM "Payment" WHERE "accessFeeChargeId"='${brokeChargeId}'`));
+check("which does make a second attempt", attemptsAfterForce === 2, `${attemptsAfterForce}`);
+
 console.log("\n=== what ops can see ===");
 const board = await call("GET", "/admin/payments", { token: adminToken });
 check("the money board names the provider in use", board.body.provider === "fake", JSON.stringify(board.body.provider));

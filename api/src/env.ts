@@ -38,6 +38,14 @@ const schema = z.object({
   PAYMENT_RECONCILE_AFTER_SECONDS: z.coerce.number().int().default(45),
   /** How often the reconciler and the access-fee sweep run. */
   PAYMENT_JOB_INTERVAL_SECONDS: z.coerce.number().int().default(30),
+  /**
+   * How long to leave a driver alone after his MoMo refuses the daily fee.
+   * Every attempt is a USSD prompt on his handset, so this is measured in
+   * hours, not seconds. Four gives him time to top up between tries.
+   */
+  ACCESS_FEE_RETRY_AFTER_MINUTES: z.coerce.number().int().default(240),
+  /** After this many refusals we stop asking and it becomes an ops call. */
+  ACCESS_FEE_MAX_ATTEMPTS: z.coerce.number().int().default(4),
 
   ACCESS_FEE_XAF: z.coerce.number().int().default(500),
   MOBILE_PAYMENT_DISCOUNT_XAF: z.coerce.number().int().default(15),
