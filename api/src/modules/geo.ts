@@ -47,6 +47,22 @@ export async function resolveZoneForPoint(lat: number, lng: number): Promise<Res
 }
 
 /** The nearest named place to a point, so the app can say where someone is. */
+/**
+ * A place, in the words somebody would actually say.
+ *
+ * "Mile 17 Motor Park, Mile 17" is how the naive join reads, and Checkpoint is
+ * worse: the zone and its best-known landmark share a name, so a driver reading
+ * the offer at a junction sees "Checkpoint, Checkpoint" and wonders which of the
+ * two it means. When the landmark already carries the zone, the zone is noise.
+ */
+export function placeLabel(landmarkName: string | undefined, zoneName: string): string {
+  if (!landmarkName) return zoneName;
+  const a = landmarkName.trim().toLowerCase();
+  const b = zoneName.trim().toLowerCase();
+  if (a === b || a.includes(b)) return landmarkName.trim();
+  return `${landmarkName.trim()}, ${zoneName}`;
+}
+
 export async function nearestLandmark(lat: number, lng: number) {
   const landmarks = await prisma.landmark.findMany({
     where: { isPickupPoint: true },
@@ -103,7 +119,7 @@ export function geoRouter(): Router {
       const [zone, near] = await Promise.all([resolveZoneForPoint(lat, lng), nearestLandmark(lat, lng)]);
       res.json({
         zone: { code: zone.code, name: zone.name },
-        label: near ? `${near.landmark.name}, ${zone.name}` : zone.name,
+        label: placeLabel(near?.landmark.name, zone.name),
         nearestLandmark: near
           ? { name: near.landmark.name, distanceKm: near.distanceKm, lat: near.landmark.lat, lng: near.landmark.lng }
           : null,

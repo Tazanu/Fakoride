@@ -19,7 +19,7 @@ import { env } from "../env";
 import { ApiError, asyncHandler, param } from "../lib/http";
 import { requireAuth } from "../middleware/auth";
 import { redis, offerKey, driverActiveTripKey } from "../lib/redis";
-import { resolveZoneForPoint, nearestLandmark } from "./geo";
+import { resolveZoneForPoint, nearestLandmark, placeLabel } from "./geo";
 import { quoteZonePair } from "./fares";
 import { offerToNextDriver } from "./dispatch";
 import { recordFare } from "./ledger";
@@ -38,7 +38,7 @@ const createSchema = z.object({
   dropLat: z.number().optional(),
   dropLng: z.number().optional(),
   paymentMethod: z.enum(["CASH", "MOMO", "ORANGE_MONEY"]).default("CASH"),
-  vehicleType: z.enum(["MOTO", "CAR"]).default("MOTO"),
+  vehicleType: z.enum(["MOTO", "CAR"]).default("CAR"),
   /**
    * The two chips on the confirm screen. They narrow who may be offered the
    * trip and never touch the price — a rider asking for a helmet is asking for
@@ -106,7 +106,7 @@ export function tripsRouter(): Router {
           toZoneId: toZone.id,
           pickupLat: body.pickupLat,
           pickupLng: body.pickupLng,
-          pickupLabel: body.pickupLabel ?? (near ? `${near.landmark.name}, ${fromZone.name}` : fromZone.name),
+          pickupLabel: body.pickupLabel ?? placeLabel(near?.landmark.name, fromZone.name),
           dropLat: body.dropLat ?? toZone.centroidLat,
           dropLng: body.dropLng ?? toZone.centroidLng,
           dropLabel: body.dropLabel ?? toZone.name,

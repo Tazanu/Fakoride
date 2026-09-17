@@ -104,7 +104,7 @@ export function xaf(amount: number): string {
 /**
  * A touch target that satisfies Material's Android minimum.
  *
- * `minHeight`, never `height`: "Book this bike" becomes "Réserver cette moto"
+ * `minHeight`, never `height`: "Book this taxi" becomes "Réserver ce taxi"
  * and has to wrap without breaking the row. French runs 20–25% longer than
  * English and short labels expand the most.
  */

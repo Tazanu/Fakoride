@@ -296,7 +296,7 @@ export function adminRouter(): Router {
         .object({
           from: z.string().min(2),
           to: z.string().min(2),
-          vehicleType: z.enum(["MOTO", "CAR"]).default("MOTO"),
+          vehicleType: z.enum(["MOTO", "CAR"]).default("CAR"),
           priceXaf: z.number().int(),
           note: z.string().trim().max(300).optional(),
         })
@@ -304,7 +304,7 @@ export function adminRouter(): Router {
 
       if (body.from === body.to) throw new ApiError(400, "same_zone", "A zone pair needs two different zones.");
       if (body.priceXaf < MIN_FARE_XAF) {
-        throw new ApiError(400, "below_floor", `Nobody quotes a bendskin below ${MIN_FARE_XAF} XAF.`);
+        throw new ApiError(400, "below_floor", `Nobody quotes a taxi below ${MIN_FARE_XAF} XAF.`);
       }
       if (body.priceXaf % FARE_ROUNDING_XAF !== 0) {
         // Riders think in 50s. A 237 XAF fare is not a real price.
@@ -578,7 +578,7 @@ export function adminRouter(): Router {
   // --- the service banner --------------------------------------------------
 
   /**
-   * "Bikes running normally in Buea today", or the day it is not true.
+   * "Taxis running normally in Buea today", or the day it is not true.
    *
    * Carries a French string alongside the English one because both apps run in
    * both languages and a server's English sentence must never reach a rider.

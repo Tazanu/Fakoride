@@ -3,7 +3,7 @@
  *
  * Two rooms per person: `rider:<userId>` and `driver:<driverId>`. Offers, trip
  * state and driver positions ride the socket; nothing important depends on the
- * socket being up, because a bendskin on the Soppo climb will lose signal.
+ * socket being up, because a taxi on the Soppo climb will lose signal.
  */
 
 import type { Server as HttpServer } from "node:http";

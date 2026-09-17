@@ -38,7 +38,7 @@ export async function quoteZonePair(opts: {
   vehicleType?: "MOTO" | "CAR";
   mobileDiscountXaf: number;
 }): Promise<Quote> {
-  const vehicleType = opts.vehicleType ?? "MOTO";
+  const vehicleType = opts.vehicleType ?? "CAR";
 
   if (opts.fromZoneId === opts.toZoneId) {
     throw new ApiError(400, "same_zone", "Pickup and drop-off are in the same zone.");
@@ -84,7 +84,7 @@ const quoteQuery = z.object({
   fromLng: z.coerce.number().optional(),
   fromZone: z.string().optional(),
   toZone: z.string(),
-  vehicleType: z.enum(["MOTO", "CAR"]).default("MOTO"),
+  vehicleType: z.enum(["MOTO", "CAR"]).default("CAR"),
 });
 
 export function faresRouter(config: { mobileDiscountXaf: number }): Router {
@@ -98,7 +98,7 @@ export function faresRouter(config: { mobileDiscountXaf: number }): Router {
       if (!zone) throw new ApiError(404, "zone_not_found", "Unknown zone.");
 
       const fares = await prisma.fare.findMany({
-        where: { fromZoneId: zone.id, vehicleType: "MOTO" },
+        where: { fromZoneId: zone.id, vehicleType: "CAR" },
         include: { toZone: true },
         orderBy: { priceXaf: "asc" },
       });

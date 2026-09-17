@@ -18,7 +18,7 @@ const applySchema = z.object({
   name: z.string().trim().min(2).max(60),
   plate: z.string().trim().min(4).max(20),
   cniNumber: z.string().trim().min(5).max(30),
-  vehicleType: z.enum(["MOTO", "CAR"]).default("MOTO"),
+  vehicleType: z.enum(["MOTO", "CAR"]).default("CAR"),
   homeZone: z.string().optional(),
   /**
    * Optional, and only ever used to match a rider who asked for a woman driver.

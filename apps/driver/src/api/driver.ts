@@ -44,7 +44,11 @@ export type Me = {
 
 export const auth = {
   requestCode: (phone: string) =>
-    api.post<{ sent: true; expiresInSeconds: number }>("/auth/otp/request", { phone }, { anonymous: true }),
+    api.post<{ sent: true; expiresInSeconds: number; devCode?: string }>(
+      "/auth/otp/request",
+      { phone },
+      { anonymous: true },
+    ),
 
   verifyCode: (params: { phone: string; code: string; name?: string }) =>
     api.post<{ token: string; user: Me }>(
@@ -89,7 +93,7 @@ export type ZoneDemand = {
   name: string;
   pickupPoint: string | null;
   waitingRiders: number;
-  bikesNearby: number;
+  driversNearby: number;
   level: "QUIET" | "STEADY" | "BUSY";
 };
 

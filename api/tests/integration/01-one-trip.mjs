@@ -113,7 +113,7 @@ check("going online twice in a day charges once", feeRows === 1, `rows=${feeRows
 
 console.log("\n=== demand ===");
 const nearby = await call("GET", `/demand/nearby?lat=${CHECKPOINT.lat}&lng=${CHECKPOINT.lng}`, { token: riderToken });
-check("the rider sees a bike count, not positions", nearby.body.bikesNearby === 1 && nearby.body.position === undefined, JSON.stringify(nearby.body));
+check("the rider sees a driver count, not positions", nearby.body.driversNearby === 1 && nearby.body.position === undefined, JSON.stringify(nearby.body));
 
 const boardBefore = await call("GET", "/demand/zones", { token: driverToken });
 const cpBefore = boardBefore.body.zones?.find((z) => z.zone === "CHECKPOINT");

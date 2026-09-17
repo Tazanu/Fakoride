@@ -12,10 +12,15 @@ import { computeFormulaFare, roadKm } from "../src/modules/fare-math";
 const prisma = new PrismaClient();
 
 /**
- * A bendskin does not run an intercity route. Buea → Mutengene is a shared-taxi
- * trip and always has been, so it gets no moto fare until we launch cars.
+ * How far one seeded fare may stretch.
+ *
+ * A moto does not run an intercity route, which is what the old 8 km cap
+ * encoded — and it skipped 42 zone pairs, Buea → Mutengene among them. A taxi
+ * runs exactly those, so the cap moves out to cover Fako end to end. It is not
+ * removed: a pair further apart than this is almost certainly a gazetteer
+ * mistake rather than a route anybody drives.
  */
-const MAX_MOTO_ROAD_KM = 8;
+const MAX_ROAD_KM = 40;
 
 async function main(): Promise<void> {
   console.log("Seeding Fako zones and landmarks...");
@@ -54,7 +59,7 @@ async function main(): Promise<void> {
   const byCode = new Map(zones.map((z) => [z.code, z]));
   console.log(`  ${zones.length} zones, ${await prisma.landmark.count()} landmarks`);
 
-  console.log("Generating provisional moto fares...");
+  console.log("Generating provisional taxi fares...");
   let written = 0;
   let skippedFar = 0;
   let keptField = 0;
@@ -67,13 +72,13 @@ async function main(): Promise<void> {
         { lat: from.centroidLat, lng: from.centroidLng },
         { lat: to.centroidLat, lng: to.centroidLng },
       );
-      if (km > MAX_MOTO_ROAD_KM) {
+      if (km > MAX_ROAD_KM) {
         skippedFar += 1;
         continue;
       }
 
       const existing = await prisma.fare.findUnique({
-        where: { fromZoneId_toZoneId_vehicleType: { fromZoneId: from.id, toZoneId: to.id, vehicleType: "MOTO" } },
+        where: { fromZoneId_toZoneId_vehicleType: { fromZoneId: from.id, toZoneId: to.id, vehicleType: "CAR" } },
       });
       if (existing?.source === "FIELD") {
         keptField += 1;
@@ -86,15 +91,15 @@ async function main(): Promise<void> {
       );
 
       await prisma.fare.upsert({
-        where: { fromZoneId_toZoneId_vehicleType: { fromZoneId: from.id, toZoneId: to.id, vehicleType: "MOTO" } },
-        create: { fromZoneId: from.id, toZoneId: to.id, vehicleType: "MOTO", priceXaf, source: "FORMULA" },
+        where: { fromZoneId_toZoneId_vehicleType: { fromZoneId: from.id, toZoneId: to.id, vehicleType: "CAR" } },
+        create: { fromZoneId: from.id, toZoneId: to.id, vehicleType: "CAR", priceXaf, source: "FORMULA" },
         update: { priceXaf, source: "FORMULA" },
       });
       written += 1;
     }
   }
 
-  console.log(`  ${written} formula fares written, ${keptField} field-set fares left alone, ${skippedFar} pairs too far for a moto`);
+  console.log(`  ${written} formula fares written, ${keptField} field-set fares left alone, ${skippedFar} pairs too far to be a real route`);
 
   console.log("Applying observed corridor fares as FIELD rows...");
   for (const o of OBSERVED_FARES) {
@@ -105,11 +110,11 @@ async function main(): Promise<void> {
       continue;
     }
     await prisma.fare.upsert({
-      where: { fromZoneId_toZoneId_vehicleType: { fromZoneId: from.id, toZoneId: to.id, vehicleType: "MOTO" } },
+      where: { fromZoneId_toZoneId_vehicleType: { fromZoneId: from.id, toZoneId: to.id, vehicleType: "CAR" } },
       create: {
         fromZoneId: from.id,
         toZoneId: to.id,
-        vehicleType: "MOTO",
+        vehicleType: "CAR",
         priceXaf: o.xaf,
         source: "FIELD",
         note: "Quoted on the corridor — confirm during field work",

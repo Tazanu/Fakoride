@@ -17,9 +17,9 @@ export type DemandLevel = "QUIET" | "STEADY" | "BUSY";
 export const DEMAND_WINDOW_MINUTES = 15;
 
 /** More than three riders for every two bikes is the point of riding over. */
-const BUSY_RIDERS_PER_BIKE = 1.5;
+const BUSY_RIDERS_PER_DRIVER = 1.5;
 /** Below one rider per two bikes, the zone is already served. */
-const STEADY_RIDERS_PER_BIKE = 0.5;
+const STEADY_RIDERS_PER_DRIVER = 0.5;
 
 /**
  * Deliberately a ratio rather than a raw count.
@@ -29,10 +29,10 @@ const STEADY_RIDERS_PER_BIKE = 0.5;
  * fare on the mountain. A driver reading a raw count rides toward the crowd and
  * finds it already served — which teaches him to stop reading the board.
  */
-export function demandLevel(waitingRiders: number, bikesNearby: number): DemandLevel {
+export function demandLevel(waitingRiders: number, driversNearby: number): DemandLevel {
   if (waitingRiders <= 0) return "QUIET";
-  const ridersPerBike = waitingRiders / Math.max(bikesNearby, 1);
-  if (ridersPerBike >= BUSY_RIDERS_PER_BIKE) return "BUSY";
-  if (ridersPerBike >= STEADY_RIDERS_PER_BIKE) return "STEADY";
+  const ridersPerDriver = waitingRiders / Math.max(driversNearby, 1);
+  if (ridersPerDriver >= BUSY_RIDERS_PER_DRIVER) return "BUSY";
+  if (ridersPerDriver >= STEADY_RIDERS_PER_DRIVER) return "STEADY";
   return "QUIET";
 }

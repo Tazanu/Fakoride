@@ -23,6 +23,9 @@ enum UserRole {
   ADMIN
 }
 
+/// Buea runs on shared taxis; Limbe and Tiko run on motos. CAR is the default
+/// because Buea is the launch town — MOTO stays so the other towns are a config
+/// change and not a migration.
 enum VehicleType {
   MOTO
   CAR
@@ -161,11 +164,12 @@ model Driver {
   id             String       @id @default(cuid())
   userId         String       @unique
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  vehicleType    VehicleType  @default(MOTO)
+  vehicleType    VehicleType  @default(CAR)
   gender         DriverGender @default(UNSPECIFIED)
-  /// A second helmet on the bike. This is what "I need a helmet" actually asks for.
+  /// A second helmet, on a moto. Meaningless for a taxi and always false there;
+  /// kept because Limbe and Tiko run motos and will need it again.
   hasSpareHelmet Boolean      @default(false)
-  /// Registration plate as painted on the bike — the rider checks this before mounting.
+  /// Registration plate as painted on the vehicle — the rider checks it before getting in.
   plate          String
   cniNumber      String
   /// The S10. A paid moto trip cannot legally be dispatched without one, so an
@@ -256,7 +260,7 @@ model Fare {
   fromZone    Zone        @relation("FareFromZone", fields: [fromZoneId], references: [id], onDelete: Cascade)
   toZoneId    String
   toZone      Zone        @relation("FareToZone", fields: [toZoneId], references: [id], onDelete: Cascade)
-  vehicleType VehicleType @default(MOTO)
+  vehicleType VehicleType @default(CAR)
 
   priceXaf Int
   source   FareSource @default(FORMULA)
@@ -292,7 +296,7 @@ model Trip {
   /// Quoted before the rider committed, and never recalculated afterwards.
   priceXaf      Int
   paymentMethod PaymentMethod @default(CASH)
-  vehicleType   VehicleType   @default(MOTO)
+  vehicleType   VehicleType   @default(CAR)
 
   /// Booking preferences. Both narrow who may be offered the trip; neither
   /// changes the price, because the price is the zone pair and nothing else.

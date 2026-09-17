@@ -223,8 +223,8 @@ function DemandRow({ zone }: { zone: ZoneDemand }) {
           {zone.name}
           {zone.pickupPoint ? ` · ${zone.pickupPoint}` : ""}
         </Text>
-        <Text style={styles.zoneBikes}>
-          {zone.bikesNearby} {zone.bikesNearby === 1 ? "bike" : "bikes"} near
+        <Text style={styles.zoneDrivers}>
+          {zone.driversNearby} {zone.driversNearby === 1 ? "taxi" : "taxis"} near
         </Text>
       </View>
       <View style={[styles.levelChip, { backgroundColor: level.tint }]}>
@@ -295,7 +295,7 @@ const styles = StyleSheet.create({
   },
   zoneCount: { ...type.fareSmall, color: c.ink, minWidth: 34 },
   zoneName: { ...type.body, color: c.ink },
-  zoneBikes: { ...type.secondary, color: c.muted },
+  zoneDrivers: { ...type.secondary, color: c.muted },
   levelChip: { borderRadius: radius.pill, paddingHorizontal: space.sm, paddingVertical: space.xs },
   levelText: { ...type.label },
 

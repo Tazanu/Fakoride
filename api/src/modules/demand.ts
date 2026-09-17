@@ -1,14 +1,14 @@
 /**
  * Where people are waiting now.
  *
- * A bendskin driver already knows the corridor better than any algorithm will.
+ * A taxi driver already knows the corridor better than any algorithm will.
  * What he cannot see from where he is parked is how many riders are standing at
  * Mile 17 right this minute, so that — and only that — is what this serves. It
  * never tells him where to go; it gives him the one fact he is missing and lets
  * him decide.
  *
  * Demand is read from trips that are still looking for a driver. Supply is read
- * from the Redis GEO set, which is the only place that knows where bikes are.
+ * from the Redis GEO set, which is the only place that knows where drivers are.
  */
 
 import { Router } from "express";
@@ -30,7 +30,7 @@ export type ZoneDemand = {
   /** "Checkpoint" — where in the zone people actually stand. */
   pickupPoint: string | null;
   waitingRiders: number;
-  bikesNearby: number;
+  driversNearby: number;
   level: DemandLevel;
 };
 
@@ -41,13 +41,13 @@ export function demandRouter(): Router {
    * The board on the driver's home screen.
    *
    * Driver-only: it is a supply signal, and a rider who could see which zones
-   * are short of bikes has been handed a reason to distrust the fixed fare.
+   * are short of taxis has been handed a reason to distrust the fixed fare.
    */
   router.get(
     "/zones",
     requireAuth("DRIVER", "ADMIN"),
     asyncHandler(async (req, res) => {
-      const vehicleType = req.query.vehicleType === "CAR" ? "CAR" : "MOTO";
+      const vehicleType = req.query.vehicleType === "MOTO" ? "MOTO" : "CAR";
       const since = new Date(Date.now() - DEMAND_WINDOW_MINUTES * 60_000);
 
       const [zones, waiting] = await Promise.all([
@@ -66,7 +66,7 @@ export function demandRouter(): Router {
 
       const waitingByZone = new Map(waiting.map((w) => [w.fromZoneId, w._count._all]));
 
-      // One round trip for every zone's bike count. Fourteen zones, one pipeline.
+      // One round trip for every zone's taxi count. Fourteen zones, one pipeline.
       const pipeline = redis.pipeline();
       for (const zone of zones) {
         pipeline.geosearch(
@@ -85,16 +85,16 @@ export function demandRouter(): Router {
 
       const board: ZoneDemand[] = zones.map((zone, i) => {
         const result = counts?.[i];
-        // A Redis hiccup must not blank the screen; report no bikes and move on.
-        const bikesNearby = result && !result[0] && Array.isArray(result[1]) ? result[1].length : 0;
+        // A Redis hiccup must not blank the screen; report none and move on.
+        const driversNearby = result && !result[0] && Array.isArray(result[1]) ? result[1].length : 0;
         const waitingRiders = waitingByZone.get(zone.id) ?? 0;
         return {
           zone: zone.code,
           name: zone.name,
           pickupPoint: zone.landmarks[0]?.name ?? null,
           waitingRiders,
-          bikesNearby,
-          level: demandLevel(waitingRiders, bikesNearby),
+          driversNearby,
+          level: demandLevel(waitingRiders, driversNearby),
         };
       });
 
@@ -108,7 +108,7 @@ export function demandRouter(): Router {
   /**
    * "7 near" on the rider's home screen.
    *
-   * A count, never positions. Showing a rider exactly where each bike is parked
+   * A count, never positions. Showing a rider exactly where each taxi is parked
    * exposes drivers to being picked off directly and cuts us out of the trip
    * the safety features depend on.
    */
@@ -119,7 +119,7 @@ export function demandRouter(): Router {
         .object({
           lat: z.coerce.number(),
           lng: z.coerce.number(),
-          vehicleType: z.enum(["MOTO", "CAR"]).default("MOTO"),
+          vehicleType: z.enum(["MOTO", "CAR"]).default("CAR"),
         })
         .parse(req.query);
 
@@ -137,9 +137,9 @@ export function demandRouter(): Router {
       });
 
       res.json({
-        bikesNearby: eligible,
+        driversNearby: eligible,
         radiusM: env.DISPATCH_RADIUS_M,
-        nearestBikeM: nearby[0] ? Math.round(nearby[0].distanceM) : null,
+        nearestDriverM: nearby[0] ? Math.round(nearby[0].distanceM) : null,
       });
     }),
   );

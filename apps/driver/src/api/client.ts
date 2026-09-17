@@ -3,7 +3,7 @@
  *
  * Three things this has to get right, all of them because of where the app runs:
  *
- *   1. A dropped connection is normal, not exceptional. A bendskin on the Soppo
+ *   1. A dropped connection is normal, not exceptional. A taxi on the Soppo
  *      climb loses signal several times a trip. Every failure here is a value
  *      the caller can render, never an unhandled throw.
  *   2. Errors are matched on `code`, never on `message`. The API answers in
@@ -15,7 +15,7 @@
  */
 
 import Constants from "expo-constants";
-import * as SecureStore from "expo-secure-store";
+import { deleteSecret, getSecret, setSecret } from "./storage";
 
 /** Long enough for a bad 3G handshake, short enough that a driver is not stuck. */
 const TIMEOUT_MS = 15_000;
@@ -70,18 +70,18 @@ let memoryToken: string | null = null;
 
 export async function getToken(): Promise<string | null> {
   if (memoryToken) return memoryToken;
-  memoryToken = await SecureStore.getItemAsync(TOKEN_KEY);
+  memoryToken = await getSecret(TOKEN_KEY);
   return memoryToken;
 }
 
 export async function setToken(token: string): Promise<void> {
   memoryToken = token;
-  await SecureStore.setItemAsync(TOKEN_KEY, token);
+  await setSecret(TOKEN_KEY, token);
 }
 
 export async function clearToken(): Promise<void> {
   memoryToken = null;
-  await SecureStore.deleteItemAsync(TOKEN_KEY);
+  await deleteSecret(TOKEN_KEY);
 }
 
 type RequestOptions = {
