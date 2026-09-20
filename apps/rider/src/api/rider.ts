@@ -1,0 +1,247 @@
+/**
+ * Every call this app makes, typed.
+ *
+ * The shapes mirror what the API actually returns — they are not a guess. If a
+ * field moves, this file is where the compiler tells you, rather than a screen
+ * rendering `undefined` in front of somebody standing at a junction at night.
+ */
+
+import { api } from "./client";
+
+// --- shared shapes ----------------------------------------------------------
+
+export type PaymentMethod = "CASH" | "MOMO" | "ORANGE_MONEY";
+
+export type TripStatus =
+  | "REQUESTED"
+  | "OFFERED"
+  | "ACCEPTED"
+  | "ARRIVED"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "CANCELLED_BY_RIDER"
+  | "CANCELLED_BY_DRIVER"
+  | "NO_DRIVER_FOUND";
+
+export type Me = {
+  id: string;
+  phone: string;
+  name: string | null;
+  role: "RIDER" | "DRIVER" | "ADMIN";
+  language: string;
+};
+
+// --- signing in -------------------------------------------------------------
+
+export const auth = {
+  requestCode: (phone: string) =>
+    api.post<{ sent: true; expiresInSeconds: number; devCode?: string }>(
+      "/auth/otp/request",
+      { phone },
+      { anonymous: true },
+    ),
+
+  verifyCode: (params: { phone: string; code: string; name?: string }) =>
+    api.post<{ token: string; user: Me }>(
+      "/auth/otp/verify",
+      { ...params, role: "RIDER" },
+      { anonymous: true },
+    ),
+
+  me: () => api.get<Me>("/auth/me"),
+};
+
+// --- where we are -----------------------------------------------------------
+
+export type Zone = { code: string; name: string; town: string; elevationM: number };
+
+export type Resolved = {
+  zone: { code: string; name: string };
+  /** "Checkpoint" or "Mile 17 Motor Park, Mile 17" — already de-duplicated. */
+  label: string;
+  nearestLandmark: { name: string; distanceKm: number } | null;
+};
+
+export const geo = {
+  zones: () => api.get<{ zones: Zone[] }>("/geo/zones", { anonymous: true }),
+
+  /** Turns a GPS fix into the words a person would say. */
+  resolve: (lat: number, lng: number) =>
+    api.get<Resolved>(`/geo/resolve?lat=${lat}&lng=${lng}`, { anonymous: true }),
+
+  /** Road closures, fuel queues, a landslide on the Soppo climb. */
+  notices: () =>
+    api.get<{
+      notices: { message: string; messageFr: string | null; severity: string; zone: string | null }[];
+    }>("/geo/notices", { anonymous: true }),
+};
+
+// --- what it costs ----------------------------------------------------------
+
+/**
+ * The fare, before anybody is asked to drive anywhere.
+ *
+ * `priceXaf` is cash and `mobilePriceXaf` is the same trip paid by phone. The
+ * difference is the whole reason the discount exists and it belongs on screen,
+ * not buried: the rider is being paid to choose the cheaper rail for us.
+ */
+export type Quote = {
+  /** Codes, not objects — the API answers with the pair it priced. */
+  fromZoneCode: string;
+  toZoneCode: string;
+  vehicleType: "MOTO" | "CAR";
+  priceXaf: number;
+  mobilePriceXaf: number;
+  hillFare: boolean;
+  source: "FIELD" | "FORMULA";
+};
+
+export const fares = {
+  quote: (params: { fromLat: number; fromLng: number; toZone: string }) =>
+    api.get<Quote>(
+      `/fares/quote?fromLat=${params.fromLat}&fromLng=${params.fromLng}&toZone=${encodeURIComponent(params.toZone)}`,
+    ),
+};
+
+// --- how busy it is ---------------------------------------------------------
+
+export const demand = {
+  /** A count of taxis near a point, never their positions. */
+  nearby: (lat: number, lng: number) =>
+    api.get<{ driversNearby: number; nearestDriverM: number | null }>(
+      `/demand/nearby?lat=${lat}&lng=${lng}`,
+    ),
+};
+
+// --- the trip ---------------------------------------------------------------
+
+export type TripDriver = {
+  name: string | null;
+  phone: string;
+  plate: string;
+  rating: number;
+  tripCount: number;
+  verified: boolean;
+  hasSpareHelmet: boolean;
+};
+
+export type TripDetail = {
+  id: string;
+  status: TripStatus;
+  priceXaf: number;
+  paymentMethod: PaymentMethod;
+  pickupLabel: string;
+  dropLabel: string;
+  from: { code: string; name: string };
+  to: { code: string; name: string };
+  /**
+   * Four digits, and only the rider ever sees them.
+   *
+   * She reads them out; he types what he is told. That direction is the whole
+   * safety design — a driver who could see the PIN could start a trip with
+   * somebody who never got in.
+   */
+  pin?: string;
+  driver: TripDriver | null;
+  needsHelmet: boolean;
+  womanDriverOnly: boolean;
+  requestedAt: string;
+  acceptedAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+};
+
+export type Repeat = {
+  zone: string;
+  name: string;
+  label: string;
+  tripCount: number;
+  priceXaf: number;
+  mobilePriceXaf: number;
+  hillFare: boolean;
+};
+
+export type BookRequest = {
+  pickupLat: number;
+  pickupLng: number;
+  pickupLabel?: string;
+  toZone: string;
+  paymentMethod: PaymentMethod;
+  needsHelmet?: boolean;
+  womanDriverOnly?: boolean;
+};
+
+export const trips = {
+  book: (body: BookRequest) =>
+    api.post<{
+      id: string;
+      status: TripStatus;
+      priceXaf: number;
+      paymentMethod: PaymentMethod;
+      pin: string;
+      pickupLabel: string;
+      dropLabel: string;
+      hillFare: boolean;
+      needsHelmet: boolean;
+      womanDriverOnly: boolean;
+    }>("/trips", body),
+
+  get: (id: string) => api.get<TripDetail>(`/trips/${id}`),
+
+  /** Her own history, newest first. Drives "go there again". */
+  mine: (limit = 10) =>
+    api.get<{ trips: TripDetail[]; nextBefore: string | null }>(`/trips?limit=${limit}`),
+
+  /**
+   * The trips she takes over and over, so booking one is a single tap.
+   *
+   * `label` is what she called the place last time, not what the gazetteer
+   * calls it — the point of the row is recognition, not correctness.
+   */
+  repeats: (lat: number, lng: number) =>
+    api.get<{
+      from: { code: string; name: string };
+      repeats: Repeat[];
+    }>(`/trips/repeats?fromLat=${lat}&fromLng=${lng}`),
+
+  cancel: (id: string, reason?: string) =>
+    api.post<{ status: string }>(`/trips/${id}/cancel`, { reason }),
+
+  rate: (id: string, stars: number, comment?: string) =>
+    api.post<{ ok: true }>(`/trips/${id}/rate`, { stars, ...(comment ? { comment } : {}) }),
+
+  /** Panic. Sends position with it, because "where" is the whole question. */
+  sos: (id: string, body: { lat?: number; lng?: number; note?: string }) =>
+    api.post<{ alertId: string; status: string; next: string }>(`/trips/${id}/sos`, body),
+};
+
+// --- letting somebody watch -------------------------------------------------
+
+/**
+ * A link her mother can open.
+ *
+ * Expires on its own — the API gives it six hours and half an hour of grace
+ * after the trip ends. A share link that outlives the ride is a tracker.
+ */
+export type Share = {
+  token: string;
+  /** Relative — the app joins it to the API origin to make something sendable. */
+  path: string;
+  sharedWith: string | null;
+  expiresAt: string;
+};
+
+export const share = {
+  create: (tripId: string, sharedWith?: string) =>
+    api.post<Share>(`/trips/${tripId}/share`, sharedWith ? { sharedWith } : {}),
+
+  /** Who is watching, so the trip screen can say so by name. */
+  list: (tripId: string) =>
+    api.get<{
+      shares: { token: string; sharedWith: string | null; viewCount: number; expiresAt: string }[];
+    }>(`/trips/${tripId}/share`),
+
+  /** Taking it back. The reason these are stored rather than signed. */
+  revoke: (tripId: string, token: string) =>
+    api.delete<{ revoked: true }>(`/trips/${tripId}/share/${token}`),
+};
