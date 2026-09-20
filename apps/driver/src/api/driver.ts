@@ -175,6 +175,31 @@ export const trips = {
     api.post<{ alertId: string; status: string; next: string }>(`/trips/${id}/sos`, body),
 };
 
+// --- documents --------------------------------------------------------------
+
+export type DocumentKind = "NATIONAL_ID" | "VEHICLE_REGISTRATION" | "DRIVER_PHOTO";
+
+export type DocumentState = {
+  kind: DocumentKind;
+  uploaded: boolean;
+  uploadedAt: string | null;
+  byteSize: number | null;
+};
+
+/**
+ * What he has sent, and what is still missing.
+ *
+ * Note what is *not* here: the file, or any key to fetch it with. A driver has
+ * no reason to read his own ID card back out of us, and not returning it means
+ * a stolen token cannot be used to harvest identity documents.
+ */
+export const driverDocuments = {
+  list: () =>
+    api.get<{ required: DocumentKind[]; documents: DocumentState[]; complete: boolean }>(
+      "/drivers/me/documents",
+    ),
+};
+
 // --- money ------------------------------------------------------------------
 
 export type EarningsDay = {

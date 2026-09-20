@@ -6,10 +6,8 @@
  * screen quietly failing every request.
  */
 
-import { View } from "react-native";
 import { Redirect, Stack } from "expo-router";
 import { useSession } from "@/session/SessionProvider";
-import { OfferSheet } from "@/realtime/OfferSheet";
 import { RealtimeProvider } from "@/realtime/RealtimeProvider";
 import { palette } from "@/theme";
 
@@ -23,23 +21,22 @@ export default function AppLayout() {
   const c = palette("light");
 
   /**
-   * The offer sits above the stack, not inside it.
+   * The offer lives on the home screen now, not over the stack.
    *
-   * A ride can arrive while he is reading his earnings, and it has to be
-   * answerable there — pushing a screen would throw away whatever he was doing
-   * for something he may well decline.
+   * It used to be a sheet here so it could cover any screen. The canvas puts it
+   * inline instead, and that is the better call for this app: a driver looking
+   * at this screen is *waiting* for work, so the offer belongs in the flow of
+   * the page where his thumb already is. Two offer surfaces at once was the bug
+   * that made the change obvious.
    */
   return (
     <RealtimeProvider>
-      <View style={{ flex: 1 }}>
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: c.paper },
-          }}
-        />
-        <OfferSheet />
-      </View>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: c.paper },
+        }}
+      />
     </RealtimeProvider>
   );
 }

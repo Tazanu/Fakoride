@@ -1,8 +1,8 @@
 /**
  * The root of the driver app.
  *
- * Holds the two things every screen below depends on: the display face, and who
- * is signed in. Nothing renders until the font has resolved — a fare that
+ * Holds the two things every screen below depends on: the two faces, and who
+ * is signed in. Nothing renders until they resolve — a fare that
  * reflows a moment after it appears is the flash of invisible text that
  * design/README.md spends a rule avoiding, and it lands hardest on exactly the
  * Android Go handsets our drivers carry.
@@ -13,11 +13,14 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import * as SplashScreen from "expo-splash-screen";
+import { useFonts } from "expo-font";
+import { Archivo_600SemiBold, Archivo_700Bold } from "@expo-google-fonts/archivo";
 import {
-  useFonts,
-  BarlowSemiCondensed_600SemiBold,
-  BarlowSemiCondensed_700Bold,
-} from "@expo-google-fonts/barlow-semi-condensed";
+  Manrope_400Regular,
+  Manrope_500Medium,
+  Manrope_600SemiBold,
+  Manrope_700Bold,
+} from "@expo-google-fonts/manrope";
 import { SessionProvider } from "@/session/SessionProvider";
 import { palette } from "@/theme";
 
@@ -25,8 +28,12 @@ void SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
-    BarlowSemiCondensed_600SemiBold,
-    BarlowSemiCondensed_700Bold,
+    Archivo_600SemiBold,
+    Archivo_700Bold,
+    Manrope_400Regular,
+    Manrope_500Medium,
+    Manrope_600SemiBold,
+    Manrope_700Bold,
   });
 
   useEffect(() => {

@@ -35,28 +35,60 @@ export function palette(scheme: Scheme = "light"): Palette {
 /** MTN yellow and Orange orange. Only ever for a payment chip. */
 export const brand = tokens.color.brand;
 
+/**
+ * The map's own colours.
+ *
+ * Kept apart from the interface palette on purpose: these are illustration, and
+ * nothing outside the map panel may reach for them. A block grey that leaked
+ * into a card would be a colour nobody chose for text to sit on.
+ */
+export const mapPalette = tokens.color.map;
+
+/** The welcome badge's two colours. Artwork, never interface. */
+export const logoPalette = tokens.color.logo;
+
 export const space = tokens.space;
 export const radius = tokens.radius;
 export const touch = tokens.touch;
 
 /**
- * Interface text ships in the phone's own font.
+ * The two faces, by exact PostScript name.
  *
- * `undefined` is deliberate and is the whole point: it resolves to Roboto on
- * Android and San Francisco on iOS, costs no APK weight, and cannot produce a
- * flash of invisible text on the Android Go handsets our drivers carry. Only
- * the display face is bundled, and only for money, headings and the wordmark.
+ * Both are bundled. That is a change from the first version, which used the
+ * phone's own font for body text to save weight — the design canvas asks for
+ * Manrope throughout, and one typographic voice across a market where the
+ * system face differs handset to handset is worth the download.
  */
 export const fontFamily = {
-  ui: undefined,
-  display: "BarlowSemiCondensed_700Bold",
-  displaySemi: "BarlowSemiCondensed_600SemiBold",
+  ui: "Manrope_400Regular",
+  uiMedium: "Manrope_500Medium",
+  uiSemi: "Manrope_600SemiBold",
+  uiBold: "Manrope_700Bold",
+  display: "Archivo_700Bold",
+  displaySemi: "Archivo_600SemiBold",
 } as const;
 
-/** The font keys expo-font loads at startup. Must match fontFamily above. */
-export const DISPLAY_FONTS = ["BarlowSemiCondensed_600SemiBold", "BarlowSemiCondensed_700Bold"] as const;
+/**
+ * The faces loaded at startup. Must match fontFamily above.
+ *
+ * Body text is a bundled face now rather than the phone's own. That costs a
+ * download once, and buys a single typographic voice across a market where the
+ * system font is Roboto on one handset and something else on the next.
+ */
+export const APP_FONTS = [
+  "Archivo_600SemiBold",
+  "Archivo_700Bold",
+  "Manrope_400Regular",
+  "Manrope_500Medium",
+  "Manrope_600SemiBold",
+  "Manrope_700Bold",
+] as const;
 
-type Role = "fare" | "fareSmall" | "title" | "heading" | "body" | "bodyPlain" | "secondary" | "label";
+type Role = keyof typeof tokens.type extends infer K
+  ? K extends `$${string}`
+    ? never
+    : K
+  : never;
 
 /**
  * Six sizes, and nothing in the product invents a seventh.
@@ -66,16 +98,39 @@ type Role = "fare" | "fareSmall" | "title" | "heading" | "body" | "bodyPlain" | 
  * unreadable one-handed, outdoors, in sun.
  */
 function textStyle(role: Role): TextStyle {
-  const t = tokens.type[role];
-  const isDisplay = t.family === "display";
+  const t = tokens.type[role] as {
+    size: number;
+    weight: number;
+    family: "display" | "ui";
+    lineHeight?: number;
+    tracking?: number;
+  };
+
+  /**
+   * Weight is chosen by picking a face, never by `fontWeight`.
+   *
+   * Android does not synthesise weights for a bundled family — asking for 600
+   * on a family that only has 400 loaded gets you 400, silently, and the design
+   * quietly flattens. Naming the exact face is the only way to be sure.
+   */
+  const family =
+    t.family === "display"
+      ? t.weight >= 700
+        ? fontFamily.display
+        : fontFamily.displaySemi
+      : t.weight >= 700
+        ? fontFamily.uiBold
+        : t.weight >= 600
+          ? fontFamily.uiSemi
+          : t.weight >= 500
+            ? fontFamily.uiMedium
+            : fontFamily.ui;
+
   return {
     fontSize: t.size,
-    lineHeight: "lineHeight" in t ? Math.round(t.size * t.lineHeight) : undefined,
-    ...(isDisplay
-      ? { fontFamily: t.weight >= 700 ? fontFamily.display : fontFamily.displaySemi }
-      : { fontWeight: String(t.weight) as TextStyle["fontWeight"] }),
-    ...("letterSpacing" in t ? { letterSpacing: t.letterSpacing } : {}),
-    ...("uppercase" in t && t.uppercase ? { textTransform: "uppercase" as const } : {}),
+    fontFamily: family,
+    ...(t.lineHeight ? { lineHeight: Math.round(t.size * t.lineHeight) } : {}),
+    ...(t.tracking ? { letterSpacing: t.tracking } : {}),
   };
 }
 
@@ -83,11 +138,16 @@ export const type = {
   fare: textStyle("fare"),
   fareSmall: textStyle("fareSmall"),
   title: textStyle("title"),
+  titleSmall: textStyle("titleSmall"),
   heading: textStyle("heading"),
+  plate: textStyle("plate"),
   body: textStyle("body"),
+  bodyStrong: textStyle("bodyStrong"),
   bodyPlain: textStyle("bodyPlain"),
   secondary: textStyle("secondary"),
+  secondaryStrong: textStyle("secondaryStrong"),
   label: textStyle("label"),
+  button: textStyle("button"),
 } as const;
 
 /**
