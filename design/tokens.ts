@@ -52,13 +52,17 @@ export const radius = tokens.radius;
 export const touch = tokens.touch;
 
 /**
- * Font families. UI text uses whatever the phone already has; only the display
- * face is bundled, and only for fares, headings and the wordmark.
+ * Font families.
+ *
+ * Both faces are bundled now — Archivo for anything read as a number or a
+ * heading, Manrope for anything read as a sentence. The phone's own font is no
+ * longer used for body text, so there is no per-platform stack to choose from.
  */
 export const font = {
-  ui: (platform: "android" | "ios" | "web" = "android") => tokens.font.ui[platform],
-  display: tokens.font.display.web,
-  displayFamily: tokens.font.display.family,
+  ui: tokens.font.ui.family,
+  uiWeb: tokens.font.ui.web,
+  display: tokens.font.display.family,
+  displayWeb: tokens.font.display.web,
 };
 
 export type TypeRole = Exclude<keyof typeof tokens.type, `$${string}`>;
