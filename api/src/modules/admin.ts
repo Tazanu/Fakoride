@@ -16,6 +16,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { ApiError, asyncHandler, param } from "../lib/http";
+import { adminDocumentsRouter, REQUIRED_KINDS } from "./documents/routes";
 import { requireAuth } from "../middleware/auth";
 import { clearDriverPosition } from "../lib/presence";
 import { FARE_ROUNDING_XAF, MIN_FARE_XAF } from "./fare-math";
@@ -43,7 +44,12 @@ const rejectSchema = z.object({
 
 export function adminRouter(): Router {
   const router = Router();
+
   router.use(requireAuth("ADMIN"));
+  // Below the guard, deliberately. Mounted above it these routes served ID
+  // photographs to anybody who knew a driver id — which is what the first
+  // version of this line did.
+  router.use("/drivers/:id/documents", adminDocumentsRouter());
   // Inherits the ADMIN guard above, so the money views need no guard of their own.
   router.use(adminPaymentsRouter());
 
@@ -65,6 +71,8 @@ export function adminRouter(): Router {
         include: {
           user: { select: { name: true, phone: true, language: true } },
           homeZone: { select: { code: true, name: true } },
+          // A count, not the rows: the queue needs "2 of 3", not the keys.
+          _count: { select: { documents: true } },
         },
       });
 
@@ -81,7 +89,10 @@ export function adminRouter(): Router {
           appliedAt: d.createdAt,
           /** How long this person has been waiting to hear from us. */
           waitingDays: Math.floor((Date.now() - d.createdAt.getTime()) / 86_400_000),
-          hasDocuments: Boolean(d.cniDocKey && d.licenceKey),
+          // How many of the three he has sent — the queue shows "2 of 3".
+          documentsHeld: d._count.documents,
+          documentsRequired: REQUIRED_KINDS.length,
+          hasDocuments: d._count.documents >= REQUIRED_KINDS.length,
         })),
       });
     }),

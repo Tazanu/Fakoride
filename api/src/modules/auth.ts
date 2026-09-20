@@ -142,7 +142,23 @@ export function authRouter(): Router {
         where: { phone },
         create: { phone, name: body.name ?? null, role: body.role },
         update: body.name ? { name: body.name } : {},
-        include: { driver: { select: { id: true, status: true, vehicleType: true } } },
+        // The same columns /auth/me returns. Two endpoints answering with the
+        // same `Me` shape is the whole point — a client that signs in and then
+        // reads a field only one of them sends gets undefined at runtime while
+        // the types say otherwise.
+        include: {
+          driver: {
+            select: {
+              id: true,
+              status: true,
+              vehicleType: true,
+              plate: true,
+              online: true,
+              rating: true,
+              tripCount: true,
+            },
+          },
+        },
       });
 
       res.json({

@@ -9,6 +9,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { ApiError, asyncHandler } from "../lib/http";
+import { driverDocumentsRouter } from "./documents/routes";
 import { requireAuth } from "../middleware/auth";
 import { setDriverPosition, clearDriverPosition } from "../lib/presence";
 import { driverBalance, ensureAccessFee, todaySummary, weeklyEarnings } from "./ledger";
@@ -49,6 +50,9 @@ async function currentDriver(userId: string) {
 
 export function driversRouter(): Router {
   const router = Router();
+
+  // His own documents. Mounted here so the whole driver surface is one prefix.
+  router.use("/me/documents", driverDocumentsRouter());
 
   /** Apply to drive. Verification is a human step — nothing here grants access. */
   router.post(

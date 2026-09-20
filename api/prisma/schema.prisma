@@ -175,9 +175,6 @@ model Driver {
   /// The S10. A paid moto trip cannot legally be dispatched without one, so an
   /// admin cannot mark a driver ACTIVE without typing the number off the card.
   licenceNumber  String?
-  /// Object key in R2 for the CNI scan. Required before ACTIVE; never public.
-  cniDocKey      String?
-  licenceKey     String?
   status         DriverStatus @default(PENDING_REVIEW)
   verifiedAt     DateTime?
 
@@ -197,6 +194,7 @@ model Driver {
   ledger     LedgerEntry[]
   accessFees AccessFeeCharge[]
   reviews    DriverReview[]
+  documents  DriverDocument[]
   payments   Payment[]
 
   @@index([status, online])
@@ -546,4 +544,35 @@ model Payment {
   @@index([status, createdAt])
   @@index([driverId, createdAt])
   @@index([purpose, status])
+}
+
+/// What a driver has to hand over before anybody may be dispatched to him.
+enum DocumentKind {
+  /// The CNI card itself. The number lives on Driver; this is the photograph.
+  NATIONAL_ID
+  /// Carte grise — proof the car is his to drive.
+  VEHICLE_REGISTRATION
+  /// His face, which the rider sees before getting in.
+  DRIVER_PHOTO
+}
+
+/// One uploaded file.
+///
+/// `key` is an opaque object key in whatever store is configured — never a URL
+/// and never public. These are national ID photographs: they are read back only
+/// through an authenticated ops route, and never served as static files.
+model DriverDocument {
+  id          String       @id @default(cuid())
+  driverId    String
+  driver      Driver       @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  kind        DocumentKind
+  key         String
+  contentType String
+  byteSize    Int
+  uploadedAt  DateTime     @default(now())
+
+  /// One current copy per kind. Re-uploading replaces rather than piles up —
+  /// a driver who reshoots a blurry photo should not leave the blurry one behind.
+  @@unique([driverId, kind])
+  @@index([driverId])
 }

@@ -6,3 +6,7 @@ dist/
 *.log
 .DS_Store
 coverage/
+
+# Driver documents in development: photographs of national ID cards.
+# These must never reach a commit.
+.uploads/

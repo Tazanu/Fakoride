@@ -47,6 +47,19 @@ const schema = z.object({
   /** After this many refusals we stop asking and it becomes an ops call. */
   ACCESS_FEE_MAX_ATTEMPTS: z.coerce.number().int().default(4),
 
+  /**
+   * Where driver documents are kept.
+   *
+   * `local` writes to DOCUMENT_DIR on this machine and is for development only.
+   * `r2` is the production adapter and refuses until it is wired, which is the
+   * honest failure — a store that silently drops an ID photograph is worse.
+   */
+  DOCUMENT_STORE: z.enum(["local", "r2"]).default("local"),
+  /** Outside the repo by default. Never served statically, never committed. */
+  DOCUMENT_DIR: z.string().default(".uploads"),
+  /** A phone photo is 2-4 MB. Six leaves room without inviting an upload bomb. */
+  DOCUMENT_MAX_BYTES: z.coerce.number().int().default(6 * 1024 * 1024),
+
   ACCESS_FEE_XAF: z.coerce.number().int().default(500),
   MOBILE_PAYMENT_DISCOUNT_XAF: z.coerce.number().int().default(15),
   OFFER_TTL_SECONDS: z.coerce.number().int().default(12),
