@@ -66,8 +66,18 @@ async function signIn(phone, role, name) {
   return v.body.token;
 }
 
+/**
+ * The database the API under test is actually using.
+ *
+ * These helpers used to hardcode `fako_ride`. That is right until somebody
+ * points the suite at a second database to avoid destroying their dev data —
+ * and then every SQL assertion silently queries the wrong one and fails,
+ * which reads exactly like a pile of real bugs. Follow DATABASE_URL.
+ */
+const DB = (process.env.DATABASE_URL ?? "").split("/").pop()?.split("?")[0] || "fako_ride";
+
 const sql = (q) =>
-  execSync(`docker exec fako-postgres psql -U fako -d fako_ride -tAc "${q.replace(/"/g, '\\"')}"`, {
+  execSync(`docker exec fako-postgres psql -U fako -d ${DB} -tAc "${q.replace(/"/g, '\\"')}"`, {
     encoding: "utf8",
   }).trim();
 
@@ -176,7 +186,15 @@ check("the rolling earnings window answers", earnings.status === 200 && typeof e
 check("and carries the day's fee alongside the trips", Array.isArray(earnings.body.accessFees) && Array.isArray(earnings.body.trips), JSON.stringify(earnings.body.accessFees));
 
 console.log("\n=== the position fallback, for when the socket is down ===");
-const geoKey = "drivers:online:MOTO";
+/**
+ * The dispatch key follows the vehicle, not a guess.
+ *
+ * These read `drivers:online:MOTO` before the taxi pivot made CAR the
+ * default, so they were looking in an empty set: one failed, and the one
+ * after it passed vacuously — zero equals zero whether or not suspension
+ * clears Redis at all. A test that cannot fail is worse than one that does.
+ */
+const geoKey = `drivers:online:${sql(`SELECT "vehicleType" FROM "Driver" WHERE id='${driver.id}'`)}`;
 const before = redisCmd("GEOPOS", geoKey, driver.id);
 const moved = await call("POST", "/drivers/position", { token: driverToken, body: { lat: 4.1600, lng: 9.2800 } });
 check("a REST position ping is accepted", moved.body.ok === true, JSON.stringify(moved.body));

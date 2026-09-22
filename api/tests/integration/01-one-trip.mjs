@@ -60,8 +60,18 @@ async function signIn(phone, role, name) {
   return verified.body.token;
 }
 
+/**
+ * The database the API under test is actually using.
+ *
+ * These helpers used to hardcode `fako_ride`. That is right until somebody
+ * points the suite at a second database to avoid destroying their dev data —
+ * and then every SQL assertion silently queries the wrong one and fails,
+ * which reads exactly like a pile of real bugs. Follow DATABASE_URL.
+ */
+const DB = (process.env.DATABASE_URL ?? "").split("/").pop()?.split("?")[0] || "fako_ride";
+
 const sql = (q) =>
-  execSync(`docker exec fako-postgres psql -U fako -d fako_ride -tAc "${q}"`, { encoding: "utf8" }).trim();
+  execSync(`docker exec fako-postgres psql -U fako -d ${DB} -tAc "${q}"`, { encoding: "utf8" }).trim();
 
 console.log("\n=== auth ===");
 const riderToken = await signIn("+237670000001", "RIDER", "Mirabel");

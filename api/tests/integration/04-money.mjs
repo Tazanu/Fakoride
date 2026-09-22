@@ -73,8 +73,18 @@ async function signIn(phone, role, name) {
   return v.body.token;
 }
 
+/**
+ * The database the API under test is actually using.
+ *
+ * These helpers used to hardcode `fako_ride`. That is right until somebody
+ * points the suite at a second database to avoid destroying their dev data —
+ * and then every SQL assertion silently queries the wrong one and fails,
+ * which reads exactly like a pile of real bugs. Follow DATABASE_URL.
+ */
+const DB = (process.env.DATABASE_URL ?? "").split("/").pop()?.split("?")[0] || "fako_ride";
+
 const sql = (q) =>
-  execSync(`docker exec fako-postgres psql -U fako -d fako_ride -tAc "${q.replace(/"/g, '\\"')}"`, {
+  execSync(`docker exec fako-postgres psql -U fako -d ${DB} -tAc "${q.replace(/"/g, '\\"')}"`, {
     encoding: "utf8",
   }).trim();
 
@@ -295,7 +305,18 @@ sql(`UPDATE "AccessFeeCharge" SET "serviceDate" = "serviceDate" - INTERVAL '1 da
 const brokeChargeId = sql(`SELECT id FROM "AccessFeeCharge" WHERE "driverId"='${brokeDriver.id}' LIMIT 1`);
 
 const firstSweep = await call("POST", "/admin/access-fees/collect", { token: adminToken });
-check("the sweep picks up a fee due from yesterday", firstSweep.body.attempted >= 1, JSON.stringify(firstSweep.body));
+/*
+ * `due`, not `attempted`.
+ *
+ * The harness runs the background access-fee job every second, so it can put
+ * the prompt on his phone a moment before this manual sweep does — and the
+ * manual one then correctly reports `inFlight` rather than `attempted`,
+ * because a second USSD on the same charge is exactly what must not happen.
+ * What this line is really asserting is that the sweep did not walk past a
+ * fee owed from yesterday, and `due` says that without racing the job.
+ * "one attempt was made", below, is what holds the prompt count to one.
+ */
+check("the sweep picks up a fee due from yesterday", firstSweep.body.due >= 1, JSON.stringify(firstSweep.body));
 
 await sleep(1500);
 const attemptsAfterFirst = Number(sql(`SELECT count(*) FROM "Payment" WHERE "accessFeeChargeId"='${brokeChargeId}'`));
