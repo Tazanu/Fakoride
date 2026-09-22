@@ -138,7 +138,7 @@ const queue = await call("GET", "/admin/drivers", { token: adminToken });
 const applicant = queue.body.drivers?.find((d) => d.plate === DRIVER_PLATE);
 await call("POST", `/admin/drivers/${applicant.id}/verify`, {
   token: adminToken,
-  body: { licenceNumber: `S10-${nonce}` },
+  body: { licenceNumber: `S10-${nonce}`, overrideMissingDocuments: true, note: "Test fixture — no documents uploaded." },
 });
 await call("POST", "/drivers/online", { token: driverToken, body: CHECKPOINT });
 
@@ -191,8 +191,23 @@ const tripStill = sql(`SELECT status FROM "Trip" WHERE id='${failedTrip.id}'`);
 check("but the trip itself stays completed — the ride happened", tripStill === "COMPLETED", tripStill);
 
 console.log("\n=== the webhook ===");
+/*
+ * A rider whose payment will never settle by itself.
+ *
+ * The fake provider resolves a charge asynchronously, so a webhook test using
+ * an ordinary rider races it — and when the provider wins, the ledger is already
+ * credited and the stored reference is the provider’s, not the webhook’s. The
+ * assertions below then pass or fail on timing, and the webhook path they exist
+ * to cover is never exercised at all.
+ *
+ * A number ending 11 stays PENDING forever in the fake provider — the
+ * stuck-payment case. That makes the webhook the only thing that can settle this
+ * charge, which is exactly what these assertions mean to prove.
+ */
+const WEBHOOK_RIDER = `+2376711${String(nonce).slice(0, -2)}11`;
+const webhookRiderToken = await signIn(WEBHOOK_RIDER, "RIDER", "Adeline");
 const target = await call("POST", "/trips", {
-  token: riderToken,
+  token: webhookRiderToken,
   body: { pickupLat: CHECKPOINT.lat, pickupLng: CHECKPOINT.lng, toZone: "MALINGO", paymentMethod: "MOMO" },
 });
 await call("POST", `/trips/${target.body.id}/accept`, { token: driverToken });
@@ -296,7 +311,7 @@ const brokeQueue = await call("GET", "/admin/drivers", { token: adminToken });
 const brokeDriver = brokeQueue.body.drivers.find((d) => d.plate === BROKE_PLATE);
 await call("POST", `/admin/drivers/${brokeDriver.id}/verify`, {
   token: adminToken,
-  body: { licenceNumber: `S10-${nonce}-B` },
+  body: { licenceNumber: `S10-${nonce}-B`, overrideMissingDocuments: true, note: "Test fixture — no documents uploaded." },
 });
 await call("POST", "/drivers/online", { token: brokeToken2, body: CHECKPOINT });
 
