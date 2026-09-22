@@ -1,10 +1,15 @@
 # Fako Ride
 
-Bendskin-hailing for Fako Division, Cameroon. Motos first, fixed zone-pair fares,
+Taxi-hailing for Fako Division, Cameroon. Fixed zone-pair fares priced by gradient,
 cash accepted, and drivers pay a flat daily access fee instead of a per-trip commission.
 
-This repo currently holds the **backend spine**: the data model, the Fako gazetteer,
-the fare engine, trip lifecycle and dispatch. The rider and driver apps come after.
+**Buea runs on taxis, not motos.** The research began with bendskins and the ground
+contradicted it. `vehicleType` still carries `MOTO` because Limbe and Tiko do run
+bikes and will need it back, but `CAR` is the default and everything visible says
+taxi.
+
+Three things live here: the API, one mobile app that serves riders and drivers from
+a single account, and the ops console.
 
 ## Why it is built this way
 
@@ -32,6 +37,14 @@ api/
                            demand, safety (SOS + complaints), share, admin
   src/modules/payments/    the provider port, a Fapshi adapter, and a fake one
   src/realtime.ts          socket.io: driver positions, offers, trip state
+  tests/integration/       five suites over real HTTP, Postgres and Redis
+apps/
+  mobile/                  one Expo app. Sign in once; whether the account has a
+                           driver record decides which half opens. Routes split
+                           (rider)/ and (driver)/ under a shared welcome, sign-in,
+                           application and account.
+  ops/                     the console: approvals, safety, trips, complaints,
+                           fares, drivers
 design/
   tokens.json              the Daylight design system — source of truth
   tokens.ts                typed access for the apps and the ops console
