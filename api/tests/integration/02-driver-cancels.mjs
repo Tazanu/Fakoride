@@ -85,7 +85,7 @@ const bernard = pending.body.drivers?.find((d) => d.plate === "SW 7781 C");
 check("the second bike is waiting for verification", Boolean(bernard), JSON.stringify(pending.body.waiting));
 await call("POST", `/admin/drivers/${bernard.id}/verify`, {
   token: adminToken,
-  body: { licenceNumber: "S10-2026-0002" },
+  body: { licenceNumber: "S10-2026-0002", overrideMissingDocuments: true, note: "Test fixture — no documents uploaded." },
 });
 await call("POST", "/drivers/online", { token: driverBToken, body: CHECKPOINT });
 

@@ -104,7 +104,7 @@ const applicant = queue.body.drivers?.find((d) => d.plate === "SW 4192 B");
 check("he is waiting in the ops verification queue", Boolean(applicant), JSON.stringify(queue.body.waiting));
 const verifiedDriver = await call("POST", `/admin/drivers/${applicant.id}/verify`, {
   token: adminToken,
-  body: { licenceNumber: "S10-2026-0001" },
+  body: { licenceNumber: "S10-2026-0001", overrideMissingDocuments: true, note: "Test fixture — no documents uploaded." },
 });
 check("ops verifies him", verifiedDriver.body.status === "ACTIVE", JSON.stringify(verifiedDriver.body));
 

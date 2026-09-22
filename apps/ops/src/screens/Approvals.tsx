@@ -79,6 +79,10 @@ function errorFor(err: unknown): string {
       return "Could not reach the API. Is it running?";
     case "already_active":
       return "This driver is already approved.";
+    case "documents_missing":
+      return "This driver has not sent every document. Use “Approve without them” if you have seen them yourself.";
+    case "override_needs_reason":
+      return "Say where you saw the documents before approving without them.";
     case "invalid_request":
       return "The licence number is required, and the reason must be a sentence.";
     default:
@@ -250,6 +254,8 @@ function Application({
   const [docs, setDocs] = useState<DocumentRow[] | null>(null);
   const [licence, setLicence] = useState("");
   const [rejecting, setRejecting] = useState(false);
+  /** Set when ops chooses to approve somebody whose photographs are not all here. */
+  const [overriding, setOverriding] = useState(false);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -291,10 +297,16 @@ function Application({
       setError("Type the licence number off the card before approving.");
       return;
     }
+    // The API refuses an override without a reason, so catch it here where the
+    // person can still fix it rather than bouncing them off a 400.
+    if (short && reason.trim().length < 5) {
+      setError("Say where you saw the documents before approving without them.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      await ops.verify(driver.id, licence.trim());
+      await ops.verify(driver.id, licence.trim(), short ? reason.trim() : undefined, short);
       onDone();
     } catch (err) {
       setError(errorFor(err));
@@ -418,15 +430,39 @@ function Application({
               />
             </label>
           ) : (
-            <label style={styles.licence}>
-              <span style={styles.licenceLabel}>Licence number, off the card</span>
-              <input
-                value={licence}
-                onChange={(e) => setLicence(e.target.value)}
-                placeholder="SW-LIC-4192"
-                disabled={busy}
-              />
-            </label>
+            <>
+              <label style={styles.licence}>
+                <span style={styles.licenceLabel}>Licence number, off the card</span>
+                <input
+                  value={licence}
+                  onChange={(e) => setLicence(e.target.value)}
+                  placeholder="SW-LIC-4192"
+                  disabled={busy}
+                />
+              </label>
+
+              {/*
+                Approving without every photograph is possible and deliberate.
+                The reason is not paperwork: it is the only thing that will
+                tell the next person why an unchecked driver is on the road.
+              */}
+              {short && overriding ? (
+                <label style={styles.licence}>
+                  <span style={styles.licenceLabel}>
+                    Where did you see the missing documents?
+                  </span>
+                  <textarea
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="He brought the card and the registration to the office; his phone would not upload."
+                    disabled={busy}
+                    rows={2}
+                    autoFocus
+                    style={styles.reason}
+                  />
+                </label>
+              ) : null}
+            </>
           )}
           <div style={styles.buttons}>
             <button
@@ -457,15 +493,27 @@ function Application({
               >
                 Cancel
               </button>
+            ) : short && !overriding ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setOverriding(true);
+                  setError(null);
+                }}
+                disabled={busy}
+                style={styles.override}
+                title="Only if you have seen the documents yourself"
+              >
+                Approve without them
+              </button>
             ) : (
               <button
                 type="button"
                 onClick={() => void approve()}
-                disabled={busy || short}
-                style={{ ...styles.approve, ...(busy || short ? styles.approveOff : null) }}
-                title={short ? "This driver has not sent every document" : undefined}
+                disabled={busy}
+                style={{ ...styles.approve, ...(busy ? styles.approveOff : null) }}
               >
-                {busy ? "Working…" : "Approve driver"}
+                {busy ? "Working…" : short ? "Approve anyway" : "Approve driver"}
               </button>
             )}
           </div>
@@ -659,6 +707,17 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 15,
     lineHeight: 1.45,
     color: "var(--c-ink)",
+  },
+  /* Amber, not teal: possible, deliberate, and not the ordinary path. */
+  override: {
+    flexGrow: 2,
+    minHeight: 48,
+    borderRadius: 12,
+    border: "1.5px solid var(--c-amber)",
+    background: "var(--c-amber-tint)",
+    fontSize: 15,
+    fontWeight: 700,
+    color: "var(--c-hill)",
   },
   cancel: {
     flexGrow: 1,

@@ -296,10 +296,22 @@ export const ops = {
       ...(note ? { note } : {}),
     }),
 
-  verify: (driverId: string, licenceNumber: string, note?: string) =>
+  /**
+   * Approve a driver.
+   *
+   * `overrideMissingDocuments` is refused by the API unless a note comes with
+   * it, so the screen must collect one rather than sending the flag on its own.
+   */
+  verify: (
+    driverId: string,
+    licenceNumber: string,
+    note?: string,
+    overrideMissingDocuments = false,
+  ) =>
     api.post<{ id: string; status: DriverStatus }>(`/admin/drivers/${driverId}/verify`, {
       licenceNumber,
       ...(note ? { note } : {}),
+      ...(overrideMissingDocuments ? { overrideMissingDocuments: true } : {}),
     }),
 
   reject: (driverId: string, reason: string) =>

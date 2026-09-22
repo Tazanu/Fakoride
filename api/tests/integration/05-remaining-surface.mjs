@@ -104,7 +104,7 @@ await call("POST", "/drivers/apply", {
 });
 const pending = await call("GET", "/admin/drivers", { token: adminToken });
 const driver = pending.body.drivers.find((d) => d.plate === DRIVER_PLATE);
-await call("POST", `/admin/drivers/${driver.id}/verify`, { token: adminToken, body: { licenceNumber: `S10-${nonce}` } });
+await call("POST", `/admin/drivers/${driver.id}/verify`, { token: adminToken, body: { licenceNumber: `S10-${nonce}`, overrideMissingDocuments: true, note: "Test fixture — no documents uploaded." } });
 await call("POST", "/drivers/online", { token: driverToken, body: CHECKPOINT });
 
 console.log("\n=== the gazetteer, which the rider home screen opens with ===");

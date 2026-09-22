@@ -35,6 +35,19 @@ const verifySchema = z.object({
    */
   licenceNumber: z.string().trim().min(4).max(40),
   note: z.string().trim().max(500).optional(),
+  /**
+   * Approve a driver whose photographs are not all here.
+   *
+   * There is a real case for it: ops had the man at the desk with his papers
+   * in his hand and the upload failed on his phone. Refusing outright would
+   * send him away over our bug.
+   *
+   * But it is deliberate, never accidental, and never silent — it needs a
+   * reason in writing, and that reason goes on his record next to whoever
+   * typed it. The same logic as the licence number above: the thing that
+   * makes a check real is that a person had to put something in.
+   */
+  overrideMissingDocuments: z.boolean().default(false),
 });
 
 const rejectSchema = z.object({
@@ -151,6 +164,33 @@ export function adminRouter(): Router {
       if (!driver) throw new ApiError(404, "no_driver", "No such driver.");
       if (driver.status === "ACTIVE") throw new ApiError(409, "already_active", "This driver is already active.");
 
+      /**
+       * No papers, no dispatch.
+       *
+       * This used to be guarded only by a disabled button in the console,
+       * which means it was not guarded at all: anything holding an admin
+       * token could put an unchecked driver on the road, and a bug in the
+       * console was one click from doing it by accident.
+       */
+      const held = await prisma.driverDocument.count({ where: { driverId: driver.id } });
+      const missing = REQUIRED_KINDS.length - held;
+      if (missing > 0 && !body.overrideMissingDocuments) {
+        throw new ApiError(
+          409,
+          "documents_missing",
+          `${missing} of ${REQUIRED_KINDS.length} documents are missing. Approve anyway only if you have seen them yourself, and say so.`,
+        );
+      }
+      if (missing > 0 && !body.note) {
+        throw new ApiError(
+          400,
+          "override_needs_reason",
+          "Say where you saw the documents before approving without them.",
+        );
+      }
+
+      const overrode = missing > 0;
+
       const [updated] = await prisma.$transaction([
         prisma.driver.update({
           where: { id: driver.id },
@@ -165,12 +205,16 @@ export function adminRouter(): Router {
             driverId: driver.id,
             action: "VERIFIED",
             by: req.user!.sub,
-            note: body.note ?? null,
+            // The override is written into the record itself, not inferred
+            // later from a count of rows that may have arrived since.
+            note: overrode
+              ? `Approved with ${missing} document(s) missing. ${body.note}`
+              : (body.note ?? null),
           },
         }),
       ]);
 
-      logger.info({ driverId: driver.id, by: req.user!.sub }, "driver verified");
+      logger.info({ driverId: driver.id, by: req.user!.sub, missingDocuments: missing }, "driver verified");
       res.json({ id: updated.id, status: updated.status, verifiedAt: updated.verifiedAt });
     }),
   );

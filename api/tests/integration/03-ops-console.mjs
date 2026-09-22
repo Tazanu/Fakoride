@@ -116,9 +116,32 @@ check("cannot verify without the S10 licence number", noLicence.status === 400, 
 const blocked = await call("POST", "/drivers/online", { token: applicantToken, body: CHECKPOINT });
 check("an unverified driver still cannot go online", blocked.status === 403);
 
+/*
+ * No papers, no dispatch.
+ *
+ * Grace has sent nothing. This used to be guarded only by a disabled button
+ * in the console, which is to say not guarded at all — anything holding an
+ * admin token could put an unchecked driver on the road.
+ */
+const noDocs = await call("POST", `/admin/drivers/${grace.id}/verify`, {
+  token: adminToken,
+  body: { licenceNumber: "S10-2026-4471" },
+});
+check("cannot verify a driver who has sent no documents", noDocs.status === 409 && noDocs.body.error?.code === "documents_missing", JSON.stringify(noDocs.body.error?.code));
+
+const bareOverride = await call("POST", `/admin/drivers/${grace.id}/verify`, {
+  token: adminToken,
+  body: { licenceNumber: "S10-2026-4471", overrideMissingDocuments: true },
+});
+check("and overriding that needs a reason in writing", bareOverride.status === 400 && bareOverride.body.error?.code === "override_needs_reason", JSON.stringify(bareOverride.body.error?.code));
+
 const verified = await call("POST", `/admin/drivers/${grace.id}/verify`, {
   token: adminToken,
-  body: { licenceNumber: "S10-2026-4471", note: "CNI and S10 seen at the office." },
+  body: {
+    licenceNumber: "S10-2026-4471",
+    overrideMissingDocuments: true,
+    note: "CNI and S10 seen at the office.",
+  },
 });
 check("verifying with the licence number activates the driver", verified.body.status === "ACTIVE", JSON.stringify(verified.body));
 
@@ -127,6 +150,7 @@ check("and she can now go online — no SQL touched", nowOnline.body.online === 
 
 const history = await call("GET", `/admin/drivers/${grace.id}`, { token: adminToken });
 check("the decision is on the record with who made it", history.body.history?.[0]?.action === "VERIFIED", JSON.stringify(history.body.history));
+check("and the record says the documents were missing", /document\(s\) missing/.test(history.body.history?.[0]?.note ?? ""), history.body.history?.[0]?.note);
 check("the licence number is stored", history.body.licenceNumber === "S10-2026-4471");
 
 console.log("\n=== suspension reaches dispatch ===");
