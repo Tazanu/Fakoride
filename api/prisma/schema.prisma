@@ -149,6 +149,10 @@ model User {
   name      String?
   role      UserRole @default(RIDER)
   language  String   @default("en")
+  /// A key into the document store, or null. Not a URL: the bytes are served
+  /// by us, to people entitled to see them, and never linked publicly.
+  photoKey  String?
+  photoAt   DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

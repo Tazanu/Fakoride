@@ -26,6 +26,7 @@ import { recordFare } from "./ledger";
 import { chargeTripFare } from "./payments/service";
 import { tripShareRouter } from "./share";
 import { tripSosRouter } from "./safety";
+import { tripPhotoRouter } from "./profile";
 import { emitToDriver, emitToRider, emitToTrip } from "../realtime";
 import { logger } from "../lib/logger";
 
@@ -551,6 +552,8 @@ export function tripsRouter(): Router {
   // Both hang off one trip, so they mount here rather than at the top level.
   router.use("/:id/share", tripShareRouter());
   router.use("/:id/sos", tripSosRouter());
+  // Recognising each other at the kerb. Guarded by trip membership, not by role.
+  router.use("/:id/photo", tripPhotoRouter());
 
   return router;
 }

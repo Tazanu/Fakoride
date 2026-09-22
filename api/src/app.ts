@@ -7,6 +7,7 @@ import { logger } from "./lib/logger";
 import { errorHandler, notFoundHandler } from "./lib/http";
 import { authRouter } from "./modules/auth";
 import { geoRouter } from "./modules/geo";
+import { profileRouter } from "./modules/profile";
 import { faresRouter } from "./modules/fares";
 import { driversRouter } from "./modules/drivers";
 import { tripsRouter } from "./modules/trips";
@@ -30,6 +31,7 @@ export function createApp(): express.Express {
 
   app.use("/auth", authRouter());
   app.use("/geo", geoRouter());
+  app.use("/me", profileRouter());
   app.use("/fares", faresRouter({ mobileDiscountXaf: env.MOBILE_PAYMENT_DISCOUNT_XAF }));
   app.use("/drivers", driversRouter());
   // Mounted alongside, not inside, so the money routes stay in one file.

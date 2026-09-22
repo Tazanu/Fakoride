@@ -169,6 +169,8 @@ export function authRouter(): Router {
           name: user.name,
           role: user.role,
           language: user.language,
+          // Whether one exists, never where it is. The bytes come from /me/photo.
+          hasPhoto: user.photoAt !== null,
           driver: user.driver ?? null,
         },
       });
@@ -190,6 +192,7 @@ export function authRouter(): Router {
         name: user.name,
         role: user.role,
         language: user.language,
+        hasPhoto: user.photoAt !== null,
         driver: user.driver
           ? {
               id: user.driver.id,
