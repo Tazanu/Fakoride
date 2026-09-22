@@ -1,0 +1,19 @@
+/*
+ * Everything the build compiles, plus the scripts it doesn't.
+ *
+ * `tsconfig.json` has rootDir src, because dist should hold the server and
+ * nothing else. The side effect is that scripts/ is never typechecked — and
+ * `seed-application.ts` shipped two errors a compiler would have caught in a
+ * second: a module path that does not exist, and a Prisma relation written the
+ * scalar way. They only surfaced by running it against a live database.
+ *
+ * So: no emit, wider net, and `npm run typecheck` uses this one.
+ */
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "."
+  },
+  "include": ["src/**/*.ts", "scripts/**/*.ts", "prisma/**/*.ts"]
+}

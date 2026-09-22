@@ -12,8 +12,9 @@
     "start": "node dist/server.js",
     "seed": "tsx prisma/seed.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -p tsconfig.check.json",
     "admin:grant": "tsx scripts/grant-admin.ts",
+    "seed:application": "tsx scripts/seed-application.ts",
     "test:integration": "node tests/integration/run.mjs"
   },
   "dependencies": {
