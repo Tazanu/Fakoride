@@ -76,6 +76,14 @@ export const complaints = {
 
 export type Zone = { code: string; name: string; town: string; elevationM: number };
 
+export type Landmark = {
+  name: string;
+  zone: string;
+  zoneName: string;
+  lat: number;
+  lng: number;
+};
+
 export type Resolved = {
   zone: { code: string; name: string };
   /** "Checkpoint" or "Mile 17 Motor Park, Mile 17" — already de-duplicated. */
@@ -89,6 +97,19 @@ export const geo = {
   /** Turns a GPS fix into the words a person would say. */
   resolve: (lat: number, lng: number) =>
     api.get<Resolved>(`/geo/resolve?lat=${lat}&lng=${lng}`, { anonymous: true }),
+
+  /**
+   * Find a place by what people call it.
+   *
+   * Matches landmark names *and their aliases*, which is the whole reason the
+   * gazetteer exists: nobody here gives a street address, they say Checkpoint
+   * or Mile 17 Motor Park. Searching the fourteen zone names instead offers
+   * her "Molyko" when she typed the name of a junction inside it.
+   */
+  search: (q: string) =>
+    api.get<{ results: Landmark[] }>(`/geo/search?q=${encodeURIComponent(q)}`, {
+      anonymous: true,
+    }),
 
   /** Road closures, fuel queues, a landslide on the Soppo climb. */
   notices: () =>

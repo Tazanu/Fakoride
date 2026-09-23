@@ -23,7 +23,15 @@ import { useFocusEffect, useRouter } from "expo-router";
 import * as Location from "expo-location";
 import { ClockIcon, CrosshairIcon, HouseIcon, ListIcon, MagnifyingGlassIcon } from "@/ui/icons";
 import { ApiError } from "@/api/client";
-import { demand, geo, trips, type Repeat, type Resolved, type Zone } from "@/api/rider";
+import {
+  demand,
+  geo,
+  trips,
+  type Landmark,
+  type Repeat,
+  type Resolved,
+  type Zone,
+} from "@/api/rider";
 import { findMe, type Fix } from "@/ui/position";
 import { Appear } from "@/ui/motion";
 import { MapButton, MapPanel, MapPill, Sheet } from "@/ui/map";
@@ -35,20 +43,6 @@ const c = palette("light");
 /** The canvas gives the map roughly 55% of a 844pt screen. */
 const MAP_HEIGHT = 470;
 
-/**
- * Where the other taxis sit on the drawing.
- *
- * Fixed positions, deliberately. The API gives a count and never coordinates —
- * showing a rider exactly where each car is parked is a safety problem — so
- * these are decoration that stands for "some, nearby", and the honest number
- * is the one written in the pill.
- */
-const PIN_SPOTS = [
-  { x: 0.25, y: 0.44 },
-  { x: 0.8, y: 0.4 },
-  { x: 0.69, y: 0.7 },
-  { x: 0.16, y: 0.72 },
-];
 
 export default function Book() {
   const router = useRouter();
@@ -146,6 +140,38 @@ export default function Book() {
     });
   }
 
+  /**
+   * Named places, from the gazetteer.
+   *
+   * The fourteen zones are coarse: somebody typing "Checkpoint" means a
+   * junction inside Molyko, not Molyko itself. `/geo/search` matches landmark
+   * names and their aliases — what people actually say — and that is the
+   * reason the gazetteer exists at all.
+   *
+   * Debounced, because this is a search field on a connection paid for by the
+   * megabyte: a request per keystroke would be several requests per word.
+   */
+  const [places, setPlaces] = useState<Landmark[]>([]);
+
+  useEffect(() => {
+    const term = query.trim();
+    if (term.length < 2) {
+      setPlaces([]);
+      return;
+    }
+    let alive = true;
+    const timer = setTimeout(() => {
+      void geo
+        .search(term)
+        .then((r) => alive && setPlaces(r.results))
+        .catch(() => undefined);
+    }, 280);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [query]);
+
   const q = query.trim().toLowerCase();
   const matches = (text: string) => text.toLowerCase().includes(q);
 
@@ -157,8 +183,8 @@ export default function Book() {
       !repeats.some((r) => r.zone === z.code) &&
       (!q || matches(z.name) || matches(z.town)),
   );
-  const nothingMatched = q.length > 0 && shownRepeats.length === 0 && shown.length === 0;
-  const pins = nearby === null ? [] : PIN_SPOTS.slice(0, Math.min(nearby, PIN_SPOTS.length));
+  const nothingMatched =
+    q.length > 0 && shownRepeats.length === 0 && shown.length === 0 && places.length === 0;
 
   return (
     <ScrollView
@@ -177,7 +203,15 @@ export default function Book() {
         />
       }
     >
-      <MapPanel height={MAP_HEIGHT} pins={pins}>
+      {/*
+        No pins any more.
+        
+        On the drawing, scattered dots meant "some taxis, nearby" and cost
+        nothing. On a real map a dot sits at a real place, which would be a
+        claim that a taxi is standing there — and the API only ever gives a
+        count, never positions. The pill above says the honest thing.
+      */}
+      <MapPanel height={MAP_HEIGHT} here={fix}>
         <View style={[styles.mapTop, { top: insets.top + space.sm }]}>
           {/*
             This used to sign her out in one tap, from a button that looked
@@ -224,9 +258,9 @@ export default function Book() {
         {/*
           A real filter, not a dead control.
           
-          There is no place-search endpoint, but all fourteen zones are already
-          on the device — so this narrows what is below rather than pretending
-          to call a server. It is the design's primary affordance and it works.
+          Two things at once: it narrows the zones already on the device, and
+          it asks the gazetteer for named places — junctions, motor parks, the
+          university gate — which is what somebody actually types.
         */}
         <View style={[styles.search, query ? styles.searchOn : null]}>
           <MagnifyingGlassIcon size={20} color={query ? c.actionText : c.muted} />
@@ -276,10 +310,46 @@ export default function Book() {
             </Appear>
           ))}
 
+          {/*
+            Named places first.
+
+            She typed something, so the specific answer belongs above the broad
+            one: "Mile 17 Motor Park" before "Mile 17". The zone still follows,
+            because sometimes the whole neighbourhood is what she meant.
+          */}
+          {places.map((p, i) => (
+            <Appear key={`${p.zone}-${p.name}`} index={shownRepeats.length + i}>
+              <Pressable
+                onPress={() => choose(p.zone, p.name)}
+                disabled={!fix}
+                accessibilityRole="button"
+                accessibilityLabel={`Go to ${p.name}`}
+                style={({ pressed }) => [
+                  styles.row,
+                  (i > 0 || shownRepeats.length > 0) && styles.rowRuled,
+                  pressed && styles.rowPressed,
+                ]}
+              >
+                <View style={[styles.tile, styles.tilePlain]}>
+                  <MagnifyingGlassIcon size={20} color={c.actionText} />
+                </View>
+                <View style={styles.grow}>
+                  <Text style={styles.rowPlace} numberOfLines={1}>
+                    {p.name}
+                  </Text>
+                  {/* The zone it sits in, unless the landmark is named after it. */}
+                  {p.zoneName.trim().toLowerCase() !== p.name.trim().toLowerCase() ? (
+                    <Text style={styles.rowSub}>{p.zoneName}</Text>
+                  ) : null}
+                </View>
+              </Pressable>
+            </Appear>
+          ))}
+
           {shown.map((z, i) => {
-            const ruled = i > 0 || shownRepeats.length > 0;
+            const ruled = i > 0 || shownRepeats.length > 0 || places.length > 0;
             return (
-              <Appear key={z.code} index={shownRepeats.length + i}>
+              <Appear key={z.code} index={shownRepeats.length + places.length + i}>
                 <Pressable
                   onPress={() => choose(z.code, z.name)}
                   disabled={!fix}
