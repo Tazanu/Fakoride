@@ -11,10 +11,12 @@
  * a second content file rather than a second screen.
  */
 
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { CaretLeftIcon } from "@/ui/icons";
+import { useSession } from "@/session/SessionProvider";
 import { Press } from "@/ui/motion";
 import { palette, radius, space, touch, type } from "@/theme";
 
@@ -26,18 +28,55 @@ export type Section = {
   body: string[];
 };
 
+/** One document, in the languages we have it in. */
+export type Translated = {
+  readonly en: { title: string; updated: string; intro: string; sections: Section[]; footer: string };
+  readonly fr: { title: string; updated: string; intro: string; sections: Section[]; footer: string };
+};
+
+/**
+ * A legal document, in the reader's language.
+ *
+ * Defaults to the account's language, and to English for somebody who has not
+ * signed in — Fako is the anglophone South-West and Buea reads English. But the
+ * switch is on the page, not buried in settings, because the person most likely
+ * to need French is exactly the one who has no account yet: they are reading
+ * this from the welcome screen, before they agree to it.
+ */
+export function LegalDoc({ doc }: { doc: Translated }) {
+  const { me } = useSession();
+  const [lang, setLang] = useState<"en" | "fr">(me?.language === "fr" ? "fr" : "en");
+  const d = doc[lang];
+
+  return (
+    <LegalPage
+      title={d.title}
+      updated={d.updated}
+      intro={d.intro}
+      sections={d.sections}
+      footer={d.footer}
+      lang={lang}
+      onLang={setLang}
+    />
+  );
+}
+
 export function LegalPage({
   title,
   updated,
   intro,
   sections,
   footer,
+  lang,
+  onLang,
 }: {
   title: string;
   updated: string;
   intro: string;
   sections: Section[];
   footer?: string;
+  lang?: "en" | "fr";
+  onLang?: (next: "en" | "fr") => void;
 }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -54,8 +93,33 @@ export function LegalPage({
         <CaretLeftIcon size={24} color={c.ink} />
       </Press>
 
-      <Text style={styles.h1}>{title}</Text>
-      <Text style={styles.updated}>Last updated {updated}</Text>
+      <View style={styles.titleRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.h1}>{title}</Text>
+          <Text style={styles.updated}>
+            {lang === "fr" ? "Mis à jour le" : "Last updated"} {updated}
+          </Text>
+        </View>
+
+        {onLang ? (
+          <View style={styles.langs}>
+            {(["en", "fr"] as const).map((code) => (
+              <Pressable
+                key={code}
+                onPress={() => onLang(code)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: lang === code }}
+                accessibilityLabel={code === "en" ? "Read in English" : "Lire en français"}
+                style={[styles.lang, lang === code && styles.langOn]}
+              >
+                <Text style={[styles.langText, lang === code && styles.langTextOn]}>
+                  {code === "en" ? "EN" : "FR"}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+      </View>
 
       <Text style={styles.intro}>{intro}</Text>
 
@@ -92,7 +156,15 @@ const styles = StyleSheet.create({
 
   back: { width: touch.min, height: touch.min, justifyContent: "center", marginLeft: -space.sm },
 
-  h1: { ...type.title, color: c.ink, marginTop: space.sm },
+  titleRow: { flexDirection: "row", alignItems: "flex-start", gap: space.md, marginTop: space.sm },
+  h1: { ...type.title, color: c.ink },
+
+  /* Two letters, not a dropdown. There are two languages and there will be two. */
+  langs: { flexDirection: "row", borderRadius: radius.sm, borderWidth: 1, borderColor: c.lineStrong, overflow: "hidden" },
+  lang: { paddingHorizontal: space.md, paddingVertical: space.sm, minWidth: 44, alignItems: "center" },
+  langOn: { backgroundColor: c.action },
+  langText: { ...type.secondaryStrong, color: c.muted },
+  langTextOn: { color: c.onAction },
   updated: { ...type.secondary, color: c.muted, marginTop: space.xs },
   intro: { ...type.body, lineHeight: 26, color: c.inkSoft, marginTop: space.lg },
 
