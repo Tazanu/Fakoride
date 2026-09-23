@@ -208,6 +208,20 @@ export type Fare = {
   updatedBy: string | null;
 };
 
+export type NoticeSeverity = "INFO" | "WARNING" | "SERVICE_SUSPENDED";
+
+export type Notice = {
+  id: string;
+  message: string;
+  messageFr: string;
+  severity: NoticeSeverity;
+  zone: string | null;
+  activeFrom: string;
+  activeUntil: string | null;
+  /** Whether the apps are showing this one right now. */
+  live: boolean;
+};
+
 export type Zone = { code: string; name: string; town: string };
 
 export const ops = {
@@ -246,6 +260,24 @@ export const ops = {
     `/api/admin/drivers/${driverId}/documents/${kind.toLowerCase()}`,
 
   trips: (status: TripStatus) => api.get<{ trips: TripRow[] }>(`/admin/trips?status=${status}`),
+
+  /**
+   * The banner both apps show at the top of the home screen.
+   *
+   * `messageFr` is not optional — the API refuses a notice without it. Both
+   * apps run in both languages and a French speaker must not be handed
+   * English, least of all when the message is "no taxis are running today".
+   */
+  notices: () => api.get<{ notices: Notice[] }>("/admin/notices"),
+
+  postNotice: (body: {
+    message: string;
+    messageFr: string;
+    severity: NoticeSeverity;
+    zone?: string;
+  }) => api.post<{ id: string; severity: NoticeSeverity }>("/admin/notices", body),
+
+  removeNotice: (id: string) => request<void>(`/admin/notices/${id}`, { method: "DELETE" }),
 
   sos: () => api.get<{ open: number; alerts: SosAlert[] }>("/admin/sos"),
 

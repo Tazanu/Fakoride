@@ -14,7 +14,14 @@
 
 import type { ReactNode } from "react";
 
-export type Section = "approvals" | "safety" | "trips" | "complaints" | "fares" | "drivers";
+export type Section =
+  | "approvals"
+  | "safety"
+  | "trips"
+  | "complaints"
+  | "fares"
+  | "drivers"
+  | "notices";
 
 const ITEMS: { id: Section; label: string }[] = [
   // Safety sits second, under approvals: it is empty almost always, and the
@@ -25,6 +32,9 @@ const ITEMS: { id: Section; label: string }[] = [
   { id: "complaints", label: "Complaints" },
   { id: "fares", label: "Fare rules" },
   { id: "drivers", label: "All drivers" },
+  // Last: it is the only one that speaks to everybody at once, and the only
+  // one you open knowing what you came to say.
+  { id: "notices", label: "Service notice" },
 ];
 
 export function Shell({

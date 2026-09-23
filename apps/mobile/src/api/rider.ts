@@ -43,9 +43,33 @@ export type ComplaintCategory =
   | "APP_PROBLEM"
   | "OTHER";
 
+export type MyComplaint = {
+  id: string;
+  tripId: string | null;
+  category: ComplaintCategory;
+  message: string;
+  status: "OPEN" | "ANSWERED" | "CLOSED";
+  createdAt: string;
+  /** The day we promised an answer by. */
+  respondBy: string;
+  answeredAt: string | null;
+  /** What a person wrote back. Null until somebody has. */
+  response: string | null;
+};
+
 export const complaints = {
   file: (body: { category: ComplaintCategory; message: string; tripId?: string }) =>
     api.post<{ id: string; status: string; respondBy: string; next: string }>("/complaints", body),
+
+  /**
+   * What she told us, and what came back.
+   *
+   * The API has answered this from the beginning and no screen ever asked.
+   * The end-of-trip form promised "a person reads this and answers you within
+   * a day" — and the answer then had nowhere to land. Ops has been writing
+   * replies into a void.
+   */
+  mine: () => api.get<{ complaints: MyComplaint[] }>("/complaints/mine"),
 };
 
 // --- where we are -----------------------------------------------------------

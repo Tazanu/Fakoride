@@ -253,6 +253,20 @@ export default function Profile() {
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       {/*
+        Where an answer to a complaint arrives. Without this the end-of-trip
+        form was a one-way street: she could tell us something went wrong and
+        never find out what we did about it.
+      */}
+      <Pressable
+        onPress={() => router.push("/reports")}
+        accessibilityRole="button"
+        style={styles.rowLink}
+      >
+        <Text style={styles.rowLinkText}>What you told us</Text>
+        <Text style={styles.rowLinkHint}>Reports you sent, and what came back</Text>
+      </Pressable>
+
+      {/*
         Reachable after you have signed in, not only on the welcome screen you
         saw once and will never see again.
       */}
@@ -365,6 +379,18 @@ const styles = StyleSheet.create({
   factMono: { ...type.plate },
 
   error: { ...type.secondary, color: c.danger },
+
+  rowLink: {
+    gap: 2,
+    paddingVertical: space.md,
+    paddingHorizontal: space.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: c.edge,
+    backgroundColor: c.card,
+  },
+  rowLinkText: { ...type.bodyStrong, color: c.ink },
+  rowLinkHint: { ...type.secondary, color: c.muted },
 
   legal: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.sm },
   legalLink: { ...type.secondaryStrong, color: c.actionText },

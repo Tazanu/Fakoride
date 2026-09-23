@@ -638,8 +638,42 @@ export function adminRouter(): Router {
    * Carries a French string alongside the English one because both apps run in
    * both languages and a server's English sentence must never reach a rider.
    */
-  router.post(
+  /**
+   * Every notice, including the ones the public endpoint hides.
+   *
+   * `GET /geo/notices` answers "what should the apps show right now", so it
+   * filters by date and returns no ids — correct for a banner, useless for the
+   * desk that writes them. Ops needs to see what is scheduled, what has
+   * expired, and which row to take down.
+   */
+  router.get(
     "/notices",
+    asyncHandler(async (_req, res) => {
+      const now = new Date();
+      const notices = await prisma.serviceNotice.findMany({
+        orderBy: { activeFrom: "desc" },
+        take: 50,
+        include: { zone: { select: { code: true } } },
+      });
+
+      res.json({
+        notices: notices.map((n) => ({
+          id: n.id,
+          message: n.message,
+          messageFr: n.messageFr,
+          severity: n.severity,
+          zone: n.zone?.code ?? null,
+          activeFrom: n.activeFrom,
+          activeUntil: n.activeUntil,
+          /** Whether the apps are showing this one at this moment. */
+          live: n.activeFrom <= now && (n.activeUntil === null || n.activeUntil >= now),
+        })),
+      });
+    }),
+  );
+
+  router.post(
+"/notices",
     asyncHandler(async (req, res) => {
       const body = z
         .object({
