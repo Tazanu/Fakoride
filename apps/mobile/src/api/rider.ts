@@ -131,6 +131,9 @@ export type TripDetail = {
   dropLabel: string;
   from: { code: string; name: string };
   to: { code: string; name: string };
+  /** Where those places are, for the map. Labels are for people. */
+  pickup: { lat: number; lng: number };
+  drop: { lat: number; lng: number };
   /**
    * Four digits, and only the rider ever sees them.
    *

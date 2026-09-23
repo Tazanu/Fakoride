@@ -291,6 +291,15 @@ export function tripsRouter(): Router {
         dropLabel: trip.dropLabel,
         from: trip.fromZone,
         to: trip.toZone,
+        /**
+         * Where those two places actually are.
+         *
+         * The labels are what a person reads; these are what the map draws.
+         * Until now only the labels were sent, so a real map could show the
+         * taxi moving but not where it was going.
+         */
+        pickup: { lat: trip.pickupLat, lng: trip.pickupLng },
+        drop: { lat: trip.dropLat, lng: trip.dropLng },
         // Only the rider reads the PIN out; the driver types what he is told.
         pin: isRider ? trip.pin : undefined,
         driver: trip.driver
