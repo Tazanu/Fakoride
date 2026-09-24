@@ -204,14 +204,13 @@ export default function Book() {
       }
     >
       {/*
-        No pins any more.
+        No scattered taxi pins.
         
-        On the drawing, scattered dots meant "some taxis, nearby" and cost
-        nothing. On a real map a dot sits at a real place, which would be a
-        claim that a taxi is standing there — and the API only ever gives a
-        count, never positions. The pill above says the honest thing.
+        They stood for "some taxis, nearby" and the API only ever gives a
+        count, never positions — so they were decoration standing in for a
+        fact. The pill above says the honest thing, and says it in words.
       */}
-      <MapPanel height={MAP_HEIGHT} here={fix}>
+      <MapPanel height={MAP_HEIGHT}>
         <View style={[styles.mapTop, { top: insets.top + space.sm }]}>
           {/*
             This used to sign her out in one tap, from a button that looked
