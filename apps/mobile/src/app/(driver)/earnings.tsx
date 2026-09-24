@@ -26,6 +26,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
 import { ApiError } from "@/api/client";
 import { money, type Balance, type WeekEarnings } from "@/api/driver";
+import { PaymentHistory } from "@/ui/payment-history";
 import { cardShadow, palette, primaryButton, radius, space, touch, type, xaf } from "@/theme";
 
 const c = palette("light");
@@ -210,6 +211,16 @@ export default function Earnings() {
               ) : null}
             </View>
           ) : null}
+
+          {/*
+            The record.
+            
+            He could see a balance and press a button, and nowhere could he
+            check what had actually moved — which fee came out on which
+            morning, whether last week's cash-out ever landed. This is his
+            income; a money screen without a history is where trust goes.
+          */}
+          <PaymentHistory />
         </>
       )}
     </ScrollView>
