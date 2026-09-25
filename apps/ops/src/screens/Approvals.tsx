@@ -404,7 +404,7 @@ function Application({
               URL.revokeObjectURL(viewing.url);
               setViewing(null);
             }}
-            style={styles.viewerClose}
+            className="ops-btn ops-btn-quiet"
           >
             Close {DOC_LABEL[viewing.kind]}
           </button>
@@ -426,7 +426,7 @@ function Application({
                 disabled={busy}
                 rows={2}
                 autoFocus
-                style={styles.reason}
+                className="ops-textarea"
               />
             </label>
           ) : (
@@ -458,7 +458,7 @@ function Application({
                     disabled={busy}
                     rows={2}
                     autoFocus
-                    style={styles.reason}
+                    className="ops-textarea"
                   />
                 </label>
               ) : null}
@@ -476,7 +476,7 @@ function Application({
                 }
               }}
               disabled={busy}
-              style={styles.reject}
+              className="ops-btn ops-btn-quiet"
             >
               {rejecting ? "Confirm rejection" : "Reject"}
             </button>
@@ -489,7 +489,7 @@ function Application({
                   setError(null);
                 }}
                 disabled={busy}
-                style={styles.cancel}
+                className="ops-btn ops-btn-quiet"
               >
                 Cancel
               </button>
@@ -501,7 +501,7 @@ function Application({
                   setError(null);
                 }}
                 disabled={busy}
-                style={styles.override}
+                className="ops-btn ops-btn-warn"
                 title="Only if you have seen the documents yourself"
               >
                 Approve without them
@@ -511,7 +511,7 @@ function Application({
                 type="button"
                 onClick={() => void approve()}
                 disabled={busy}
-                style={{ ...styles.approve, ...(busy ? styles.approveOff : null) }}
+                className="ops-btn ops-btn-primary" style={{ ...(busy ? styles.approveOff : null) }}
               >
                 {busy ? "Working…" : short ? "Approve anyway" : "Approve driver"}
               </button>
@@ -674,16 +674,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 12,
     border: "1px solid var(--c-edge)",
     background: "var(--c-fill)",
-  },
-  viewerClose: {
-    minHeight: 40,
-    borderRadius: 10,
-    border: "1.5px solid var(--c-line-strong)",
-    background: "var(--c-card)",
-    fontSize: 13,
-    fontWeight: 600,
-    color: "var(--c-ink-soft)",
-  },
+  },
 
   appError: { margin: "0 18px 8px", fontSize: 13, color: "var(--c-danger)" },
 
@@ -695,52 +686,10 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: "column",
     gap: 12,
   },
-  licence: { display: "flex", flexDirection: "column", gap: 6 },
-  reason: {
-    resize: "vertical",
-    minHeight: 58,
-    padding: "10px 12px",
-    borderRadius: 12,
-    border: "1.5px solid var(--c-line-strong)",
-    background: "var(--c-card)",
-    fontFamily: "var(--font-ui)",
-    fontSize: 15,
-    lineHeight: 1.45,
-    color: "var(--c-ink)",
-  },
-  /* Amber, not teal: possible, deliberate, and not the ordinary path. */
-  override: {
-    flexGrow: 2,
-    minHeight: 48,
-    borderRadius: 12,
-    border: "1.5px solid var(--c-amber)",
-    background: "var(--c-amber-tint)",
-    fontSize: 15,
-    fontWeight: 700,
-    color: "var(--c-hill)",
-  },
-  cancel: {
-    flexGrow: 1,
-    minHeight: 48,
-    borderRadius: 12,
-    border: "1.5px solid var(--c-line-strong)",
-    background: "var(--c-card)",
-    fontSize: 15,
-    fontWeight: 600,
-    color: "var(--c-ink-soft)",
-  },
+  licence: { display: "flex", flexDirection: "column", gap: 6 },
+  /* Amber, not teal: possible, deliberate, and not the ordinary path. */
   licenceLabel: { fontSize: 13, fontWeight: 600, color: "var(--c-ink-soft)" },
-  buttons: { display: "flex", gap: 10 },
-  reject: {
-    flexGrow: 1,
-    minHeight: 48,
-    borderRadius: 12,
-    border: "1.5px solid var(--c-danger-edge)",
-    background: "var(--c-card)",
-    fontSize: 15,
-    fontWeight: 600,
-    color: "var(--c-danger)",
-  },
+  buttons: { display: "flex", gap: 10 },
   approve: {
     flexGrow: 2,
     minHeight: 48,

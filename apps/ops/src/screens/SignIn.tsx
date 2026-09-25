@@ -142,7 +142,7 @@ export function SignIn({ onSignedIn }: { onSignedIn: (name: string | null) => vo
         <button
           type="submit"
           disabled={busy || (step === "phone" ? phone.replace(/\D/g, "").length < 9 : code.length !== 6)}
-          style={styles.cta}
+          className="ops-btn ops-btn-primary"
         >
           {busy ? "Working…" : step === "phone" ? "Send me the code" : "Sign in"}
         </button>
@@ -199,15 +199,6 @@ const styles: Record<string, React.CSSProperties> = {
 
   error: { margin: 0, fontSize: 13, color: "var(--c-danger)" },
 
-  cta: {
-    minHeight: 48,
-    borderRadius: 12,
-    border: 0,
-    background: "var(--c-action)",
-    fontSize: 15,
-    fontWeight: 700,
-    color: "var(--c-on-action)",
-  },
   back: {
     minHeight: 40,
     border: 0,

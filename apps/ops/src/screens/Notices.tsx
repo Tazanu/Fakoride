@@ -144,7 +144,7 @@ export function Notices() {
             rows={2}
             maxLength={300}
             disabled={busy}
-            style={styles.textarea}
+            className="ops-textarea"
           />
         </label>
 
@@ -157,7 +157,7 @@ export function Notices() {
             rows={2}
             maxLength={300}
             disabled={busy}
-            style={styles.textarea}
+            className="ops-textarea"
           />
         </label>
 
@@ -179,7 +179,7 @@ export function Notices() {
             </select>
           </label>
 
-          <button type="button" onClick={() => void post()} disabled={busy} style={styles.post}>
+          <button type="button" onClick={() => void post()} disabled={busy} className="ops-btn ops-btn-primary">
             {busy ? "Posting…" : "Show this in both apps"}
           </button>
         </div>
@@ -205,7 +205,7 @@ export function Notices() {
               </span>
               <span style={styles.rowAction}>
                 {n.live ? (
-                  <button type="button" onClick={() => void remove(n.id)} disabled={busy} style={styles.take}>
+                  <button type="button" onClick={() => void remove(n.id)} disabled={busy} className="ops-btn ops-btn-sm ops-btn-quiet">
                     Take it down
                   </button>
                 ) : null}
@@ -240,18 +240,6 @@ const styles: Record<string, React.CSSProperties> = {
 
   field: { display: "flex", flexDirection: "column", gap: 6, flexGrow: 1 },
   label: { fontSize: 13, fontWeight: 600, color: "var(--c-ink-soft)" },
-  textarea: {
-    resize: "vertical",
-    minHeight: 58,
-    padding: "10px 12px",
-    borderRadius: 12,
-    border: "1.5px solid var(--c-line-strong)",
-    background: "var(--c-card)",
-    fontFamily: "var(--font-ui)",
-    fontSize: 15,
-    lineHeight: 1.45,
-    color: "var(--c-ink)",
-  },
   select: {
     height: 48,
     padding: "0 12px",
@@ -289,14 +277,4 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
   },
   rowAction: { display: "flex", justifyContent: "flex-end" },
-  take: {
-    minHeight: 36,
-    padding: "0 12px",
-    borderRadius: 10,
-    border: "1.5px solid var(--c-line-strong)",
-    background: "var(--c-card)",
-    fontSize: 13,
-    fontWeight: 600,
-    color: "var(--c-ink-soft)",
-  },
 };

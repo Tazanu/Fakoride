@@ -128,7 +128,7 @@ export function Fares() {
                     <button
                       type="button"
                       onClick={() => setEditing(open ? null : { from: f.from, to: f.to })}
-                      style={styles.edit}
+                      className="ops-btn ops-btn-sm ops-btn-quiet"
                     >
                       {open ? "Cancel" : "Set price"}
                     </button>
@@ -221,7 +221,7 @@ function Inline({
         </label>
       </div>
       {error ? <p style={styles.error}>{error}</p> : null}
-      <button type="button" onClick={() => void save()} disabled={busy} style={styles.save}>
+      <button type="button" onClick={() => void save()} disabled={busy} className="ops-btn ops-btn-primary">
         {busy ? "Saving…" : "Save this price"}
       </button>
     </div>
@@ -306,10 +306,10 @@ function PriceByHand({ zones, onSaved }: { zones: Zone[]; onSaved: () => void })
       </div>
       {error ? <p style={styles.error}>{error}</p> : null}
       <div style={styles.addActions}>
-        <button type="button" onClick={() => setOpen(false)} disabled={busy} style={styles.cancel}>
+        <button type="button" onClick={() => setOpen(false)} disabled={busy} className="ops-btn ops-btn-quiet">
           Cancel
         </button>
-        <button type="button" onClick={() => void save()} disabled={busy} style={styles.save}>
+        <button type="button" onClick={() => void save()} disabled={busy} className="ops-btn ops-btn-primary">
           {busy ? "Saving…" : "Save this price"}
         </button>
       </div>
@@ -327,17 +327,7 @@ const styles: Record<string, React.CSSProperties> = {
   checked: { fontSize: 13, fontWeight: 600, color: "var(--c-action-text)" },
   guess: { fontSize: 13, fontWeight: 600, color: "var(--c-hill)" },
 
-  rowAction: { display: "flex", justifyContent: "flex-end" },
-  edit: {
-    minHeight: 36,
-    padding: "0 12px",
-    borderRadius: 10,
-    border: "1.5px solid var(--c-line-strong)",
-    background: "var(--c-card)",
-    fontSize: 13,
-    fontWeight: 600,
-    color: "var(--c-ink-soft)",
-  },
+  rowAction: { display: "flex", justifyContent: "flex-end" },
 
   inline: {
     display: "flex",
@@ -386,26 +376,5 @@ const styles: Record<string, React.CSSProperties> = {
   },
 
   error: { margin: 0, fontSize: 13, color: "var(--c-danger)" },
-
-  save: {
-    alignSelf: "flex-start",
-    minHeight: 46,
-    padding: "0 20px",
-    borderRadius: 12,
-    border: 0,
-    background: "var(--c-action)",
-    fontSize: 15,
-    fontWeight: 700,
-    color: "var(--c-on-action)",
-  },
-  cancel: {
-    minHeight: 46,
-    padding: "0 18px",
-    borderRadius: 12,
-    border: "1.5px solid var(--c-line-strong)",
-    background: "var(--c-card)",
-    fontSize: 15,
-    fontWeight: 600,
-    color: "var(--c-ink-soft)",
-  },
+
 };

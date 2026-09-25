@@ -151,7 +151,7 @@ function Alarm({ alert, onDone }: { alert: SosAlert; onDone: () => void }) {
           placeholder="Called him. He had pulled over at Mile 17, the rider had already got out."
           rows={2}
           disabled={busy}
-          style={styles.textarea}
+          className="ops-textarea"
         />
       </label>
 
@@ -159,16 +159,16 @@ function Alarm({ alert, onDone }: { alert: SosAlert; onDone: () => void }) {
 
       <div style={styles.actions}>
         {!seen ? (
-          <button type="button" onClick={() => void close("ACKNOWLEDGED")} disabled={busy} style={styles.ack}>
+          <button type="button" onClick={() => void close("ACKNOWLEDGED")} disabled={busy} className="ops-btn ops-btn-quiet">
             I am on it
           </button>
         ) : (
           <span style={styles.seen}>Acknowledged</span>
         )}
-        <button type="button" onClick={() => void close("FALSE_ALARM")} disabled={busy} style={styles.false}>
+        <button type="button" onClick={() => void close("FALSE_ALARM")} disabled={busy} className="ops-btn ops-btn-ghost">
           False alarm
         </button>
-        <button type="button" onClick={() => void close("RESOLVED")} disabled={busy} style={styles.resolve}>
+        <button type="button" onClick={() => void close("RESOLVED")} disabled={busy} className="ops-btn ops-btn-primary">
           {busy ? "Working…" : "Resolved"}
         </button>
       </div>
@@ -232,52 +232,9 @@ const styles: Record<string, React.CSSProperties> = {
 
   field: { display: "flex", flexDirection: "column", gap: 6 },
   label: { fontSize: 13, fontWeight: 600, color: "var(--c-ink-soft)" },
-  textarea: {
-    resize: "vertical",
-    minHeight: 58,
-    padding: "10px 12px",
-    borderRadius: 12,
-    border: "1.5px solid var(--c-line-strong)",
-    background: "var(--c-card)",
-    fontFamily: "var(--font-ui)",
-    fontSize: 15,
-    lineHeight: 1.45,
-    color: "var(--c-ink)",
-  },
 
   error: { margin: 0, fontSize: 13, color: "var(--c-danger)" },
 
   actions: { display: "flex", flexWrap: "wrap", gap: 10 },
-  ack: {
-    minHeight: 44,
-    padding: "0 16px",
-    borderRadius: 12,
-    border: "1.5px solid var(--c-line-strong)",
-    background: "var(--c-card)",
-    fontSize: 14,
-    fontWeight: 600,
-    color: "var(--c-ink-soft)",
-  },
   seen: { alignSelf: "center", fontSize: 13, fontWeight: 600, color: "var(--c-action-text)" },
-  false: {
-    minHeight: 44,
-    padding: "0 16px",
-    borderRadius: 12,
-    border: "1.5px solid var(--c-line-strong)",
-    background: "transparent",
-    fontSize: 14,
-    fontWeight: 600,
-    color: "var(--c-muted)",
-  },
-  resolve: {
-    marginLeft: "auto",
-    minHeight: 44,
-    padding: "0 20px",
-    borderRadius: 12,
-    border: 0,
-    background: "var(--c-action)",
-    fontSize: 15,
-    fontWeight: 700,
-    color: "var(--c-on-action)",
-  },
 };

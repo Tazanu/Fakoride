@@ -251,6 +251,78 @@ input[type="checkbox"] {
 .ops-table-row[data-flag="late"] { box-shadow: inset 3px 0 0 var(--c-amber); }
 
 /* ---------------------------------------------------------------------------
+ * Controls.
+ *
+ * The same teal button had been written out in seven screens and had drifted
+ * to three different heights — 44, 46 and 48 — which nobody chose. Buttons and
+ * text areas live here now, as classes, for the same reason the layout does:
+ * one place to be consistent, and one place to change.
+ *
+ * Weight, not colour, is the name. "quiet" is the ordinary secondary; "danger"
+ * is reserved for the two actions that take work away from a driver.
+ * ------------------------------------------------------------------------- */
+
+.ops-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 12px;
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ops-btn-primary { background: var(--c-action); color: var(--c-on-action); }
+.ops-btn-danger { background: var(--c-danger); color: var(--c-on-action); }
+
+.ops-btn-quiet {
+  border: 1.5px solid var(--c-line-strong);
+  background: var(--c-card);
+  font-weight: 600;
+  color: var(--c-ink-soft);
+}
+
+.ops-btn-ghost {
+  background: transparent;
+  font-weight: 600;
+  color: var(--c-muted);
+}
+
+/* Possible, deliberate, and not the ordinary path. */
+.ops-btn-warn {
+  border: 1.5px solid var(--c-amber);
+  background: var(--c-amber-tint);
+  color: var(--c-hill);
+}
+
+/* The one that sits inside a table row, where 48px would crowd the line. */
+.ops-btn-sm {
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ops-textarea {
+  resize: vertical;
+  min-height: 58px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--c-line-strong);
+  border-radius: 12px;
+  background: var(--c-card);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--c-ink);
+}
+.ops-textarea:focus { border-color: var(--c-action-bright); }
+
+/* ---------------------------------------------------------------------------
  * One column.
  *
  * Below this width the two panels cannot sit side by side — 452px of detail

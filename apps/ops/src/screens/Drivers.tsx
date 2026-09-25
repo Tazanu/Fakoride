@@ -185,7 +185,7 @@ function Act({
           }
           rows={2}
           disabled={busy}
-          style={styles.textarea}
+          className="ops-textarea"
           autoFocus
         />
       </label>
@@ -251,18 +251,6 @@ const styles: Record<string, React.CSSProperties> = {
 
   field: { display: "flex", flexDirection: "column", gap: 6 },
   label: { fontSize: 13, fontWeight: 600, color: "var(--c-ink-soft)" },
-  textarea: {
-    resize: "vertical",
-    minHeight: 58,
-    padding: "10px 12px",
-    borderRadius: 12,
-    border: "1.5px solid var(--c-line-strong)",
-    background: "var(--c-card)",
-    fontFamily: "var(--font-ui)",
-    fontSize: 15,
-    lineHeight: 1.45,
-    color: "var(--c-ink)",
-  },
 
   error: { margin: 0, fontSize: 13, color: "var(--c-danger)" },
 

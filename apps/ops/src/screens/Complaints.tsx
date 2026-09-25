@@ -172,7 +172,7 @@ function Row({
               placeholder="We checked the fare for that trip. 700 XAF is the set price from Molyko to Mile 17."
               rows={3}
               disabled={busy}
-              style={styles.textarea}
+              className="ops-textarea"
             />
           </label>
 
@@ -189,7 +189,7 @@ function Row({
               />
               <span>Close it — this answers everything</span>
             </label>
-            <button type="button" onClick={() => void send()} disabled={busy} style={styles.send}>
+            <button type="button" onClick={() => void send()} disabled={busy} className="ops-btn ops-btn-primary">
               {busy ? "Sending…" : close ? "Answer and close" : "Answer"}
             </button>
           </div>
@@ -232,34 +232,11 @@ const styles: Record<string, React.CSSProperties> = {
   trip: { display: "flex", flexWrap: "wrap", gap: 14, fontSize: 13, color: "var(--c-ink-soft)" },
 
   field: { display: "flex", flexDirection: "column", gap: 6 },
-  label: { fontSize: 13, fontWeight: 600, color: "var(--c-ink-soft)" },
-  textarea: {
-    resize: "vertical",
-    minHeight: 76,
-    padding: "10px 12px",
-    borderRadius: 12,
-    border: "1.5px solid var(--c-line-strong)",
-    background: "var(--c-card)",
-    fontFamily: "var(--font-ui)",
-    fontSize: 15,
-    lineHeight: 1.5,
-    color: "var(--c-ink)",
-  },
+  label: { fontSize: 13, fontWeight: 600, color: "var(--c-ink-soft)" },
 
   error: { margin: 0, fontSize: 13, color: "var(--c-danger)" },
 
   actions: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 14 },
   check: { display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "var(--c-ink-soft)" },
-  checkbox: { width: 18, height: 18, accentColor: "var(--c-action)" },
-  send: {
-    marginLeft: "auto",
-    minHeight: 46,
-    padding: "0 20px",
-    borderRadius: 12,
-    border: 0,
-    background: "var(--c-action)",
-    fontSize: 15,
-    fontWeight: 700,
-    color: "var(--c-on-action)",
-  },
+  checkbox: { width: 18, height: 18, accentColor: "var(--c-action)" },
 };
