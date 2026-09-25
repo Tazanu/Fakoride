@@ -40,6 +40,8 @@ import { useDriverRealtime } from "@/realtime/DriverRealtime";
 import { findMe } from "@/ui/position";
 import { MapPanel, Sheet } from "@/ui/map";
 import { ServiceNotice } from "@/ui/notice";
+import { S } from "@/content/strings";
+import { useT, type Phrase } from "@/ui/i18n";
 import { palette, radius, space, touch, type, xaf } from "@/theme";
 
 const c = palette("light");
@@ -51,12 +53,13 @@ export default function Home() {
   const { me } = useSession();
   const insets = useSafeAreaInsets();
   const { offer, clearOffer } = useDriverRealtime();
+  const t = useT();
 
   const [today, setToday] = useState<TodaySummary | null>(null);
   const [online, setOnline] = useState(me?.driver?.online ?? false);
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Phrase | null>(null);
   const [answering, setAnswering] = useState(false);
 
   const load = useCallback(async () => {
@@ -64,7 +67,7 @@ export default function Home() {
       setToday(await shift.today());
       setError(null);
     } catch (err) {
-      setError(err instanceof ApiError && err.offline ? "No network. Pull down to try again." : null);
+      setError(err instanceof ApiError && err.offline ? S.driver.offlinePullDown : null);
     }
   }, []);
 
@@ -86,12 +89,12 @@ export default function Home() {
         // until he grants this. Asked here, at the moment it is needed.
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
-          setError("We need your location to send you rides nearby.");
+          setError(S.driver.needLocation);
           return;
         }
         const fix = await findMe();
         if (!fix) {
-          setError("We could not find you. Check that location is on.");
+          setError(S.driver.turnOnLocation);
           return;
         }
         await shift.goOnline(fix.lat, fix.lng);
@@ -105,8 +108,8 @@ export default function Home() {
       }
       setError(
         err instanceof ApiError && err.offline
-          ? "No network. Try again in a moment."
-          : "That did not work. Try again.",
+          ? S.driver.offlineMoment
+          : S.driver.didNotWorkTryAgain,
       );
     } finally {
       setBusy(false);
@@ -128,7 +131,7 @@ export default function Home() {
         clearOffer();
         return;
       }
-      setError(err instanceof ApiError && err.offline ? "No network." : "That did not work.");
+      setError(err instanceof ApiError && err.offline ? S.driver.noNetwork : S.driver.didNotWork);
     } finally {
       setAnswering(false);
     }
@@ -166,14 +169,14 @@ export default function Home() {
         <View style={[styles.statusBar, { top: insets.top + space.sm }]}>
           <View style={styles.statusLeft}>
             <View style={[styles.dot, online ? styles.dotOn : styles.dotOff]} />
-            <Text style={styles.statusText}>{online ? "You're online" : "You're offline"}</Text>
+            <Text style={styles.statusText}>{t(online ? S.driver.online : S.driver.offline)}</Text>
           </View>
           <Pressable
             onPress={toggleOnline}
             disabled={busy}
             accessibilityRole="switch"
             accessibilityState={{ checked: online, busy }}
-            accessibilityLabel={online ? "Go offline" : "Go online"}
+            accessibilityLabel={t(online ? S.driver.goOffline : S.driver.goOnline)}
             style={[styles.switch, online ? styles.switchOn : styles.switchOff]}
           >
             {busy ? (
@@ -189,8 +192,8 @@ export default function Home() {
         <ServiceNotice />
 
         <View style={styles.stats}>
-          <Stat label="Today" value={`${xaf(today?.earnedXaf ?? 0)} F`} />
-          <Stat label="Rides today" value={String(today?.tripCount ?? 0)} />
+          <Stat label={t(S.driver.today)} value={`${xaf(today?.earnedXaf ?? 0)} F`} />
+          <Stat label={t(S.driver.ridesToday)} value={String(today?.tripCount ?? 0)} />
         </View>
 
         {offer ? (
@@ -202,14 +205,14 @@ export default function Home() {
           />
         ) : null}
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? <Text style={styles.error}>{t(error)}</Text> : null}
 
         {fee ? (
           <View style={[styles.feeRow, fee.paid ? styles.feePaid : styles.feeDue]}>
             <Text style={[styles.feeText, fee.paid ? styles.feeTextPaid : styles.feeTextDue]}>
-              {fee.paid
-                ? `Today's fee paid — ${xaf(fee.amountXaf)} FCFA`
-                : `Today's fee — ${xaf(fee.amountXaf)} FCFA, taken tomorrow morning`}
+              {t(fee.paid ? S.driver.feePaid : S.driver.feeDue, {
+                amount: xaf(fee.amountXaf),
+              })}
             </Text>
           </View>
         ) : null}
@@ -217,7 +220,7 @@ export default function Home() {
         <View style={styles.ratingRow}>
           <View style={styles.ratingLeft}>
             <StarIcon size={18} color={c.amber} weight="fill" />
-            <Text style={styles.ratingLabel}>Your rating</Text>
+            <Text style={styles.ratingLabel}>{t(S.driver.yourRating)}</Text>
           </View>
           <Text style={styles.ratingValue}>
             {typeof me?.driver?.rating === "number" ? me.driver.rating.toFixed(1) : "—"}
@@ -227,19 +230,19 @@ export default function Home() {
         <Pressable
           onPress={() => router.push("/(driver)/earnings")}
           accessibilityRole="button"
-          accessibilityLabel="My money"
+          accessibilityLabel={t(S.driver.myMoney)}
           style={({ pressed }) => [styles.ghost, pressed && styles.pressed]}
         >
-          <Text style={styles.ghostLabel}>My money</Text>
+          <Text style={styles.ghostLabel}>{t(S.driver.myMoney)}</Text>
         </Pressable>
 
         <Pressable
           onPress={() => router.push("/profile")}
           accessibilityRole="button"
-          accessibilityLabel="Your account"
+          accessibilityLabel={t(S.driver.account)}
           style={styles.account}
         >
-          <Text style={styles.accountLabel}>Your account</Text>
+          <Text style={styles.accountLabel}>{t(S.driver.account)}</Text>
         </Pressable>
       </Sheet>
     </ScrollView>
@@ -275,6 +278,7 @@ function OfferCard({
 }) {
   const [left, setLeft] = useState(offer.expiresInSeconds);
   const tick = useRef<ReturnType<typeof setInterval> | null>(null);
+  const t = useT();
 
   useEffect(() => {
     setLeft(offer.expiresInSeconds);
@@ -287,13 +291,13 @@ function OfferCard({
 
   const away =
     offer.pickupDistanceM < 1000
-      ? `${Math.round(offer.pickupDistanceM / 10) * 10} m away`
-      : `${(offer.pickupDistanceM / 1000).toFixed(1)} km away`;
+      ? t(S.driver.metresAway, { n: Math.round(offer.pickupDistanceM / 10) * 10 })
+      : t(S.driver.kmAway, { n: (offer.pickupDistanceM / 1000).toFixed(1) });
 
   return (
     <View style={styles.offer}>
       <View style={styles.offerHead}>
-        <Text style={styles.offerTitle}>NEW RIDE REQUEST</Text>
+        <Text style={styles.offerTitle}>{t(S.driver.newRide)}</Text>
         <View style={styles.clock}>
           <Text style={styles.clockText}>{left}</Text>
         </View>
@@ -303,7 +307,8 @@ function OfferCard({
         <Text style={styles.offerFare}>{xaf(offer.priceXaf)}</Text>
         <Text style={styles.offerUnit}>FCFA</Text>
         <Text style={styles.offerPay}>
-          · {offer.paymentMethod === "CASH" ? "cash" : "by phone"}
+          {"· "}
+          {t(offer.paymentMethod === "CASH" ? S.driver.payCash : S.driver.payPhone)}
         </Text>
       </View>
 
@@ -328,22 +333,22 @@ function OfferCard({
           onPress={onDecline}
           disabled={busy}
           accessibilityRole="button"
-          accessibilityLabel="Leave this ride"
+          accessibilityLabel={t(S.driver.leaveRide)}
           style={({ pressed }) => [styles.decline, pressed && styles.pressed]}
         >
-          <Text style={styles.declineLabel}>Decline</Text>
+          <Text style={styles.declineLabel}>{t(S.driver.decline)}</Text>
         </Pressable>
         <Pressable
           onPress={onAccept}
           disabled={busy}
           accessibilityRole="button"
-          accessibilityLabel={`Accept this ride for ${offer.priceXaf} francs`}
+          accessibilityLabel={t(S.driver.acceptFor, { n: offer.priceXaf })}
           style={({ pressed }) => [styles.accept, pressed && styles.pressed, busy && styles.dimmed]}
         >
           {busy ? (
             <ActivityIndicator color={c.action} />
           ) : (
-            <Text style={styles.acceptLabel}>Accept ride</Text>
+            <Text style={styles.acceptLabel}>{t(S.driver.accept)}</Text>
           )}
         </Pressable>
       </View>

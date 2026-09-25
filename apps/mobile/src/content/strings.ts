@@ -51,6 +51,7 @@ export const S = {
     otherNumber: p("Use a different number", "Utiliser un autre numéro"),
     devHint: p("No SMS in development. Tap to fill:", "Pas de SMS en développement. Touchez pour remplir :"),
     goBack: p("Go back", "Retour"),
+    mapOfArea: p("Map of your area", "Carte de votre quartier"),
     enterCode: p("Enter your code", "Entrez votre code"),
     sentTo: p("Sent by SMS to", "Envoyé par SMS au"),
     changeNumber: p("Change number", "Changer de numéro"),
@@ -171,6 +172,347 @@ export const S = {
       "Vos signalements, et les réponses reçues",
     ),
     signOut: p("Sign out", "Se déconnecter"),
+  },
+
+  confirm: {
+    back: p("Back", "Retour"),
+    findingYou: p("Finding you…", "Localisation en cours…"),
+    yourFare: p("Your fare", "Votre tarif"),
+    upTheHill: p("up the hill", "en montée"),
+    fixedPrice: p(
+      "Fixed price. Your driver cannot ask for more.",
+      "Prix fixe. Votre chauffeur ne peut pas demander plus.",
+    ),
+    payWith: p("Pay with", "Payer avec"),
+    cash: p("Cash", "Espèces"),
+    momo: p("MoMo", "MoMo"),
+    orange: p("Orange", "Orange"),
+    phoneSaves: p(
+      "Paying by phone saves you {n} FCFA — it costs us less too.",
+      "Payer par téléphone vous fait économiser {n} FCFA — cela nous coûte moins cher aussi.",
+    ),
+    womanDriver: p("Woman driver", "Femme au volant"),
+    womanDriverOnly: p("Woman driver only", "Femme au volant uniquement"),
+    findTaxi: p("Find me a taxi", "Trouvez-moi un taxi"),
+
+    offline: p("No network. Try again in a moment.", "Pas de réseau. Réessayez dans un instant."),
+    noFare: p(
+      "We do not have a price for that trip yet.",
+      "Nous n'avons pas encore de tarif pour ce trajet.",
+    ),
+    alreadyRiding: p("You already have a ride running.", "Vous avez déjà une course en cours."),
+    didNotWork: p("That did not work. Try again.", "Cela n'a pas fonctionné. Réessayez."),
+  },
+
+  /**
+   * The driver's side.
+   *
+   * He is a taxi man at a junction with the phone in one hand. Short lines,
+   * and the money said in full francs rather than rounded.
+   */
+  driver: {
+    online: p("You're online", "Vous êtes en ligne"),
+    offline: p("You're offline", "Vous êtes hors ligne"),
+    goOnline: p("Go online", "Se mettre en ligne"),
+    goOffline: p("Go offline", "Se mettre hors ligne"),
+
+    today: p("Today", "Aujourd'hui"),
+    ridesToday: p("Rides today", "Courses aujourd'hui"),
+    yourRating: p("Your rating", "Votre note"),
+    myMoney: p("My money", "Mon argent"),
+    account: p("Your account", "Votre compte"),
+
+    feePaid: p("Today's fee paid — {amount} FCFA", "Frais du jour payés — {amount} FCFA"),
+    feeDue: p(
+      "Today's fee — {amount} FCFA, taken tomorrow morning",
+      "Frais du jour — {amount} FCFA, prélevés demain matin",
+    ),
+
+    newRide: p("NEW RIDE REQUEST", "NOUVELLE DEMANDE"),
+    payCash: p("cash", "espèces"),
+    payPhone: p("by phone", "par téléphone"),
+    metresAway: p("{n} m away", "à {n} m"),
+    kmAway: p("{n} km away", "à {n} km"),
+    decline: p("Decline", "Refuser"),
+    leaveRide: p("Leave this ride", "Laisser cette course"),
+    accept: p("Accept ride", "Accepter la course"),
+    acceptFor: p("Accept this ride for {n} francs", "Accepter cette course pour {n} francs"),
+
+    needLocation: p(
+      "We need your location to send you rides nearby.",
+      "Nous avons besoin de votre position pour vous envoyer les courses proches.",
+    ),
+    turnOnLocation: p(
+      "We could not find you. Check that location is on.",
+      "Nous ne vous trouvons pas. Vérifiez que la localisation est activée.",
+    ),
+    offlineMoment: p("No network. Try again in a moment.", "Pas de réseau. Réessayez dans un instant."),
+    offlinePullDown: p(
+      "No network. Pull down to try again.",
+      "Pas de réseau. Tirez vers le bas pour réessayer.",
+    ),
+    noNetwork: p("No network.", "Pas de réseau."),
+    didNotWork: p("That did not work.", "Cela n'a pas fonctionné."),
+    didNotWorkTryAgain: p("That did not work. Try again.", "Cela n'a pas fonctionné. Réessayez."),
+  },
+
+  /**
+   * The ride he is carrying.
+   *
+   * Said in the second person to a man driving: short lines, one action on the
+   * screen at a time, and the money stated before anything else.
+   */
+  job: {
+    goGetHer: p("Go and get her", "Allez la chercher"),
+    youAreThere: p("You are there", "Vous y êtes"),
+    carryingHer: p("Carrying her now", "Course en cours"),
+    finished: p("Ride finished", "Course terminée"),
+    over: p("This ride is over", "Cette course est terminée"),
+
+    paysCash: p("She pays you cash", "Elle vous paie en espèces"),
+    paidMomo: p("Paid by MTN MoMo", "Payé par MTN MoMo"),
+    paidOrange: p("Paid by Orange Money", "Payé par Orange Money"),
+
+    pickUp: p("PICK UP", "PRISE EN CHARGE"),
+    drop: p("DROP", "DÉPOSE"),
+    spareHelmet: p("Give her your spare helmet", "Donnez-lui votre casque de réserve"),
+
+    iAmHere: p("I AM HERE", "JE SUIS ARRIVÉ"),
+    askHerNumber: p("Ask her for her number", "Demandez-lui son numéro"),
+    askHerNumberWhy: p(
+      "She has four digits on her phone. Do not start until she reads them to you.",
+      "Elle a quatre chiffres sur son téléphone. Ne démarrez pas avant qu'elle vous les lise.",
+    ),
+    herFourDigits: p("Her four digit number", "Son numéro à quatre chiffres"),
+    startRide: p("START THE RIDE", "DÉMARRER LA COURSE"),
+    finishRide: p("FINISH RIDE", "TERMINER LA COURSE"),
+    done: p("DONE", "TERMINÉ"),
+
+    takeCash: p(
+      "Take the fare in cash. It is yours — we take nothing from it.",
+      "Prenez le tarif en espèces. Il est à vous — nous n'en prenons rien.",
+    ),
+    paidByPhone: p(
+      "Paid by phone. It lands in your balance.",
+      "Payé par téléphone. Cela arrive dans votre solde.",
+    ),
+
+    callHer: p("Call her", "L'appeler"),
+    dropRide: p("Drop this ride", "Abandonner cette course"),
+    getHelp: p("GET HELP", "DEMANDER DE L'AIDE"),
+    getHelpLabel: p("Get help", "Demander de l'aide"),
+
+    sheCancelled: p("She cancelled", "Elle a annulé"),
+    sheCancelledWhy: p("The rider called this ride off.", "La passagère a annulé cette course."),
+    ok: p("OK", "OK"),
+    dropAsk: p("Drop this ride?", "Abandonner cette course ?"),
+    dropWhy: p(
+      "She is waiting for you. Only do this if you truly cannot reach her.",
+      "Elle vous attend. Ne faites cela que si vous ne pouvez vraiment pas la rejoindre.",
+    ),
+    keepIt: p("Keep it", "La garder"),
+    dropIt: p("Drop it", "L'abandonner"),
+
+    wrongPin: p(
+      "That is not the number she has. Ask her to read it again.",
+      "Ce n'est pas le numéro qu'elle a. Demandez-lui de le relire.",
+    ),
+    movedOn: p(
+      "This ride has moved on. Pull down to refresh.",
+      "Cette course a changé d'état. Tirez vers le bas pour actualiser.",
+    ),
+  },
+
+  /**
+   * The driver's money.
+   *
+   * The whole argument for this app over the roadside is a small fixed fee and
+   * nothing else, which is a claim he should be able to check rather than take
+   * on trust. So every figure here is said in full, including the ones that
+   * are not in our favour.
+   */
+  money: {
+    back: p("Back", "Retour"),
+    title: p("My money", "Mon argent"),
+    thisWeek: p("This week · {from} to {to}", "Cette semaine · du {from} au {to}"),
+    earned: p("FCFA earned", "FCFA gagnés"),
+
+    /* Derived from the date on the device: the API sends English days. */
+    sun: p("Sun", "Dim"),
+    mon: p("Mon", "Lun"),
+    tue: p("Tue", "Mar"),
+    wed: p("Wed", "Mer"),
+    thu: p("Thu", "Jeu"),
+    fri: p("Fri", "Ven"),
+    sat: p("Sat", "Sam"),
+
+    barGhost: p(
+      "{day}, ghost town, you did not work",
+      "{day}, ville morte, vous n'avez pas travaillé",
+    ),
+    barDay: p(
+      "{day}, {amount} francs from {rides} rides",
+      "{day}, {amount} francs pour {rides} courses",
+    ),
+    ghostNote: p(
+      "A quiet Monday never counts against you.",
+      "Un lundi calme ne vous sera jamais reproché.",
+    ),
+
+    feeTitle: p("500 FCFA a day, nothing per ride", "500 FCFA par jour, rien par course"),
+    feeBody: p(
+      "Taken from your MoMo each morning you work.",
+      "Prélevés sur votre MoMo chaque matin où vous travaillez.",
+    ),
+    feeFigureOne: p(
+      "{paid} of {worked} day paid — {fees} FCFA. You kept {kept} FCFA.",
+      "{paid} jour sur {worked} payé — {fees} FCFA. Vous avez gardé {kept} FCFA.",
+    ),
+    feeFigureMany: p(
+      "{paid} of {worked} days paid — {fees} FCFA. You kept {kept} FCFA.",
+      "{paid} jours sur {worked} payés — {fees} FCFA. Vous avez gardé {kept} FCFA.",
+    ),
+
+    holding: p("We are holding for you", "Nous gardons pour vous"),
+    cashIsYours: p(
+      "Cash fares are already yours. This is only what we are holding.",
+      "Les courses payées en espèces sont déjà à vous. Ceci n'est que ce que nous gardons.",
+    ),
+    stillToCollect: p(
+      "{amount} FCFA of fees still to collect.",
+      "{amount} FCFA de frais restent à prélever.",
+    ),
+    sendMomo: p("Send it to my MoMo", "Envoyer sur mon MoMo"),
+    sendMomoLoud: p("SEND IT TO MY MOMO", "ENVOYER SUR MON MOMO"),
+    nothingToSend: p(
+      "Cash fares are already in your pocket — there is nothing for us to send.",
+      "Les courses en espèces sont déjà dans votre poche — nous n'avons rien à envoyer.",
+    ),
+
+    onItsWay: p("On its way to your MoMo.", "En route vers votre MoMo."),
+    couldNotSend: p("Could not send it", "Envoi impossible"),
+    didNotGoThrough: p("That did not go through.", "Cela n'est pas passé."),
+    refused: p(
+      "Your mobile money service refused it. Try again later.",
+      "Votre service mobile money l'a refusé. Réessayez plus tard.",
+    ),
+
+    /* The record underneath. */
+    everyFranc: p("Every franc in and out", "Chaque franc qui entre et qui sort"),
+    nothingYet: p(
+      "Nothing yet. Your daily fee and anything we send you will be listed here.",
+      "Rien pour le moment. Vos frais journaliers et tout ce que nous vous envoyons apparaîtront ici.",
+    ),
+    dailyFee: p("Daily fee", "Frais journaliers"),
+    sentToMomo: p("Sent to your MoMo", "Envoyé sur votre MoMo"),
+    farePaidByPhone: p("Fare paid by phone", "Course payée par téléphone"),
+    stateDone: p("Done", "Fait"),
+    stateOnItsWay: p("On its way", "En route"),
+    stateFailed: p("Did not go through", "N'est pas passé"),
+    stateExpired: p("Timed out", "Délai dépassé"),
+    today: p("Today", "Aujourd'hui"),
+    yesterday: p("Yesterday", "Hier"),
+  },
+
+  trip: {
+    /* The line in the pill over the map. */
+    looking: p("Looking for a taxi", "Recherche d'un taxi"),
+    coming: p("Your taxi is on the way", "Votre taxi arrive"),
+    outside: p("Your taxi is outside", "Votre taxi est dehors"),
+    riding: p("On the way", "En route"),
+    arrived: p("You have arrived", "Vous êtes arrivé"),
+    nobodyTook: p("Nobody took this one", "Personne n'a pris cette course"),
+    heDropped: p("He dropped the ride", "Le chauffeur a abandonné la course"),
+    over: p("This ride is over", "Cette course est terminée"),
+
+    usuallyQuick: p(
+      "Usually under 4 minutes on this road.",
+      "Généralement moins de 4 minutes sur cette route.",
+    ),
+    noTaxiTook: p(
+      "No taxi took this one. Nothing has been charged. Try again, or walk to the junction.",
+      "Aucun taxi n'a pris cette course. Rien ne vous a été facturé. Réessayez, ou marchez jusqu'au carrefour.",
+    ),
+
+    yourDriver: p("Your driver", "Votre chauffeur"),
+    oneRide: p("{n} ride", "{n} course"),
+    manyRides: p("{n} rides", "{n} courses"),
+    callDriver: p("Call your driver", "Appeler votre chauffeur"),
+    plateNumber: p("Plate number", "Numéro de plaque"),
+    tellHim: p("TELL HIM THIS NUMBER", "DITES-LUI CE NUMÉRO"),
+    tellHimWhy: p(
+      "Do not get in before he says it back.",
+      "Ne montez pas avant qu'il vous le répète.",
+    ),
+
+    youPaid: p("You paid", "Vous avez payé"),
+    payOnArrival: p("You pay on arrival", "Vous payez à l'arrivée"),
+    cash: p("Cash", "Espèces"),
+    momo: p("MTN MoMo", "MTN MoMo"),
+    orangeMoney: p("Orange Money", "Orange Money"),
+
+    done: p("Done", "Terminé"),
+    bookAnother: p("Book another", "Réserver une autre"),
+    shareTrip: p("Share trip", "Partager la course"),
+    shareThisTrip: p("Share this trip", "Partager cette course"),
+    makingLink: p("Making a link…", "Création du lien…"),
+    followMe: p("Follow my Fako Ride: {url}", "Suivez ma course Fako Ride : {url}"),
+    cancelRide: p("Cancel ride", "Annuler la course"),
+    cancelThisRide: p("Cancel this ride", "Annuler cette course"),
+    getHelp: p("Get help", "Demander de l'aide"),
+
+    cancelAsk: p("Cancel this ride?", "Annuler cette course ?"),
+    cancelWhy: p(
+      "He may already be on his way to you.",
+      "Il est peut-être déjà en route vers vous.",
+    ),
+    keepIt: p("Keep it", "La garder"),
+    cancelIt: p("Cancel it", "L'annuler"),
+
+    helpComing: p("Help is coming", "L'aide arrive"),
+    helpCominWhy: p(
+      "Ops have your location and are calling you.",
+      "L'équipe a votre position et vous appelle.",
+    ),
+    helpFailed: p("Could not send", "Envoi impossible"),
+    callPolice: p("Call 117 if you are in danger.", "Appelez le 117 si vous êtes en danger."),
+
+    offline: p("No network. Try again in a moment.", "Pas de réseau. Réessayez dans un instant."),
+    tripOver: p("That ride has already finished.", "Cette course est déjà terminée."),
+    notYours: p("That ride is not yours.", "Cette course n'est pas la vôtre."),
+    didNotWork: p("That did not work. Try again.", "Cela n'a pas fonctionné. Réessayez."),
+  },
+
+  /**
+   * Something wrong with a finished ride.
+   *
+   * The picker is first person — she is saying what happened to her — where
+   * the reports screen names the same thing as a topic she can read back.
+   * Three of the five are the shared words; two are not, on purpose.
+   */
+  wrong: {
+    link: p("Something wrong with this ride?", "Un problème avec cette course ?"),
+    title: p("What went wrong?", "Que s'est-il passé ?"),
+    feltUnsafe: p("I felt unsafe", "Je ne me suis pas senti en sécurité"),
+    leftSomething: p("I left something", "J'ai oublié quelque chose"),
+    placeholder: p(
+      "He asked for more than the app price at Mile 17.",
+      "Il a demandé plus que le prix de l'application à Mile 17.",
+    ),
+    tooShort: p("Say what happened, in a sentence.", "Dites ce qui s'est passé, en une phrase."),
+    offline: p(
+      "No network. Try again when you have signal.",
+      "Pas de réseau. Réessayez quand vous aurez du signal.",
+    ),
+    didNotSend: p("That did not send. Try again.", "L'envoi a échoué. Réessayez."),
+    notNow: p("Not now", "Pas maintenant"),
+    sending: p("Sending…", "Envoi…"),
+    send: p("Send", "Envoyer"),
+    /* Our own words, not the server's sentence. */
+    thanks: p(
+      "A person reads this and answers you within a day. You will find the answer under “What you told us” in your account.",
+      "Une personne le lit et vous répond dans la journée. Vous trouverez la réponse sous « Ce que vous nous avez dit » dans votre compte.",
+    ),
   },
 
   /**

@@ -27,22 +27,36 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { ApiError } from "@/api/client";
 import { money, type Balance, type WeekEarnings } from "@/api/driver";
 import { PaymentHistory } from "@/ui/payment-history";
+import { S } from "@/content/strings";
+import { plural, useT, type Phrase } from "@/ui/i18n";
 import { cardShadow, palette, primaryButton, radius, space, touch, type, xaf } from "@/theme";
 
 const c = palette("light");
 
 /** Tall enough to read a difference, short enough to fit seven on a phone. */
+/** Sunday first, to match `getUTCDay()`. */
+const WEEKDAY: Phrase[] = [
+  S.money.sun,
+  S.money.mon,
+  S.money.tue,
+  S.money.wed,
+  S.money.thu,
+  S.money.fri,
+  S.money.sat,
+];
+
 const BAR_MAX_HEIGHT = 96;
 
 export default function Earnings() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const t = useT();
 
   const [week, setWeek] = useState<WeekEarnings | null>(null);
   const [balance, setBalance] = useState<Balance | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [cashingOut, setCashingOut] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Phrase | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -51,7 +65,7 @@ export default function Earnings() {
       setBalance(b);
       setError(null);
     } catch (err) {
-      setError(err instanceof ApiError && err.offline ? "No network. Pull down to try again." : null);
+      setError(err instanceof ApiError && err.offline ? S.driver.offlinePullDown : null);
     }
   }, []);
 
@@ -67,18 +81,22 @@ export default function Earnings() {
     try {
       const res = await money.cashOut();
       // "On its way", never "sent" — it lands seconds later, or it fails.
-      Alert.alert(`${xaf(res.amountXaf)} FCFA`, res.next);
+      // The API sends a sentence of its own; it is English, so we say it.
+      Alert.alert(
+        `${xaf(res.amountXaf)} FCFA`,
+        t(res.status === "FAILED" ? S.money.didNotGoThrough : S.money.onItsWay),
+      );
       await load();
     } catch (err) {
       const message =
         err instanceof ApiError
           ? err.code === "offline"
-            ? "No network. Try again in a moment."
+            ? S.driver.offlineMoment
             : err.code === "payout_refused"
-              ? err.message
-              : "That did not go through."
-          : "That did not go through.";
-      Alert.alert("Could not send it", message);
+              ? S.money.refused
+              : S.money.didNotGoThrough
+          : S.money.didNotGoThrough;
+      Alert.alert(t(S.money.couldNotSend), t(message));
     } finally {
       setCashingOut(false);
     }
@@ -110,21 +128,19 @@ export default function Earnings() {
         <Pressable
           onPress={() => router.back()}
           accessibilityRole="button"
-          accessibilityLabel="Back"
+          accessibilityLabel={t(S.money.back)}
           style={styles.back}
         >
-          <Text style={styles.backLabel}>‹ Back</Text>
+          <Text style={styles.backLabel}>‹ {t(S.money.back)}</Text>
         </Pressable>
       </View>
 
-      <Text style={styles.title}>My money</Text>
+      <Text style={styles.title}>{t(S.money.title)}</Text>
       {week ? (
-        <Text style={styles.period}>
-          This week · {week.from} to {week.to}
-        </Text>
+        <Text style={styles.period}>{t(S.money.thisWeek, { from: week.from, to: week.to })}</Text>
       ) : null}
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <Text style={styles.error}>{t(error)}</Text> : null}
 
       {!week ? (
         <ActivityIndicator color={c.action} style={styles.loading} />
@@ -132,21 +148,28 @@ export default function Earnings() {
         <>
           <View style={styles.hero}>
             <Text style={styles.heroValue}>{xaf(week.earnedXaf)}</Text>
-            <Text style={styles.heroUnit}>FCFA earned</Text>
+            <Text style={styles.heroUnit}>{t(S.money.earned)}</Text>
           </View>
 
           {/* One bar per day. A missing bar has to mean something. */}
           <View style={styles.chart}>
             {week.days.map((d) => {
               const height = Math.max(3, Math.round((d.earnedXaf / peak) * BAR_MAX_HEIGHT));
+              // The API names the day in English. We have the date, so the
+              // day is named here instead.
+              const day = t(WEEKDAY[new Date(`${d.date}T00:00:00.000Z`).getUTCDay()] ?? S.money.mon);
               return (
                 <View key={d.date} style={styles.barColumn}>
                   <View
                     accessible
                     accessibilityLabel={
                       d.ghostTown
-                        ? `${d.weekday}, ghost town, you did not work`
-                        : `${d.weekday}, ${xaf(d.earnedXaf)} francs from ${d.tripCount} rides`
+                        ? t(S.money.barGhost, { day })
+                        : t(S.money.barDay, {
+                            day,
+                            amount: xaf(d.earnedXaf),
+                            rides: d.tripCount,
+                          })
                     }
                     style={[
                       styles.bar,
@@ -155,34 +178,39 @@ export default function Earnings() {
                       d.ghostTown && styles.barGhost,
                     ]}
                   />
-                  <Text style={[styles.barDay, d.ghostTown && styles.barDayGhost]}>{d.weekday}</Text>
+                  <Text style={[styles.barDay, d.ghostTown && styles.barDayGhost]}>{day}</Text>
                 </View>
               );
             })}
           </View>
 
           {week.days.some((d) => d.ghostTown) ? (
-            <Text style={styles.ghostNote}>A quiet Monday never counts against you.</Text>
+            <Text style={styles.ghostNote}>{t(S.money.ghostNote)}</Text>
           ) : null}
 
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>500 FCFA a day, nothing per ride</Text>
-            <Text style={styles.cardBody}>Taken from your MoMo each morning you work.</Text>
+            <Text style={styles.cardTitle}>{t(S.money.feeTitle)}</Text>
+            <Text style={styles.cardBody}>{t(S.money.feeBody)}</Text>
             <Text style={styles.cardFigure}>
-              {week.feesPaidCount} of {week.daysWorked} {week.daysWorked === 1 ? "day" : "days"} paid —{" "}
-              {xaf(week.feesXaf)} FCFA. You kept {xaf(week.keptXaf)} FCFA.
+              {t(plural(week.daysWorked, S.money.feeFigureOne, S.money.feeFigureMany), {
+                paid: week.feesPaidCount,
+                worked: week.daysWorked,
+                fees: xaf(week.feesXaf),
+                kept: xaf(week.keptXaf),
+              })}
             </Text>
           </View>
 
           {balance ? (
             <View style={styles.card}>
-              <Text style={styles.label}>We are holding for you</Text>
+              <Text style={styles.label}>{t(S.money.holding)}</Text>
               <Text style={styles.balance}>{xaf(balance.payableXaf)} FCFA</Text>
-              <Text style={styles.cardBody}>{balance.note}</Text>
+              {/* The API sends this line in English. Ours says the same. */}
+              <Text style={styles.cardBody}>{t(S.money.cashIsYours)}</Text>
 
               {balance.unpaidFeesXaf > 0 ? (
                 <Text style={styles.owing}>
-                  {xaf(balance.unpaidFeesXaf)} FCFA of fees still to collect.
+                  {t(S.money.stillToCollect, { amount: xaf(balance.unpaidFeesXaf) })}
                 </Text>
               ) : null}
 
@@ -190,7 +218,7 @@ export default function Earnings() {
                 onPress={cashOut}
                 disabled={!canCashOut}
                 accessibilityRole="button"
-                accessibilityLabel="Send it to my MoMo"
+                accessibilityLabel={t(S.money.sendMomo)}
                 style={({ pressed }) => [
                   styles.primary,
                   !canCashOut && styles.primaryDisabled,
@@ -200,14 +228,12 @@ export default function Earnings() {
                 {cashingOut ? (
                   <ActivityIndicator color={c.onAction} />
                 ) : (
-                  <Text style={styles.primaryLabel}>SEND IT TO MY MOMO</Text>
+                  <Text style={styles.primaryLabel}>{t(S.money.sendMomoLoud)}</Text>
                 )}
               </Pressable>
 
               {balance.payableXaf <= 0 ? (
-                <Text style={styles.cardBody}>
-                  Cash fares are already in your pocket — there is nothing for us to send.
-                </Text>
+                <Text style={styles.cardBody}>{t(S.money.nothingToSend)}</Text>
               ) : null}
             </View>
           ) : null}

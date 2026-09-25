@@ -21,6 +21,8 @@ import { StyleSheet, Text, View } from "react-native";
 import { ApiError } from "@/api/client";
 import { money as wallet } from "@/api/driver";
 import { Appear } from "@/ui/motion";
+import { S } from "@/content/strings";
+import { useLang, useT, type Phrase, type Translate } from "@/ui/i18n";
 import { palette, radius, space, type, xaf } from "@/theme";
 
 const c = palette("light");
@@ -36,46 +38,49 @@ type Row = {
 };
 
 /** What the money was for, as he would say it. */
-function purposeOf(purpose: string, amount: number): { label: string; incoming: boolean } {
+function purposeOf(purpose: string, amount: number): { label: Phrase | null; incoming: boolean } {
   switch (purpose) {
     case "ACCESS_FEE":
-      return { label: "Daily fee", incoming: false };
+      return { label: S.money.dailyFee, incoming: false };
     case "DRIVER_PAYOUT":
-      return { label: "Sent to your MoMo", incoming: true };
+      return { label: S.money.sentToMomo, incoming: true };
     case "TRIP_FARE":
-      return { label: "Fare paid by phone", incoming: true };
+      return { label: S.money.farePaidByPhone, incoming: true };
     default:
-      return { label: purpose.replace(/_/g, " ").toLowerCase(), incoming: amount > 0 };
+      // An enum we have no words for yet. Its own name, tidied, beats a blank.
+      return { label: null, incoming: amount > 0 };
   }
 }
 
-function stateOf(status: string): { label: string; style: object } {
+function stateOf(status: string): { label: Phrase | null; style: object } {
   switch (status) {
     case "SUCCESSFUL":
-      return { label: "Done", style: styles.done };
+      return { label: S.money.stateDone, style: styles.done };
     case "PENDING":
     case "PROCESSING":
-      return { label: "On its way", style: styles.pending };
+      return { label: S.money.stateOnItsWay, style: styles.pending };
     case "FAILED":
-      return { label: "Did not go through", style: styles.failed };
+      return { label: S.money.stateFailed, style: styles.failed };
     case "EXPIRED":
-      return { label: "Timed out", style: styles.failed };
+      return { label: S.money.stateExpired, style: styles.failed };
     default:
-      return { label: status.toLowerCase(), style: styles.pending };
+      return { label: null, style: styles.pending };
   }
 }
 
-function dayOf(iso: string): string {
+function dayOf(t: Translate, lang: string, iso: string): string {
   const d = new Date(iso);
   const days = Math.floor((Date.now() - d.getTime()) / 86_400_000);
-  if (days === 0) return "Today";
-  if (days === 1) return "Yesterday";
-  return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  if (days === 0) return t(S.money.today);
+  if (days === 1) return t(S.money.yesterday);
+  return d.toLocaleDateString(lang, { day: "numeric", month: "short" });
 }
 
 export function PaymentHistory() {
   const [rows, setRows] = useState<Row[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Phrase | null>(null);
+  const t = useT();
+  const lang = useLang();
 
   const load = useCallback(async () => {
     try {
@@ -84,7 +89,7 @@ export function PaymentHistory() {
       setError(null);
     } catch (err) {
       // The balance above still stands. A missing history is not worth an alarm.
-      setError(err instanceof ApiError && err.offline ? "No network." : null);
+      setError(err instanceof ApiError && err.offline ? S.driver.noNetwork : null);
       setRows([]);
     }
   }, []);
@@ -97,14 +102,12 @@ export function PaymentHistory() {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>Every franc in and out</Text>
+      <Text style={styles.title}>{t(S.money.everyFranc)}</Text>
 
-      {error ? <Text style={styles.quiet}>{error}</Text> : null}
+      {error ? <Text style={styles.quiet}>{t(error)}</Text> : null}
 
       {rows.length === 0 ? (
-        <Text style={styles.quiet}>
-          Nothing yet. Your daily fee and anything we send you will be listed here.
-        </Text>
+        <Text style={styles.quiet}>{t(S.money.nothingYet)}</Text>
       ) : (
         rows.map((r, i) => {
           const what = purposeOf(r.purpose, r.amountXaf);
@@ -113,9 +116,14 @@ export function PaymentHistory() {
             <Appear key={r.id} index={i}>
               <View style={[styles.row, i > 0 && styles.ruled]}>
                 <View style={styles.grow}>
-                  <Text style={styles.what}>{what.label}</Text>
+                  <Text style={styles.what}>
+                    {what.label ? t(what.label) : r.purpose.replace(/_/g, " ").toLowerCase()}
+                  </Text>
                   <Text style={styles.when}>
-                    {dayOf(r.createdAt)} · <Text style={state.style}>{state.label}</Text>
+                    {dayOf(t, lang, r.createdAt)} ·{" "}
+                    <Text style={state.style}>
+                      {state.label ? t(state.label) : r.status.toLowerCase()}
+                    </Text>
                   </Text>
                   {r.failureReason ? (
                     <Text style={styles.reason}>{r.failureReason}</Text>

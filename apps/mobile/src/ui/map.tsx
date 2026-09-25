@@ -20,6 +20,8 @@
 import type { ReactNode } from "react";
 import { StyleSheet, View, type ViewStyle } from "react-native";
 import Svg, { Circle, Path, Rect } from "react-native-svg";
+import { S } from "@/content/strings";
+import { useT } from "@/ui/i18n";
 import { mapPalette, palette, radius, space } from "@/theme";
 import { Rise } from "./motion";
 
@@ -48,13 +50,14 @@ export function MapPanel({
   children?: ReactNode;
 }) {
   const w = 390;
+  const t = useT();
   const h = height;
   const hx = here.x * w;
   const hy = here.y * h;
 
   return (
     <View style={[styles.map, { height }]}>
-      <Svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h} accessibilityLabel="Map of your area">
+      <Svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h} accessibilityLabel={t(S.signIn.mapOfArea)}>
         <Rect width={w} height={h} fill={map.ground} />
 
         {/* City blocks. Four, placed off-grid so it reads as a town. */}

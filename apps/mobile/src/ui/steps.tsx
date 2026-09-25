@@ -12,6 +12,8 @@
 
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { CaretLeftIcon } from "@/ui/icons";
+import { S } from "@/content/strings";
+import { useT } from "@/ui/i18n";
 import { palette, radius, space, type } from "@/theme";
 
 const c = palette("light");
@@ -26,6 +28,7 @@ export function Steps({
   /** Omitted on the last step: there is nothing to go back to once it is sent. */
   onBack?: () => void;
 }) {
+  const t = useT();
   return (
     <View style={styles.wrap}>
       <View style={styles.head}>
@@ -33,7 +36,7 @@ export function Steps({
           <Pressable
             onPress={onBack}
             accessibilityRole="button"
-            accessibilityLabel="Go back"
+            accessibilityLabel={t(S.signIn.goBack)}
             hitSlop={8}
             style={({ pressed }) => [styles.back, pressed && styles.pressed]}
           >

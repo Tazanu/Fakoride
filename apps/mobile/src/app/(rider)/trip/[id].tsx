@@ -52,52 +52,54 @@ import {
 import { useRiderRealtime } from "@/realtime/RiderRealtime";
 import { findMe } from "@/ui/position";
 import { MapPanel, MapPill, Sheet } from "@/ui/map";
+import { S } from "@/content/strings";
+import { plural, useT, type Phrase } from "@/ui/i18n";
 import { palette, radius, space, touch, type, xaf } from "@/theme";
 
 const c = palette("light");
 
 const MAP_HEIGHT = 330;
 
-const PAYMENT_LABEL: Record<PaymentMethod, string> = {
-  CASH: "Cash",
-  MOMO: "MTN MoMo",
-  ORANGE_MONEY: "Orange Money",
+const PAYMENT_LABEL: Record<PaymentMethod, Phrase> = {
+  CASH: S.trip.cash,
+  MOMO: S.trip.momo,
+  ORANGE_MONEY: S.trip.orangeMoney,
 };
 
-function errorFor(err: unknown): string {
-  if (!(err instanceof ApiError)) return "That did not work. Try again.";
+function errorFor(err: unknown): Phrase {
+  if (!(err instanceof ApiError)) return S.trip.didNotWork;
   switch (err.code) {
     case "offline":
-      return "No network. Try again in a moment.";
+      return S.trip.offline;
     case "trip_over":
-      return "That ride has already finished.";
+      return S.trip.tripOver;
     case "not_yours":
-      return "That ride is not yours.";
+      return S.trip.notYours;
     default:
-      return "That did not work. Try again.";
+      return S.trip.didNotWork;
   }
 }
 
 /** The line in the pill over the map. */
-function stageLine(status: TripDetail["status"]): string {
+function stageLine(status: TripDetail["status"]): Phrase {
   switch (status) {
     case "REQUESTED":
     case "OFFERED":
-      return "Looking for a taxi";
+      return S.trip.looking;
     case "ACCEPTED":
-      return "Your taxi is on the way";
+      return S.trip.coming;
     case "ARRIVED":
-      return "Your taxi is outside";
+      return S.trip.outside;
     case "IN_PROGRESS":
-      return "On the way";
+      return S.trip.riding;
     case "COMPLETED":
-      return "You have arrived";
+      return S.trip.arrived;
     case "NO_DRIVER_FOUND":
-      return "Nobody took this one";
+      return S.trip.nobodyTook;
     case "CANCELLED_BY_DRIVER":
-      return "He dropped the ride";
+      return S.trip.heDropped;
     default:
-      return "This ride is over";
+      return S.trip.over;
   }
 }
 
@@ -112,10 +114,11 @@ export default function Trip() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const t = useT();
   const { version, last, watch } = useRiderRealtime();
 
   const [trip, setTrip] = useState<TripDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Phrase | null>(null);
   const [busy, setBusy] = useState(false);
   const [sharing, setSharing] = useState(false);
 
@@ -170,10 +173,10 @@ export default function Trip() {
 
   function confirmCancel() {
     if (!id) return;
-    Alert.alert("Cancel this ride?", "He may already be on his way to you.", [
-      { text: "Keep it", style: "cancel" },
+    Alert.alert(t(S.trip.cancelAsk), t(S.trip.cancelWhy), [
+      { text: t(S.trip.keepIt), style: "cancel" },
       {
-        text: "Cancel it",
+        text: t(S.trip.cancelIt),
         style: "destructive",
         onPress: () => {
           setBusy(true);
@@ -199,7 +202,9 @@ export default function Trip() {
     setSharing(true);
     try {
       const created = await share.create(id);
-      await RNShare.share({ message: `Follow my Fako Ride: ${apiBaseUrl()}${created.path}` });
+      await RNShare.share({
+        message: t(S.trip.followMe, { url: `${apiBaseUrl()}${created.path}` }),
+      });
     } catch (err) {
       if (err instanceof ApiError) setError(errorFor(err));
     } finally {
@@ -217,9 +222,9 @@ export default function Trip() {
       const where = fix ? { lat: fix.lat, lng: fix.lng } : {};
       try {
         await trips.sos(id, { ...where, note: "rider pressed get help" });
-        Alert.alert("Help is coming", "Ops have your location and are calling you.");
+        Alert.alert(t(S.trip.helpComing), t(S.trip.helpCominWhy));
       } catch {
-        Alert.alert("Could not send", "Call 117 if you are in danger.");
+        Alert.alert(t(S.trip.helpFailed), t(S.trip.callPolice));
       }
     })();
   }
@@ -227,7 +232,7 @@ export default function Trip() {
   if (!trip) {
     return (
       <View style={styles.centre}>
-        {error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={c.action} />}
+        {error ? <Text style={styles.error}>{t(error)}</Text> : <ActivityIndicator color={c.action} />}
       </View>
     );
   }
@@ -262,7 +267,7 @@ export default function Trip() {
                 <View style={styles.searchDot} />
               </Pulse>
             ) : null}
-            <Text style={styles.pillText}>{stageLine(trip.status)}</Text>
+            <Text style={styles.pillText}>{t(stageLine(trip.status))}</Text>
           </MapPill>
         </View>
       </MapPanel>
@@ -271,20 +276,18 @@ export default function Trip() {
         {/* The PIN takes the top of the sheet the moment he is outside. */}
         {trip.status === "ARRIVED" && trip.pin ? (
           <View style={styles.pinCard}>
-            <Text style={styles.pinLabel}>TELL HIM THIS NUMBER</Text>
+            <Text style={styles.pinLabel}>{t(S.trip.tellHim)}</Text>
             <Text style={styles.pin}>{trip.pin}</Text>
-            <Text style={styles.pinWarn}>Do not get in before he says it back.</Text>
+            <Text style={styles.pinWarn}>{t(S.trip.tellHimWhy)}</Text>
           </View>
         ) : null}
 
         {searching ? (
-          <Text style={styles.waiting}>Usually under 4 minutes on this road.</Text>
+          <Text style={styles.waiting}>{t(S.trip.usuallyQuick)}</Text>
         ) : null}
 
         {trip.status === "NO_DRIVER_FOUND" ? (
-          <Text style={styles.waiting}>
-            No taxi took this one. Nothing has been charged. Try again, or walk to the junction.
-          </Text>
+          <Text style={styles.waiting}>{t(S.trip.noTaxiTook)}</Text>
         ) : null}
 
         {driver ? (
@@ -295,7 +298,7 @@ export default function Trip() {
             <View style={styles.grow}>
               <View style={styles.nameRow}>
                 <Text style={styles.driverName} numberOfLines={1}>
-                  {driver.name ?? "Your driver"}
+                  {driver.name ?? t(S.trip.yourDriver)}
                 </Text>
                 {driver.verified ? <SealCheckIcon size={18} color={c.actionBright} weight="fill" /> : null}
               </View>
@@ -303,14 +306,17 @@ export default function Trip() {
                 <StarIcon size={15} color={c.amber} weight="fill" />
                 <Text style={styles.rating}>{driver.rating.toFixed(1)}</Text>
                 <Text style={styles.rides}>
-                  · {driver.tripCount} {driver.tripCount === 1 ? "ride" : "rides"}
+                  {"· "}
+                  {t(plural(driver.tripCount, S.trip.oneRide, S.trip.manyRides), {
+                    n: driver.tripCount,
+                  })}
                 </Text>
               </View>
             </View>
             <Pressable
               onPress={() => void Linking.openURL(`tel:${driver.phone}`)}
               accessibilityRole="button"
-              accessibilityLabel="Call your driver"
+              accessibilityLabel={t(S.trip.callDriver)}
               style={({ pressed }) => [styles.callButton, pressed && styles.pressed]}
             >
               <PhoneCallIcon size={22} color={c.onAction} />
@@ -320,7 +326,7 @@ export default function Trip() {
 
         {driver ? (
           <View style={styles.plateRow}>
-            <Text style={styles.plateLabel}>Plate number</Text>
+            <Text style={styles.plateLabel}>{t(S.trip.plateNumber)}</Text>
             <Text style={styles.plate}>{driver.plate}</Text>
           </View>
         ) : null}
@@ -328,16 +334,16 @@ export default function Trip() {
         <View style={styles.payRow}>
           <View>
             <Text style={styles.payLabel}>
-              {trip.status === "COMPLETED" ? "You paid" : "You pay on arrival"}
+              {t(trip.status === "COMPLETED" ? S.trip.youPaid : S.trip.payOnArrival)}
             </Text>
             <Text style={styles.payAmount}>{xaf(trip.priceXaf)} FCFA</Text>
           </View>
           <View style={styles.payChip}>
-            <Text style={styles.payChipText}>{PAYMENT_LABEL[trip.paymentMethod]}</Text>
+            <Text style={styles.payChipText}>{t(PAYMENT_LABEL[trip.paymentMethod])}</Text>
           </View>
         </View>
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? <Text style={styles.error}>{t(error)}</Text> : null}
 
         <View style={styles.spacer} />
 
@@ -346,11 +352,11 @@ export default function Trip() {
             <Pressable
               onPress={() => router.replace("/(rider)")}
               accessibilityRole="button"
-              accessibilityLabel={trip.status === "COMPLETED" ? "Done" : "Book another"}
+              accessibilityLabel={t(trip.status === "COMPLETED" ? S.trip.done : S.trip.bookAnother)}
               style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
             >
               <Text style={styles.ctaLabel}>
-                {trip.status === "COMPLETED" ? "Done" : "Book another"}
+                {t(trip.status === "COMPLETED" ? S.trip.done : S.trip.bookAnother)}
               </Text>
             </Pressable>
 
@@ -369,31 +375,31 @@ export default function Trip() {
                 onPress={shareTrip}
                 disabled={sharing}
                 accessibilityRole="button"
-                accessibilityLabel="Share this trip"
+                accessibilityLabel={t(S.trip.shareThisTrip)}
                 style={({ pressed }) => [styles.ghost, pressed && styles.pressed]}
               >
                 <ShareNetworkIcon size={18} color={c.inkSoft} />
-                <Text style={styles.ghostLabel}>{sharing ? "Making a link…" : "Share trip"}</Text>
+                <Text style={styles.ghostLabel}>{t(sharing ? S.trip.makingLink : S.trip.shareTrip)}</Text>
               </Pressable>
               <Pressable
                 onPress={confirmCancel}
                 disabled={busy}
                 accessibilityRole="button"
-                accessibilityLabel="Cancel this ride"
+                accessibilityLabel={t(S.trip.cancelThisRide)}
                 style={({ pressed }) => [styles.ghost, styles.ghostDanger, pressed && styles.pressed]}
               >
-                <Text style={styles.ghostDangerLabel}>Cancel ride</Text>
+                <Text style={styles.ghostDangerLabel}>{t(S.trip.cancelRide)}</Text>
               </Pressable>
             </View>
 
             <Pressable
               onPress={getHelp}
               accessibilityRole="button"
-              accessibilityLabel="Get help"
+              accessibilityLabel={t(S.trip.getHelp)}
               style={({ pressed }) => [styles.help, pressed && styles.pressed]}
             >
               <WarningIcon size={18} color={c.danger} />
-              <Text style={styles.helpLabel}>Get help</Text>
+              <Text style={styles.helpLabel}>{t(S.trip.getHelp)}</Text>
             </Pressable>
           </>
         )}
@@ -419,33 +425,32 @@ function Wrong({ tripId }: { tripId: string }) {
   const [category, setCategory] = useState<ComplaintCategory>("FARE_DISPUTE");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const [sent, setSent] = useState<string | null>(null);
-  const [failed, setFailed] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
+  const [failed, setFailed] = useState<Phrase | null>(null);
+  const t = useT();
 
-  const KINDS: { id: ComplaintCategory; label: string }[] = [
-    { id: "FARE_DISPUTE", label: "The fare" },
-    { id: "DRIVER_CONDUCT", label: "The driver" },
-    { id: "SAFETY", label: "I felt unsafe" },
-    { id: "LOST_ITEM", label: "I left something" },
-    { id: "OTHER", label: "Something else" },
+  const KINDS: { id: ComplaintCategory; label: Phrase }[] = [
+    { id: "FARE_DISPUTE", label: S.category.FARE_DISPUTE },
+    { id: "DRIVER_CONDUCT", label: S.category.DRIVER_CONDUCT },
+    { id: "SAFETY", label: S.wrong.feltUnsafe },
+    { id: "LOST_ITEM", label: S.wrong.leftSomething },
+    { id: "OTHER", label: S.category.OTHER },
   ];
 
   async function send() {
     if (message.trim().length < 5) {
-      setFailed("Say what happened, in a sentence.");
+      setFailed(S.wrong.tooShort);
       return;
     }
     setBusy(true);
     setFailed(null);
     try {
-      const r = await complaints.file({ category, message: message.trim(), tripId });
-      setSent(r.next);
+      // The API answers with a sentence of its own, and it is English every
+      // time. It is thrown away here; we say the same thing in her language.
+      await complaints.file({ category, message: message.trim(), tripId });
+      setSent(true);
     } catch (err) {
-      setFailed(
-        err instanceof ApiError && err.offline
-          ? "No network. Try again when you have signal."
-          : "That did not send. Try again.",
-      );
+      setFailed(err instanceof ApiError && err.offline ? S.wrong.offline : S.wrong.didNotSend);
     } finally {
       setBusy(false);
     }
@@ -454,7 +459,7 @@ function Wrong({ tripId }: { tripId: string }) {
   if (sent) {
     return (
       <View style={styles.wrongDone}>
-        <Text style={styles.wrongDoneText}>{sent}</Text>
+        <Text style={styles.wrongDoneText}>{t(S.wrong.thanks)}</Text>
       </View>
     );
   }
@@ -462,14 +467,14 @@ function Wrong({ tripId }: { tripId: string }) {
   if (!open) {
     return (
       <Pressable onPress={() => setOpen(true)} accessibilityRole="button" hitSlop={8}>
-        <Text style={styles.wrongLink}>Something wrong with this ride?</Text>
+        <Text style={styles.wrongLink}>{t(S.wrong.link)}</Text>
       </Pressable>
     );
   }
 
   return (
     <View style={styles.wrong}>
-      <Text style={styles.wrongTitle}>What went wrong?</Text>
+      <Text style={styles.wrongTitle}>{t(S.wrong.title)}</Text>
 
       <View style={styles.wrongKinds}>
         {KINDS.map((k) => (
@@ -481,7 +486,7 @@ function Wrong({ tripId }: { tripId: string }) {
             style={[styles.wrongChip, category === k.id && styles.wrongChipOn]}
           >
             <Text style={[styles.wrongChipText, category === k.id && styles.wrongChipTextOn]}>
-              {k.label}
+              {t(k.label)}
             </Text>
           </Pressable>
         ))}
@@ -491,20 +496,20 @@ function Wrong({ tripId }: { tripId: string }) {
         style={styles.wrongInput}
         value={message}
         onChangeText={setMessage}
-        placeholder="He asked for more than the app price at Mile 17."
+        placeholder={t(S.wrong.placeholder)}
         placeholderTextColor={c.muted}
         multiline
         editable={!busy}
       />
 
-      {failed ? <Text style={styles.error}>{failed}</Text> : null}
+      {failed ? <Text style={styles.error}>{t(failed)}</Text> : null}
 
       <View style={styles.wrongActions}>
         <Pressable onPress={() => setOpen(false)} disabled={busy} hitSlop={8}>
-          <Text style={styles.wrongCancel}>Not now</Text>
+          <Text style={styles.wrongCancel}>{t(S.wrong.notNow)}</Text>
         </Pressable>
         <Press onPress={() => void send()} disabled={busy} style={styles.wrongSend}>
-          <Text style={styles.wrongSendLabel}>{busy ? "Sending…" : "Send"}</Text>
+          <Text style={styles.wrongSendLabel}>{t(busy ? S.wrong.sending : S.wrong.send)}</Text>
         </Press>
       </View>
     </View>

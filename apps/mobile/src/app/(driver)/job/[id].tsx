@@ -37,6 +37,8 @@ import { trips, type PaymentMethod, type TripDetail } from "@/api/driver";
 import { useDriverRealtime } from "@/realtime/DriverRealtime";
 import { pushPosition } from "@/realtime/socket";
 import { cardShadow, palette, primaryButton, radius, space, touch, type, xaf } from "@/theme";
+import { S } from "@/content/strings";
+import { useT, type Phrase } from "@/ui/i18n";
 import { keyboardBehavior, useScrollPastKeyboard } from "@/ui/keyboard";
 
 const c = palette("light");
@@ -44,39 +46,39 @@ const c = palette("light");
 /** How often his position goes up while he is carrying someone. */
 const POSITION_INTERVAL_MS = 10_000;
 
-const PAYMENT_LABEL: Record<PaymentMethod, string> = {
-  CASH: "She pays you cash",
-  MOMO: "Paid by MTN MoMo",
-  ORANGE_MONEY: "Paid by Orange Money",
+const PAYMENT_LABEL: Record<PaymentMethod, Phrase> = {
+  CASH: S.job.paysCash,
+  MOMO: S.job.paidMomo,
+  ORANGE_MONEY: S.job.paidOrange,
 };
 
-function errorFor(err: unknown): string {
-  if (!(err instanceof ApiError)) return "That did not work. Try again.";
+function errorFor(err: unknown): Phrase {
+  if (!(err instanceof ApiError)) return S.driver.didNotWorkTryAgain;
   switch (err.code) {
     case "offline":
-      return "No network. Try again in a moment.";
+      return S.driver.offlineMoment;
     case "wrong_pin":
-      return "That is not the number she has. Ask her to read it again.";
+      return S.job.wrongPin;
     case "bad_state":
-      return "This ride has moved on. Pull down to refresh.";
+      return S.job.movedOn;
     default:
-      return "That did not work. Try again.";
+      return S.driver.didNotWorkTryAgain;
   }
 }
 
 /** The one line at the top that says where in the ride he is. */
-function stageLine(status: TripDetail["status"]): string {
+function stageLine(status: TripDetail["status"]): Phrase {
   switch (status) {
     case "ACCEPTED":
-      return "Go and get her";
+      return S.job.goGetHer;
     case "ARRIVED":
-      return "You are there";
+      return S.job.youAreThere;
     case "IN_PROGRESS":
-      return "Carrying her now";
+      return S.job.carryingHer;
     case "COMPLETED":
-      return "Ride finished";
+      return S.job.finished;
     default:
-      return "This ride is over";
+      return S.job.over;
   }
 }
 
@@ -84,6 +86,7 @@ export default function Trip() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const t = useT();
   const { cancelledTripId, acknowledgeCancellation } = useDriverRealtime();
   // The PIN gate puts a keypad over the bottom half of this screen.
   const scroll = useScrollPastKeyboard();
@@ -91,7 +94,7 @@ export default function Trip() {
   const [trip, setTrip] = useState<TripDetail | null>(null);
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Phrase | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -116,8 +119,8 @@ export default function Trip() {
   useEffect(() => {
     if (!id || cancelledTripId !== id) return;
     acknowledgeCancellation();
-    Alert.alert("She cancelled", "The rider called this ride off.", [
-      { text: "OK", onPress: () => router.replace("/(driver)") },
+    Alert.alert(t(S.job.sheCancelled), t(S.job.sheCancelledWhy), [
+      { text: t(S.job.ok), onPress: () => router.replace("/(driver)") },
     ]);
   }, [cancelledTripId, id, acknowledgeCancellation, router]);
 
@@ -188,10 +191,10 @@ export default function Trip() {
 
   function confirmCancel() {
     if (!id) return;
-    Alert.alert("Drop this ride?", "She is waiting for you. Only do this if you truly cannot reach her.", [
-      { text: "Keep it", style: "cancel" },
+    Alert.alert(t(S.job.dropAsk), t(S.job.dropWhy), [
+      { text: t(S.job.keepIt), style: "cancel" },
       {
-        text: "Drop it",
+        text: t(S.job.dropIt),
         style: "destructive",
         onPress: () =>
           void step(async () => {
@@ -206,14 +209,14 @@ export default function Trip() {
     if (!id) return;
     void trips
       .sos(id, { note: "driver pressed get help" })
-      .then(() => Alert.alert("Help is coming", "Ops have your location and are calling you."))
-      .catch(() => Alert.alert("Could not send", "Call 117 if you are in danger."));
+      .then(() => Alert.alert(t(S.trip.helpComing), t(S.trip.helpCominWhy)))
+      .catch(() => Alert.alert(t(S.trip.helpFailed), t(S.trip.callPolice)));
   }
 
   if (!trip) {
     return (
       <View style={styles.centre}>
-        {error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={c.action} />}
+        {error ? <Text style={styles.error}>{t(error)}</Text> : <ActivityIndicator color={c.action} />}
       </View>
     );
   }
@@ -231,34 +234,32 @@ export default function Trip() {
         ]}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.stage}>{stageLine(trip.status)}</Text>
+        <Text style={styles.stage}>{t(stageLine(trip.status))}</Text>
 
         <View style={styles.fareCard}>
           <View style={styles.fareRow}>
             <Text style={styles.fare}>{xaf(trip.priceXaf)}</Text>
             <Text style={styles.fareUnit}>FCFA</Text>
           </View>
-          <Text style={styles.payment}>{PAYMENT_LABEL[trip.paymentMethod]}</Text>
+          <Text style={styles.payment}>{t(PAYMENT_LABEL[trip.paymentMethod])}</Text>
         </View>
 
         <View style={styles.legs}>
-          <Leg label="PICK UP" place={trip.pickupLabel} zone={trip.from.name} />
-          <Leg label="DROP" place={trip.dropLabel} zone={trip.to.name} />
+          <Leg label={t(S.job.pickUp)} place={trip.pickupLabel} zone={trip.from.name} />
+          <Leg label={t(S.job.drop)} place={trip.dropLabel} zone={trip.to.name} />
         </View>
 
-        {trip.needsHelmet && !done ? <Text style={styles.helmet}>Give her your spare helmet</Text> : null}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {trip.needsHelmet && !done ? <Text style={styles.helmet}>{t(S.job.spareHelmet)}</Text> : null}
+        {error ? <Text style={styles.error}>{t(error)}</Text> : null}
 
         {trip.status === "ACCEPTED" ? (
-          <Primary label="I AM HERE" busy={busy} onPress={() => void step(() => trips.arrived(trip.id))} />
+          <Primary label={t(S.job.iAmHere)} busy={busy} onPress={() => void step(() => trips.arrived(trip.id))} />
         ) : null}
 
         {trip.status === "ARRIVED" ? (
           <View style={styles.pinBlock}>
-            <Text style={styles.pinTitle}>Ask her for her number</Text>
-            <Text style={styles.pinHelp}>
-              She has four digits on her phone. Do not start until she reads them to you.
-            </Text>
+            <Text style={styles.pinTitle}>{t(S.job.askHerNumber)}</Text>
+            <Text style={styles.pinHelp}>{t(S.job.askHerNumberWhy)}</Text>
             <TextInput
               style={styles.pinInput}
               value={pin}
@@ -267,25 +268,23 @@ export default function Trip() {
               placeholderTextColor={c.muted}
               keyboardType="number-pad"
               editable={!busy}
-              accessibilityLabel="Her four digit number"
+              accessibilityLabel={t(S.job.herFourDigits)}
               maxLength={4}
             />
-            <Primary label="START THE RIDE" busy={busy} disabled={pin.length !== 4} onPress={() => void startRide()} />
+            <Primary label={t(S.job.startRide)} busy={busy} disabled={pin.length !== 4} onPress={() => void startRide()} />
           </View>
         ) : null}
 
         {trip.status === "IN_PROGRESS" ? (
-          <Primary label="FINISH RIDE" busy={busy} onPress={() => void step(() => trips.complete(trip.id))} />
+          <Primary label={t(S.job.finishRide)} busy={busy} onPress={() => void step(() => trips.complete(trip.id))} />
         ) : null}
 
         {done ? (
           <View style={styles.doneBlock}>
             <Text style={styles.doneText}>
-              {trip.paymentMethod === "CASH"
-                ? "Take the fare in cash. It is yours — we take nothing from it."
-                : "Paid by phone. It lands in your balance."}
+              {t(trip.paymentMethod === "CASH" ? S.job.takeCash : S.job.paidByPhone)}
             </Text>
-            <Primary label="DONE" busy={false} onPress={() => router.replace("/(driver)")} />
+            <Primary label={t(S.job.done)} busy={false} onPress={() => router.replace("/(driver)")} />
           </View>
         ) : null}
 
@@ -293,20 +292,20 @@ export default function Trip() {
           <>
             <View style={styles.minorActions}>
               <Pressable onPress={() => void Linking.openURL("tel:")} accessibilityRole="button" style={styles.minor}>
-                <Text style={styles.minorLabel}>Call her</Text>
+                <Text style={styles.minorLabel}>{t(S.job.callHer)}</Text>
               </Pressable>
               <Pressable onPress={confirmCancel} accessibilityRole="button" style={styles.minor}>
-                <Text style={[styles.minorLabel, styles.minorDanger]}>Drop this ride</Text>
+                <Text style={[styles.minorLabel, styles.minorDanger]}>{t(S.job.dropRide)}</Text>
               </Pressable>
             </View>
 
             <Pressable
               onPress={getHelp}
               accessibilityRole="button"
-              accessibilityLabel="Get help"
+              accessibilityLabel={t(S.job.getHelpLabel)}
               style={styles.sos}
             >
-              <Text style={styles.sosLabel}>GET HELP</Text>
+              <Text style={styles.sosLabel}>{t(S.job.getHelp)}</Text>
             </Pressable>
           </>
         ) : null}

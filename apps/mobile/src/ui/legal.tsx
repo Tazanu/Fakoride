@@ -18,6 +18,8 @@ import { useRouter } from "expo-router";
 import { CaretLeftIcon } from "@/ui/icons";
 import { useSession } from "@/session/SessionProvider";
 import { Press } from "@/ui/motion";
+import { S } from "@/content/strings";
+import { useT } from "@/ui/i18n";
 import { palette, radius, space, touch, type } from "@/theme";
 
 const c = palette("light");
@@ -81,6 +83,8 @@ export function LegalPage({
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
+  const t = useT();
+
   return (
     <ScrollView
       style={styles.flex}
@@ -89,7 +93,7 @@ export function LegalPage({
         { paddingTop: insets.top + space.sm, paddingBottom: insets.bottom + space.xxl },
       ]}
     >
-      <Press onPress={() => router.back()} accessibilityLabel="Go back" style={styles.back}>
+      <Press onPress={() => router.back()} accessibilityLabel={t(S.signIn.goBack)} style={styles.back}>
         <CaretLeftIcon size={24} color={c.ink} />
       </Press>
 

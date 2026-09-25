@@ -32,6 +32,8 @@ import {
 import { ApiError } from "@/api/client";
 import { fares, trips, type PaymentMethod, type Quote } from "@/api/rider";
 import { MapButton, MapPanel, Sheet } from "@/ui/map";
+import { S } from "@/content/strings";
+import { useT, type Phrase } from "@/ui/i18n";
 import { palette, radius, space, touch, type, xaf } from "@/theme";
 
 const c = palette("light");
@@ -40,30 +42,31 @@ const c = palette("light");
 const MAP_HEIGHT = 268;
 
 /** The three rails, in the words printed on the kiosks. */
-const PAYMENTS: { key: PaymentMethod; label: string }[] = [
-  { key: "CASH", label: "Cash" },
-  { key: "MOMO", label: "MoMo" },
-  { key: "ORANGE_MONEY", label: "Orange" },
+const PAYMENTS: { key: PaymentMethod; label: Phrase }[] = [
+  { key: "CASH", label: S.confirm.cash },
+  { key: "MOMO", label: S.confirm.momo },
+  { key: "ORANGE_MONEY", label: S.confirm.orange },
 ];
 
-function errorFor(err: unknown): string {
-  if (!(err instanceof ApiError)) return "That did not work. Try again.";
+function errorFor(err: unknown): Phrase {
+  if (!(err instanceof ApiError)) return S.confirm.didNotWork;
   switch (err.code) {
     case "offline":
-      return "No network. Try again in a moment.";
+      return S.confirm.offline;
     case "no_fare":
     case "zone_not_found":
-      return "We do not have a price for that trip yet.";
+      return S.confirm.noFare;
     case "trip_in_progress":
-      return "You already have a ride running.";
+      return S.confirm.alreadyRiding;
     default:
-      return "That did not work. Try again.";
+      return S.confirm.didNotWork;
   }
 }
 
 export default function Confirm() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const t = useT();
   const { toZone, toName, fromName, lat, lng } = useLocalSearchParams<{
     toZone: string;
     toName: string;
@@ -76,7 +79,7 @@ export default function Confirm() {
   const [payment, setPayment] = useState<PaymentMethod>("CASH");
   const [womanDriverOnly, setWomanDriverOnly] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Phrase | null>(null);
 
   const load = useCallback(async () => {
     if (!toZone || !lat || !lng) return;
@@ -124,7 +127,7 @@ export default function Confirm() {
         <Pressable
           onPress={() => router.back()}
           accessibilityRole="button"
-          accessibilityLabel="Back"
+          accessibilityLabel={t(S.confirm.back)}
           style={({ pressed }) => [styles.back, { top: insets.top + space.sm }, pressed && styles.pressed]}
         >
           <MapButton>
@@ -139,7 +142,7 @@ export default function Confirm() {
           <View style={styles.stopRow}>
             <View style={styles.stopStart} />
             <Text style={styles.stopText} numberOfLines={1}>
-              {fromName || quote?.fromZoneCode || "Finding you…"}
+              {fromName || quote?.fromZoneCode || t(S.confirm.findingYou)}
             </Text>
           </View>
           <View style={styles.stopJoin} />
@@ -158,11 +161,11 @@ export default function Confirm() {
           ) : (
             <>
               <View style={styles.fareHead}>
-                <Text style={styles.fareLabel}>Your fare</Text>
+                <Text style={styles.fareLabel}>{t(S.confirm.yourFare)}</Text>
                 {quote?.hillFare ? (
                   <View style={styles.hillRow}>
                     <MountainsIcon size={14} color={c.onActionSoft} />
-                    <Text style={styles.fareLabel}>up the hill</Text>
+                    <Text style={styles.fareLabel}>{t(S.confirm.upTheHill)}</Text>
                   </View>
                 ) : null}
               </View>
@@ -172,13 +175,13 @@ export default function Confirm() {
               </View>
               <View style={styles.promise}>
                 <CheckIcon size={16} color={c.onActionSoft} weight="bold" />
-                <Text style={styles.promiseText}>Fixed price. Your driver cannot ask for more.</Text>
+                <Text style={styles.promiseText}>{t(S.confirm.fixedPrice)}</Text>
               </View>
             </>
           )}
         </View>
 
-        <Text style={styles.sectionLabel}>Pay with</Text>
+        <Text style={styles.sectionLabel}>{t(S.confirm.payWith)}</Text>
         <View style={styles.payRow}>
           {PAYMENTS.map((p) => {
             const chosen = payment === p.key;
@@ -188,7 +191,7 @@ export default function Confirm() {
                 onPress={() => setPayment(p.key)}
                 accessibilityRole="radio"
                 accessibilityState={{ selected: chosen }}
-                accessibilityLabel={p.label}
+                accessibilityLabel={t(p.label)}
                 style={({ pressed }) => [styles.payTile, chosen && styles.payTileOn, pressed && styles.pressed]}
               >
                 {p.key === "CASH" ? (
@@ -196,7 +199,7 @@ export default function Confirm() {
                 ) : (
                   <DeviceMobileIcon size={22} color={chosen ? c.action : c.muted} />
                 )}
-                <Text style={[styles.payLabel, chosen && styles.payLabelOn]}>{p.label}</Text>
+                <Text style={[styles.payLabel, chosen && styles.payLabelOn]}>{t(p.label)}</Text>
                 {p.key !== "CASH" && saving > 0 ? (
                   <Text style={styles.paySave}>−{saving}</Text>
                 ) : null}
@@ -205,18 +208,20 @@ export default function Confirm() {
           })}
         </View>
         {saving > 0 ? (
-          <Text style={styles.note}>Paying by phone saves you {saving} FCFA — it costs us less too.</Text>
+          <Text style={styles.note}>{t(S.confirm.phoneSaves, { n: saving })}</Text>
         ) : null}
 
         <Pressable
           onPress={() => setWomanDriverOnly((v) => !v)}
           accessibilityRole="switch"
           accessibilityState={{ checked: womanDriverOnly }}
-          accessibilityLabel="Woman driver only"
+          accessibilityLabel={t(S.confirm.womanDriverOnly)}
           style={({ pressed }) => [styles.toggleRow, womanDriverOnly && styles.toggleRowOn, pressed && styles.pressed]}
         >
           <UserCircleIcon size={22} color={womanDriverOnly ? c.action : c.muted} />
-          <Text style={[styles.toggleLabel, womanDriverOnly && styles.toggleLabelOn]}>Woman driver</Text>
+          <Text style={[styles.toggleLabel, womanDriverOnly && styles.toggleLabelOn]}>
+            {t(S.confirm.womanDriver)}
+          </Text>
           {womanDriverOnly ? (
             <CheckIcon size={20} color={c.action} weight="bold" />
           ) : (
@@ -224,20 +229,20 @@ export default function Confirm() {
           )}
         </Pressable>
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? <Text style={styles.error}>{t(error)}</Text> : null}
 
         <Pressable
           onPress={book}
           disabled={busy || price === null}
           accessibilityRole="button"
-          accessibilityLabel="Find me a taxi"
+          accessibilityLabel={t(S.confirm.findTaxi)}
           style={({ pressed }) => [
             styles.cta,
             pressed && styles.ctaPressed,
             (busy || price === null) && styles.ctaOff,
           ]}
         >
-          {busy ? <ActivityIndicator color={c.onAction} /> : <Text style={styles.ctaLabel}>Find me a taxi</Text>}
+          {busy ? <ActivityIndicator color={c.onAction} /> : <Text style={styles.ctaLabel}>{t(S.confirm.findTaxi)}</Text>}
         </Pressable>
       </Sheet>
     </ScrollView>
