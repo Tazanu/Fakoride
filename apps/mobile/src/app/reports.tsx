@@ -19,45 +19,38 @@ import { CaretLeftIcon } from "@/ui/icons";
 import { ApiError } from "@/api/client";
 import { complaints, type MyComplaint } from "@/api/rider";
 import { Appear, Press } from "@/ui/motion";
+import { S } from "@/content/strings";
+import { plural, useT, type Phrase, type Translate } from "@/ui/i18n";
 import { palette, radius, space, touch, type } from "@/theme";
 
 const c = palette("light");
 
-const CATEGORY: Record<string, string> = {
-  FARE_DISPUTE: "The fare",
-  DRIVER_CONDUCT: "The driver",
-  RIDER_CONDUCT: "The rider",
-  SAFETY: "Safety",
-  LOST_ITEM: "Something left behind",
-  APP_PROBLEM: "The app",
-  OTHER: "Something else",
-};
-
-function when(iso: string): string {
+function when(t: Translate, iso: string): string {
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-  if (days === 0) return "today";
-  if (days === 1) return "yesterday";
-  if (days < 7) return `${days} days ago`;
+  if (days === 0) return t(S.when.today);
+  if (days === 1) return t(S.when.yesterday);
+  if (days < 7) return t(S.when.daysAgo, { n: days });
   const weeks = Math.floor(days / 7);
-  return weeks === 1 ? "a week ago" : `${weeks} weeks ago`;
+  return weeks === 1 ? t(S.when.aWeekAgo) : t(S.when.weeksAgo, { n: weeks });
 }
 
 /** How late we are, said plainly rather than hidden. */
-function overdueBy(respondBy: string): string | null {
+function overdueBy(t: Translate, respondBy: string): string | null {
   const hours = Math.floor((Date.now() - new Date(respondBy).getTime()) / 3_600_000);
   if (hours < 1) return null;
-  if (hours < 24) return `${hours} ${hours === 1 ? "hour" : "hours"} past when we said`;
+  if (hours < 24) return t(plural(hours, S.reports.lateHour, S.reports.lateHours), { n: hours });
   const days = Math.floor(hours / 24);
-  return `${days} ${days === 1 ? "day" : "days"} past when we said`;
+  return t(plural(days, S.reports.lateDay, S.reports.lateDays), { n: days });
 }
 
 export default function Reports() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const t = useT();
 
   const [rows, setRows] = useState<MyComplaint[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Phrase | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -67,8 +60,8 @@ export default function Reports() {
     } catch (err) {
       setError(
         err instanceof ApiError && err.offline
-          ? "No network. Pull down to try again."
-          : "Could not load these right now.",
+          ? S.reports.offlinePullDown
+          : S.reports.couldNotLoad,
       );
       setRows([]);
     }
@@ -97,49 +90,46 @@ export default function Reports() {
         />
       }
     >
-      <Press onPress={() => router.back()} accessibilityLabel="Go back" style={styles.back}>
+      <Press onPress={() => router.back()} accessibilityLabel={t(S.signIn.goBack)} style={styles.back}>
         <CaretLeftIcon size={24} color={c.ink} />
       </Press>
 
-      <Text style={styles.h1}>What you told us</Text>
+      <Text style={styles.h1}>{t(S.reports.title)}</Text>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <Text style={styles.error}>{t(error)}</Text> : null}
 
       {rows === null ? (
-        <Text style={styles.quiet}>Loading…</Text>
+        <Text style={styles.quiet}>{t(S.reports.loading)}</Text>
       ) : rows.length === 0 ? (
-        <Text style={styles.quiet}>
-          Nothing yet. If a ride goes wrong, there is a link at the end of it — a person reads
-          what you send and answers within a day.
-        </Text>
+        <Text style={styles.quiet}>{t(S.reports.nothing)}</Text>
       ) : (
         rows.map((r, i) => {
-          const late = r.response === null ? overdueBy(r.respondBy) : null;
+          const late = r.response === null ? overdueBy(t, r.respondBy) : null;
           return (
             <Appear key={r.id} index={i}>
               <View style={styles.card}>
                 <View style={styles.head}>
-                  <Text style={styles.category}>{CATEGORY[r.category] ?? r.category}</Text>
-                  <Text style={styles.when}>{when(r.createdAt)}</Text>
+                  <Text style={styles.category}>
+                    {S.category[r.category] ? t(S.category[r.category]) : r.category}
+                  </Text>
+                  <Text style={styles.when}>{when(t, r.createdAt)}</Text>
                 </View>
 
                 <Text style={styles.message}>{r.message}</Text>
 
                 {r.response ? (
                   <View style={styles.reply}>
-                    <Text style={styles.replyWho}>Fako Ride</Text>
+                    <Text style={styles.replyWho}>{t(S.reports.fromUs)}</Text>
                     <Text style={styles.replyText}>{r.response}</Text>
                   </View>
                 ) : late ? (
                   // Our failure, in our words, without being asked.
                   <View style={styles.lateBox}>
-                    <Text style={styles.lateText}>
-                      Still no answer — {late}. We are sorry. It is still on the list.
-                    </Text>
+                    <Text style={styles.lateText}>{t(S.reports.lateStill, { late })}</Text>
                   </View>
                 ) : (
                   <View style={styles.waiting}>
-                    <Text style={styles.waitingText}>A person is reading this. Answer within a day.</Text>
+                    <Text style={styles.waitingText}>{t(S.reports.waiting)}</Text>
                   </View>
                 )}
               </View>

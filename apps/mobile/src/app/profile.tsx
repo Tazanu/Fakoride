@@ -25,6 +25,8 @@ import * as ImagePicker from "expo-image-picker";
 import { CameraIcon, CaretLeftIcon, UserIcon } from "@/ui/icons";
 import { ApiError, fetchPhotoDataUri } from "@/api/client";
 import { profile } from "@/api/session";
+import { S } from "@/content/strings";
+import { useT } from "@/ui/i18n";
 import { uploadProfilePhoto } from "@/api/upload";
 import { useSession } from "@/session/SessionProvider";
 import { Press } from "@/ui/motion";
@@ -52,6 +54,7 @@ export default function Profile() {
   const insets = useSafeAreaInsets();
   const scroll = useScrollPastKeyboard();
   const { me, refresh, signOut } = useSession();
+  const t = useT();
 
   const [photo, setPhoto] = useState<string | null>(null);
   const [name, setName] = useState(me?.name ?? "");
@@ -136,6 +139,19 @@ export default function Profile() {
         },
       },
     ]);
+  }
+
+  async function setLanguage(next: "en" | "fr") {
+    setBusy(true);
+    setError(null);
+    try {
+      await profile.update({ language: next });
+      await refresh();
+    } catch (err) {
+      setError(errorFor(err));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function saveName() {
@@ -251,6 +267,38 @@ export default function Profile() {
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
+
+      {/*
+        The language switch.
+
+        The account has carried a language since the first migration, the
+        service banner arrives translated, and the legal pages have an EN/FR
+        toggle — and there was nowhere to say which you wanted. A French
+        speaker got a French privacy policy inside an English app.
+      */}
+      <View style={styles.field}>
+        <Text style={styles.label}>{t(S.account.language)}</Text>
+        <View style={styles.langs}>
+          {(["en", "fr"] as const).map((code) => {
+            const on = (me.language === "fr" ? "fr" : "en") === code;
+            return (
+              <Pressable
+                key={code}
+                onPress={() => void setLanguage(code)}
+                disabled={busy || on}
+                accessibilityRole="button"
+                accessibilityState={{ selected: on }}
+                style={[styles.lang, on && styles.langOn]}
+              >
+                <Text style={[styles.langText, on && styles.langTextOn]}>
+                  {code === "en" ? "English" : "Français"}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Text style={styles.hint}>{t(S.account.languageWhy)}</Text>
+      </View>
 
       {/*
         Where an answer to a complaint arrives. Without this the end-of-trip
@@ -379,6 +427,22 @@ const styles = StyleSheet.create({
   factMono: { ...type.plate },
 
   error: { ...type.secondary, color: c.danger },
+
+  langs: { flexDirection: "row", gap: space.sm },
+  lang: {
+    flexGrow: 1,
+    minHeight: touch.min,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: c.lineStrong,
+    backgroundColor: c.card,
+  },
+  langOn: { borderColor: c.action, backgroundColor: c.actionTint },
+  langText: { ...type.body, color: c.inkSoft },
+  langTextOn: { ...type.bodyStrong, color: c.actionText },
+  hint: { ...type.secondary, color: c.muted },
 
   rowLink: {
     gap: 2,

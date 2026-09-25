@@ -41,6 +41,8 @@ import { ApiError } from "@/api/client";
 import { auth } from "@/api/rider";
 import { useSession } from "@/session/SessionProvider";
 import { keyboardBehavior, useScrollPastKeyboard } from "@/ui/keyboard";
+import { S } from "@/content/strings";
+import { useT, type Phrase } from "@/ui/i18n";
 import { palette, radius, space, touch, type } from "@/theme";
 
 const c = palette("light");
@@ -48,23 +50,23 @@ const c = palette("light");
 const CODE_LENGTH = 6;
 
 /** What she should read, per failure. Never the server's words. */
-function errorFor(err: unknown): string {
-  if (!(err instanceof ApiError)) return "Something went wrong. Try again.";
+function errorFor(err: unknown): Phrase {
+  if (!(err instanceof ApiError)) return S.signIn.wentWrong;
   switch (err.code) {
     case "offline":
-      return "No network. Check your connection and try again.";
+      return S.signIn.noNetwork;
     case "bad_phone":
-      return "Enter a Cameroon number, like 6 70 00 00 00.";
+      return S.signIn.badPhone;
     case "too_many_codes":
-      return "Too many codes asked for. Try again in an hour.";
+      return S.signIn.tooManyCodes;
     case "wrong_code":
-      return "That code is not right.";
+      return S.signIn.wrongCode;
     case "code_expired":
-      return "That code has expired. Ask for a new one.";
+      return S.signIn.codeExpired;
     case "sms_unavailable":
-      return "We cannot send codes right now. Try again shortly.";
+      return S.signIn.smsUnavailable;
     default:
-      return "Something went wrong. Try again.";
+      return S.signIn.wentWrong;
   }
 }
 
@@ -76,13 +78,14 @@ export default function SignIn() {
   const insets = useSafeAreaInsets();
   const scroll = useScrollPastKeyboard();
   const codeInput = useRef<TextInput>(null);
+  const t = useT();
 
   const [step, setStep] = useState<"phone" | "code">("phone");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Phrase | null>(null);
   /**
    * The code, when the local API hands it back.
    *
@@ -146,7 +149,7 @@ export default function SignIn() {
         <Pressable
           onPress={() => (onPhone ? router.replace("/welcome") : setStep("phone"))}
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t(S.signIn.goBack)}
           hitSlop={8}
           style={({ pressed }) => [styles.back, pressed && styles.pressed]}
         >
@@ -156,15 +159,12 @@ export default function SignIn() {
         {onPhone ? (
           <>
             <View style={styles.intro}>
-              <Text style={styles.h1}>What&apos;s your number?</Text>
-              <Text style={styles.sub}>
-                We&apos;ll send you a 6-digit code to confirm it&apos;s really you. No password to
-                remember.
-              </Text>
+              <Text style={styles.h1}>{t(S.signIn.askNumber)}</Text>
+              <Text style={styles.sub}>{t(S.signIn.askNumberWhy)}</Text>
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.label}>Mobile number</Text>
+              <Text style={styles.label}>{t(S.signIn.mobileNumber)}</Text>
               <View style={styles.phoneRow}>
                 {/* Cameroon only for now, so the code is shown rather than chosen. */}
                 <View style={styles.dial}>
@@ -174,13 +174,13 @@ export default function SignIn() {
                   style={[styles.input, styles.phoneInput, phone ? styles.inputActive : null]}
                   value={phone}
                   onChangeText={setPhone}
-                  placeholder="6 72 48 84 17"
+                  placeholder={t(S.signIn.phonePlaceholder)}
                   placeholderTextColor={c.muted}
                   keyboardType="phone-pad"
                   autoComplete="tel"
                   textContentType="telephoneNumber"
                   editable={!busy}
-                  accessibilityLabel="Mobile number"
+                  accessibilityLabel={t(S.signIn.mobileNumber)}
                   returnKeyType="go"
                   onSubmitEditing={() => phoneReady && !busy && askForCode()}
                 />
@@ -189,18 +189,15 @@ export default function SignIn() {
 
             <View style={styles.infoPanel}>
               <InfoIcon size={18} color={c.actionText} />
-              <Text style={styles.infoText}>
-                MTN, Orange and Camtel numbers all work. Standard SMS rates from your network may
-                apply.
-              </Text>
+              <Text style={styles.infoText}>{t(S.signIn.networks)}</Text>
             </View>
 
-            {error ? <Text style={styles.error}>{error}</Text> : null}
+            {error ? <Text style={styles.error}>{t(error)}</Text> : null}
 
             <View style={styles.spacer} />
 
             <Cta
-              label="Send me the code"
+              label={t(S.signIn.sendCode)}
               busy={busy}
               disabled={!phoneReady}
               onPress={() => void askForCode()}
@@ -209,17 +206,17 @@ export default function SignIn() {
         ) : (
           <>
             <View style={styles.intro}>
-              <Text style={styles.h1}>Enter your code</Text>
+              <Text style={styles.h1}>{t(S.signIn.enterCode)}</Text>
               <Text style={styles.sub}>
-                Sent by SMS to <Text style={styles.subStrong}>+237 {phone}</Text>.{" "}
+                {t(S.signIn.sentTo)} <Text style={styles.subStrong}>+237 {phone}</Text>.{" "}
                 <Text style={styles.link} onPress={() => setStep("phone")}>
-                  Change number
+                  {t(S.signIn.changeNumber)}
                 </Text>
               </Text>
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.label}>6-digit code</Text>
+              <Text style={styles.label}>{t(S.signIn.codeLabel)}</Text>
 
               {/* One real input, six drawn boxes. */}
               <Pressable onPress={() => codeInput.current?.focus()} accessibilityRole="none">
@@ -240,7 +237,7 @@ export default function SignIn() {
                   autoComplete="sms-otp"
                   maxLength={CODE_LENGTH}
                   editable={!busy}
-                  accessibilityLabel="Six digit code"
+                  accessibilityLabel={t(S.signIn.sixDigitCode)}
                 />
               </Pressable>
             </View>
@@ -248,34 +245,32 @@ export default function SignIn() {
             {__DEV__ && devCode ? (
               <Pressable onPress={() => setCode(devCode)} accessibilityRole="button">
                 <View style={styles.devPanel}>
-                  <Text style={styles.devText}>No SMS in development. Tap to fill: {devCode}</Text>
+                  <Text style={styles.devText}>{t(S.signIn.devHint)} {devCode}</Text>
                 </View>
               </Pressable>
             ) : null}
 
             <View style={styles.field}>
-              <Text style={styles.label}>Your name</Text>
+              <Text style={styles.label}>{t(S.signIn.yourName)}</Text>
               <TextInput
                 style={[styles.input, name ? styles.inputActive : null]}
                 value={name}
                 onChangeText={setName}
-                placeholder="Tazanu Stanley"
+                placeholder={t(S.signIn.namePlaceholder)}
                 placeholderTextColor={c.muted}
                 autoCapitalize="words"
                 editable={!busy}
-                accessibilityLabel="Your name"
+                accessibilityLabel={t(S.signIn.yourName)}
               />
-              <Text style={styles.hint}>
-                A first name is enough. Drivers see this when they accept your ride.
-              </Text>
+              <Text style={styles.hint}>{t(S.signIn.nameHint)}</Text>
             </View>
 
-            {error ? <Text style={styles.error}>{error}</Text> : null}
+            {error ? <Text style={styles.error}>{t(error)}</Text> : null}
 
             <View style={styles.spacer} />
 
             <Cta
-              label="Verify and continue"
+              label={t(S.signIn.verify)}
               busy={busy}
               disabled={!codeReady}
               onPress={() => void submitCode()}

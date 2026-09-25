@@ -22,6 +22,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import Svg, { Circle, Path, Polygon, Rect } from "react-native-svg";
 import { ShieldCheckIcon } from "@/ui/icons";
+import { S } from "@/content/strings";
+import { useT } from "@/ui/i18n";
 import { Press, Rise } from "@/ui/motion";
 import { Mountain } from "@/ui/mountain";
 import { logoPalette, palette, radius, space, type } from "@/theme";
@@ -32,6 +34,7 @@ const logo = logoPalette;
 export default function Welcome() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const t = useT();
 
   return (
     <View style={styles.flex}>
@@ -41,7 +44,7 @@ export default function Welcome() {
           <View style={styles.words}>
             <Text style={styles.wordmark}>FakoRide</Text>
             <Text style={styles.tagline}>
-              Taxi rides across Buea at a fixed price. You see the fare before you book.
+              {t(S.welcome.tagline)}
             </Text>
           </View>
         </View>
@@ -57,43 +60,43 @@ export default function Welcome() {
       <Rise style={[styles.sheet, { paddingBottom: insets.bottom + space.xl }]}>
         <View style={styles.assurance}>
           <ShieldCheckIcon size={20} color={c.actionText} />
-          <Text style={styles.assuranceText}>Every driver is checked before they drive</Text>
+          <Text style={styles.assuranceText}>{t(S.welcome.checked)}</Text>
         </View>
 
         <Press
           onPress={() => router.push("/sign-in")}
-          accessibilityLabel="Continue as a rider"
+          accessibilityLabel={t(S.welcome.asRider)}
           style={styles.primary}
           pressedStyle={styles.primaryPressed}
         >
-          <Text style={styles.primaryLabel}>Continue as a rider</Text>
+          <Text style={styles.primaryLabel}>{t(S.welcome.asRider)}</Text>
         </Press>
 
         <Press
           onPress={() => router.push({ pathname: "/sign-in", params: { next: "apply" } })}
-          accessibilityLabel="I drive a taxi"
+          accessibilityLabel={t(S.welcome.asDriver)}
           style={styles.secondary}
           pressedStyle={styles.pressed}
         >
-          <Text style={styles.secondaryLabel}>I drive a taxi</Text>
+          <Text style={styles.secondaryLabel}>{t(S.welcome.asDriver)}</Text>
         </Press>
 
         <Text style={styles.terms}>
-          By continuing you agree to our{" "}
+          {t(S.welcome.agree)}{" "}
           <Text
             style={styles.link}
             accessibilityRole="link"
             onPress={() => router.push("/terms")}
           >
-            Terms
+            {t(S.welcome.terms)}
           </Text>{" "}
-          and{" "}
+          {t(S.welcome.and)}{" "}
           <Text
             style={styles.link}
             accessibilityRole="link"
             onPress={() => router.push("/privacy")}
           >
-            Privacy Policy
+            {t(S.welcome.privacy)}
           </Text>
           .
         </Text>

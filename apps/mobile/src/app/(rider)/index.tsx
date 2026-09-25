@@ -36,6 +36,8 @@ import { findMe, type Fix } from "@/ui/position";
 import { Appear } from "@/ui/motion";
 import { MapButton, MapPanel, MapPill, Sheet } from "@/ui/map";
 import { ServiceNotice } from "@/ui/notice";
+import { S } from "@/content/strings";
+import { plural, useT, type Phrase } from "@/ui/i18n";
 import { palette, radius, space, touch, type, xaf } from "@/theme";
 
 const c = palette("light");
@@ -48,13 +50,14 @@ export default function Book() {
   const router = useRouter();
   // Signing out moved to the account screen; nothing here needs the session.
   const insets = useSafeAreaInsets();
+  const t = useT();
 
   const [fix, setFix] = useState<Fix | null>(null);
   const [here, setHere] = useState<Resolved | null>(null);
   const [repeats, setRepeats] = useState<Repeat[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
   const [nearby, setNearby] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Phrase | null>(null);
   const [locating, setLocating] = useState(true);
   const [query, setQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -71,12 +74,12 @@ export default function Book() {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
-        setError("We need your location to know where to send the taxi.");
+        setError(S.home.needLocation);
         return;
       }
       const next = await findMe();
       if (!next) {
-        setError("We could not find you. Check that location is on, then pull down.");
+        setError(S.home.turnOnLocation);
         return;
       }
       setFix(next);
@@ -94,12 +97,12 @@ export default function Book() {
       if (place.status === "rejected") {
         setError(
           place.reason instanceof ApiError && place.reason.offline
-            ? "No network. Pull down to try again."
-            : "We could not work out where you are.",
+            ? S.home.offlinePullDown
+            : S.home.whereAreYou,
         );
       }
     } catch {
-      setError("We could not find you. Pull down to try again.");
+      setError(S.home.pullDown);
     } finally {
       setLocating(false);
     }
@@ -220,7 +223,7 @@ export default function Book() {
           <Pressable
             onPress={() => router.push("/profile")}
             accessibilityRole="button"
-            accessibilityLabel="Your account"
+            accessibilityLabel={t(S.home.account)}
             style={({ pressed }) => [pressed && styles.pressed]}
           >
             <MapButton>
@@ -232,7 +235,9 @@ export default function Book() {
             <MapPill>
               <View style={[styles.liveDot, nearby === 0 && styles.liveDotOff]} />
               <Text style={styles.pillText}>
-                {nearby === 0 ? "No taxis near you" : `${nearby} ${nearby === 1 ? "taxi" : "taxis"} near you`}
+                {nearby === 0
+                  ? t(S.home.noTaxis)
+                  : t(plural(nearby, S.home.oneTaxi, S.home.manyTaxis), { n: nearby })}
               </Text>
             </MapPill>
           ) : null}
@@ -241,7 +246,7 @@ export default function Book() {
         <Pressable
           onPress={() => void locate()}
           accessibilityRole="button"
-          accessibilityLabel="Centre on my location"
+          accessibilityLabel={t(S.home.recentre)}
           style={({ pressed }) => [styles.recentre, pressed && styles.pressed]}
         >
           <MapButton>
@@ -252,7 +257,7 @@ export default function Book() {
 
       <Sheet>
         <ServiceNotice />
-        <Text style={styles.question}>Where are you going?</Text>
+        <Text style={styles.question}>{t(S.home.where)}</Text>
 
         {/*
           A real filter, not a dead control.
@@ -267,15 +272,15 @@ export default function Book() {
             style={styles.searchInput}
             value={query}
             onChangeText={setQuery}
-            placeholder="Search for a place"
+            placeholder={t(S.home.search)}
             placeholderTextColor={c.muted}
-            accessibilityLabel="Search for a place"
+            accessibilityLabel={t(S.home.search)}
             returnKeyType="search"
             autoCorrect={false}
           />
         </View>
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? <Text style={styles.error}>{t(error)}</Text> : null}
 
         <View style={styles.list}>
           {shownRepeats.map((r, i) => (
@@ -284,7 +289,7 @@ export default function Book() {
                 onPress={() => choose(r.zone, r.label)}
                 disabled={!fix}
                 accessibilityRole="button"
-                accessibilityLabel={`${r.label}, ${r.priceXaf} francs`}
+                accessibilityLabel={t(S.home.placeAndFare, { place: r.label, n: r.priceXaf })}
                 style={({ pressed }) => [styles.row, i > 0 && styles.rowRuled, pressed && styles.rowPressed]}
               >
                 {/* First repeat is the one she uses most — the teal tile. */}
@@ -300,8 +305,8 @@ export default function Book() {
                     {r.label}
                   </Text>
                   <Text style={styles.rowSub}>
-                    {r.tripCount} {r.tripCount === 1 ? "time" : "times"}
-                    {r.hillFare ? " · up the hill" : ""}
+                    {t(plural(r.tripCount, S.home.onceBefore, S.home.manyBefore), { n: r.tripCount })}
+                    {r.hillFare ? ` · ${t(S.home.upTheHill)}` : ""}
                   </Text>
                 </View>
                 <Text style={styles.rowFare}>{xaf(r.priceXaf)}</Text>
@@ -322,7 +327,7 @@ export default function Book() {
                 onPress={() => choose(p.zone, p.name)}
                 disabled={!fix}
                 accessibilityRole="button"
-                accessibilityLabel={`Go to ${p.name}`}
+                accessibilityLabel={t(S.home.goTo, { place: p.name })}
                 style={({ pressed }) => [
                   styles.row,
                   (i > 0 || shownRepeats.length > 0) && styles.rowRuled,
@@ -353,7 +358,7 @@ export default function Book() {
                   onPress={() => choose(z.code, z.name)}
                   disabled={!fix}
                   accessibilityRole="button"
-                  accessibilityLabel={`Go to ${z.name}`}
+                  accessibilityLabel={t(S.home.goTo, { place: z.name })}
                   style={({ pressed }) => [styles.row, ruled && styles.rowRuled, pressed && styles.rowPressed]}
                 >
                   <View style={[styles.tile, styles.tilePlain]}>
@@ -375,7 +380,7 @@ export default function Book() {
             );
           })}
           {nothingMatched ? (
-            <Text style={styles.empty}>No place here matches &ldquo;{query.trim()}&rdquo;.</Text>
+            <Text style={styles.empty}>{t(S.home.noMatch)} &ldquo;{query.trim()}&rdquo;.</Text>
           ) : null}
         </View>
 
@@ -394,10 +399,8 @@ export default function Book() {
             style={styles.drive}
           >
             <View style={{ flex: 1 }}>
-              <Text style={styles.driveTitle}>Drive with Fako Ride</Text>
-              <Text style={styles.driveLine}>
-                Own a taxi? Carry riders and keep every franc of the fare.
-              </Text>
+              <Text style={styles.driveTitle}>{t(S.home.driveWithUs)}</Text>
+              <Text style={styles.driveLine}>{t(S.home.driveWithUsWhy)}</Text>
             </View>
           </Pressable>
         ) : null}
