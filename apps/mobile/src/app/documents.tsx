@@ -27,44 +27,46 @@ import { driverDocuments, type DocumentKind, type DocumentState } from "@/api/dr
 import { uploadDocument } from "@/api/upload";
 import { useSession } from "@/session/SessionProvider";
 import { Steps } from "@/ui/steps";
+import { S } from "@/content/strings";
+import { useT, type Phrase } from "@/ui/i18n";
 import { palette, radius, space, touch, type } from "@/theme";
 
 const c = palette("light");
 
 /** What each one is called, and why we are asking for it. */
-const COPY: Record<DocumentKind, { title: string; asks: string; done: string }> = {
+const COPY: Record<DocumentKind, { title: Phrase; asks: Phrase; done: Phrase }> = {
   NATIONAL_ID: {
-    title: "National ID card",
-    asks: "Tap to take a photo",
-    done: "Sent",
+    title: S.documents.nationalId,
+    asks: S.documents.tapToPhoto,
+    done: S.documents.sent,
   },
   VEHICLE_REGISTRATION: {
-    title: "Car registration document",
-    asks: "Tap to take a photo",
-    done: "Sent",
+    title: S.documents.registration,
+    asks: S.documents.tapToPhoto,
+    done: S.documents.sent,
   },
   DRIVER_PHOTO: {
-    title: "Photo of your face",
-    asks: "Riders see this before they get in",
-    done: "Sent",
+    title: S.documents.facePhoto,
+    asks: S.documents.ridersSee,
+    done: S.documents.sent,
   },
 };
 
-function errorFor(err: unknown): string {
-  if (!(err instanceof ApiError)) return "That did not send. Try again.";
+function errorFor(err: unknown): Phrase {
+  if (!(err instanceof ApiError)) return S.documents.didNotSend;
   switch (err.code) {
     case "offline":
-      return "No network. Try again in a moment.";
+      return S.driver.offlineMoment;
     case "not_an_image":
-      return "That file is not a photo. Use the camera.";
+      return S.documents.notAnImage;
     case "file_too_large":
-      return "That photo is too large. Take it again.";
+      return S.documents.tooLarge;
     case "storage_unavailable":
-      return "We cannot take documents right now. Try again shortly.";
+      return S.documents.storageDown;
     case "not_open":
-      return "This application is closed. Call us.";
+      return S.documents.notOpen;
     default:
-      return "That did not send. Try again.";
+      return S.documents.didNotSend;
   }
 }
 
@@ -72,11 +74,12 @@ export default function Documents() {
   const router = useRouter();
   const { loading, me, refresh } = useSession();
   const insets = useSafeAreaInsets();
+  const t = useT();
 
   const [state, setState] = useState<DocumentState[] | null>(null);
   const [complete, setComplete] = useState(false);
   const [sending, setSending] = useState<DocumentKind | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Phrase | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -98,7 +101,7 @@ export default function Documents() {
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== "granted") {
-        setError("We need the camera to take a photo of your documents.");
+        setError(S.documents.needCamera);
         return;
       }
 
@@ -146,10 +149,8 @@ export default function Documents() {
       <Steps step={2} onBack={() => router.replace("/apply")} />
 
       <View style={styles.intro}>
-        <Text style={styles.h1}>Your documents</Text>
-        <Text style={styles.sub}>
-          Take a clear photo of each one. Only the FakoRide team can see them.
-        </Text>
+        <Text style={styles.h1}>{t(S.documents.title)}</Text>
+        <Text style={styles.sub}>{t(S.documents.why)}</Text>
       </View>
 
       <View style={styles.list}>
@@ -171,12 +172,10 @@ export default function Documents() {
 
       <View style={styles.advice}>
         <WarningIcon size={18} color={c.hill} />
-        <Text style={styles.adviceText}>
-          Blurry or cut-off photos slow down your approval. Shoot in good light, flat on a table.
-        </Text>
+        <Text style={styles.adviceText}>{t(S.documents.advice)}</Text>
       </View>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <Text style={styles.error}>{t(error)}</Text> : null}
 
       <View style={styles.spacer} />
 
@@ -184,15 +183,18 @@ export default function Documents() {
         onPress={() => void submit()}
         disabled={!complete}
         accessibilityRole="button"
-        accessibilityLabel="Submit for review"
+        accessibilityLabel={t(S.documents.submit)}
         style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed, !complete && styles.ctaOff]}
       >
-        <Text style={styles.ctaLabel}>Submit for review</Text>
+        <Text style={styles.ctaLabel}>{t(S.documents.submit)}</Text>
       </Pressable>
 
       {!complete && state ? (
         <Text style={styles.ctaHint}>
-          {state.filter((d) => d.uploaded).length} of {state.length} sent
+          {t(S.documents.countSent, {
+            n: state.filter((d) => d.uploaded).length,
+            total: state.length,
+          })}
         </Text>
       ) : null}
     </ScrollView>
@@ -210,13 +212,16 @@ function DocRow({
 }) {
   const copy = COPY[doc.kind];
   const done = doc.uploaded;
+  const t = useT();
 
   return (
     <Pressable
       onPress={onPress}
       disabled={sending}
       accessibilityRole="button"
-      accessibilityLabel={done ? `Replace ${copy.title}` : `Take a photo of your ${copy.title}`}
+      accessibilityLabel={t(done ? S.documents.replaceThis : S.documents.photographThis, {
+        what: t(copy.title),
+      })}
       accessibilityState={{ checked: done }}
       style={({ pressed }) => [styles.row, done ? styles.rowDone : styles.rowEmpty, pressed && styles.pressed]}
     >
@@ -233,15 +238,15 @@ function DocRow({
       </View>
 
       <View style={styles.rowWords}>
-        <Text style={styles.rowTitle}>{copy.title}</Text>
+        <Text style={styles.rowTitle}>{t(copy.title)}</Text>
         <Text style={[styles.rowSub, done && styles.rowSubDone]}>
-          {sending ? "Sending…" : done ? copy.done : copy.asks}
+          {t(sending ? S.documents.sending : done ? copy.done : copy.asks)}
         </Text>
       </View>
 
       {done && !sending ? (
         <View style={styles.replace}>
-          <Text style={styles.replaceLabel}>Replace</Text>
+          <Text style={styles.replaceLabel}>{t(S.documents.replace)}</Text>
         </View>
       ) : null}
     </Pressable>

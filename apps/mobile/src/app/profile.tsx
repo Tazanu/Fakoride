@@ -26,7 +26,7 @@ import { CameraIcon, CaretLeftIcon, UserIcon } from "@/ui/icons";
 import { ApiError, fetchPhotoDataUri } from "@/api/client";
 import { profile } from "@/api/session";
 import { S } from "@/content/strings";
-import { useT } from "@/ui/i18n";
+import { useT, type Phrase } from "@/ui/i18n";
 import { uploadProfilePhoto } from "@/api/upload";
 import { useSession } from "@/session/SessionProvider";
 import { Press } from "@/ui/motion";
@@ -35,17 +35,17 @@ import { palette, radius, space, touch, type } from "@/theme";
 
 const c = palette("light");
 
-function errorFor(err: unknown): string {
-  if (!(err instanceof ApiError)) return "That did not work. Try again.";
+function errorFor(err: unknown): Phrase {
+  if (!(err instanceof ApiError)) return S.account.didNotWork;
   switch (err.code) {
     case "offline":
-      return "No network. Try again when you have signal.";
+      return S.account.offline;
     case "not_an_image":
-      return "That file is not a photo. Take one with the camera.";
+      return S.account.notAnImage;
     case "too_large":
-      return "That photo is too big. Take a new one rather than sending an original.";
+      return S.account.tooLarge;
     default:
-      return "That did not work. Try again.";
+      return S.account.didNotWork;
   }
 }
 
@@ -60,7 +60,7 @@ export default function Profile() {
   const [name, setName] = useState(me?.name ?? "");
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Phrase | null>(null);
 
   const loadPhoto = useCallback(async () => {
     if (!me?.hasPhoto) {
@@ -82,11 +82,7 @@ export default function Profile() {
           ? await ImagePicker.requestCameraPermissionsAsync()
           : await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (permission.status !== "granted") {
-        setError(
-          from === "camera"
-            ? "We need the camera to take your photo."
-            : "We need permission to open your photos.",
-        );
+        setError(from === "camera" ? S.account.needCamera : S.account.needPhotos);
         return;
       }
 
@@ -116,18 +112,18 @@ export default function Profile() {
   }
 
   function choosePhoto() {
-    Alert.alert("Your photo", "The driver coming for you sees this, and nobody else.", [
-      { text: "Take one now", onPress: () => void take("camera") },
-      { text: "Choose from photos", onPress: () => void take("library") },
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(t(S.account.photoAsk), t(S.account.photoAskWhy), [
+      { text: t(S.account.takeOne), onPress: () => void take("camera") },
+      { text: t(S.account.chooseOne), onPress: () => void take("library") },
+      { text: t(S.account.cancel), style: "cancel" },
     ]);
   }
 
   function removePhoto() {
-    Alert.alert("Remove your photo?", "Drivers will have only your name to go on.", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(t(S.account.removeAsk), t(S.account.removeWhy), [
+      { text: t(S.account.cancel), style: "cancel" },
       {
-        text: "Remove",
+        text: t(S.account.remove),
         style: "destructive",
         onPress: () => {
           setBusy(true);
@@ -157,7 +153,7 @@ export default function Profile() {
   async function saveName() {
     const trimmed = name.trim();
     if (trimmed.length < 2) {
-      setError("Type the name a driver should call you.");
+      setError(S.account.nameTooShort);
       return;
     }
     setBusy(true);
@@ -192,25 +188,25 @@ export default function Profile() {
       <Pressable
         onPress={() => router.back()}
         accessibilityRole="button"
-        accessibilityLabel="Go back"
+        accessibilityLabel={t(S.signIn.goBack)}
         hitSlop={8}
         style={styles.back}
       >
         <CaretLeftIcon size={24} color={c.ink} />
       </Pressable>
 
-      <Text style={styles.h1}>Your account</Text>
+      <Text style={styles.h1}>{t(S.account.title)}</Text>
 
       <View style={styles.portrait}>
         <Pressable
           onPress={choosePhoto}
           disabled={busy}
           accessibilityRole="button"
-          accessibilityLabel={me.hasPhoto ? "Change your photo" : "Add your photo"}
+          accessibilityLabel={t(me.hasPhoto ? S.account.changePhoto : S.account.addPhoto)}
           style={styles.avatarWrap}
         >
           {photo ? (
-            <Image source={{ uri: photo }} style={styles.avatar} accessibilityLabel="Your photo" />
+            <Image source={{ uri: photo }} style={styles.avatar} accessibilityLabel={t(S.account.photoAsk)} />
           ) : (
             <View style={[styles.avatar, styles.avatarEmpty]}>
               <UserIcon size={44} color={c.muted} />
@@ -222,25 +218,23 @@ export default function Profile() {
         </Pressable>
 
         <Text style={styles.portraitLine}>
-          {me.hasPhoto
-            ? "Only the driver coming for you can see this, and only while the trip is running."
-            : "Add a photo so the driver can find you in a crowd at the park. Only he sees it, and only during your trip."}
+          {t(me.hasPhoto ? S.account.photoPrivateSet : S.account.photoPrivateNone)}
         </Text>
 
         {me.hasPhoto ? (
           <Pressable onPress={removePhoto} disabled={busy} hitSlop={8}>
-            <Text style={styles.remove}>Remove photo</Text>
+            <Text style={styles.remove}>{t(S.account.removePhoto)}</Text>
           </Pressable>
         ) : null}
       </View>
 
       <View style={styles.field}>
-        <Text style={styles.label}>Your name</Text>
+        <Text style={styles.label}>{t(S.account.yourName)}</Text>
         <TextInput
           style={styles.input}
           value={name}
           onChangeText={setName}
-          placeholder="The name a driver should call you"
+          placeholder={t(S.account.namePlaceholder)}
           placeholderTextColor={c.muted}
           editable={!busy}
           autoCapitalize="words"
@@ -249,24 +243,32 @@ export default function Profile() {
         />
         {nameChanged ? (
           <Press onPress={() => void saveName()} disabled={busy} style={styles.save}>
-            <Text style={styles.saveLabel}>{busy ? "Saving…" : "Save name"}</Text>
+            <Text style={styles.saveLabel}>{t(busy ? S.account.saving : S.account.saveName)}</Text>
           </Press>
         ) : saved ? (
-          <Text style={styles.saved}>Saved.</Text>
+          <Text style={styles.saved}>{t(S.account.saved)}</Text>
         ) : null}
       </View>
 
       <View style={styles.facts}>
-        <Fact label="Phone" value={me.phone} />
-        {driver ? <Fact label="Plate" value={driver.plate} mono /> : null}
-        {driver ? <Fact label="Vehicle" value={driver.vehicleType === "CAR" ? "Taxi" : "Moto"} /> : null}
-        {driver ? <Fact label="Rating" value={`${driver.rating.toFixed(1)} of 5`} /> : null}
+        <Fact label={t(S.account.phone)} value={me.phone} />
+        {driver ? <Fact label={t(S.account.plate)} value={driver.plate} mono /> : null}
         {driver ? (
-          <Fact label="Trips" value={`${driver.tripCount}`} />
+          <Fact
+            label={t(S.account.vehicle)}
+            value={t(driver.vehicleType === "CAR" ? S.account.taxi : S.account.moto)}
+          />
         ) : null}
+        {driver ? (
+          <Fact
+            label={t(S.account.rating)}
+            value={t(S.account.ratingOf, { n: driver.rating.toFixed(1) })}
+          />
+        ) : null}
+        {driver ? <Fact label={t(S.account.trips)} value={`${driver.tripCount}`} /> : null}
       </View>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <Text style={styles.error}>{t(error)}</Text> : null}
 
       {/*
         The language switch.
@@ -291,7 +293,7 @@ export default function Profile() {
                 style={[styles.lang, on && styles.langOn]}
               >
                 <Text style={[styles.langText, on && styles.langTextOn]}>
-                  {code === "en" ? "English" : "Français"}
+                  {t(code === "en" ? S.account.english : S.account.french)}
                 </Text>
               </Pressable>
             );
@@ -310,8 +312,8 @@ export default function Profile() {
         accessibilityRole="button"
         style={styles.rowLink}
       >
-        <Text style={styles.rowLinkText}>What you told us</Text>
-        <Text style={styles.rowLinkHint}>Reports you sent, and what came back</Text>
+        <Text style={styles.rowLinkText}>{t(S.account.reports)}</Text>
+        <Text style={styles.rowLinkHint}>{t(S.account.reportsWhy)}</Text>
       </Pressable>
 
       {/*
@@ -320,16 +322,16 @@ export default function Profile() {
       */}
       <View style={styles.legal}>
         <Pressable onPress={() => router.push("/terms")} accessibilityRole="link" hitSlop={8}>
-          <Text style={styles.legalLink}>Terms</Text>
+          <Text style={styles.legalLink}>{t(S.account.terms)}</Text>
         </Pressable>
         <Text style={styles.legalDot}>·</Text>
         <Pressable onPress={() => router.push("/privacy")} accessibilityRole="link" hitSlop={8}>
-          <Text style={styles.legalLink}>Privacy</Text>
+          <Text style={styles.legalLink}>{t(S.account.privacyShort)}</Text>
         </Pressable>
       </View>
 
       <Pressable onPress={() => void signOut()} accessibilityRole="button" style={styles.signOut}>
-        <Text style={styles.signOutLabel}>Sign out</Text>
+        <Text style={styles.signOutLabel}>{t(S.account.signOut)}</Text>
       </Pressable>
     </ScrollView>
   );

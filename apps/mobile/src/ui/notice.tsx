@@ -24,7 +24,7 @@
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { geo } from "@/api/rider";
-import { useSession } from "@/session/SessionProvider";
+import { useLang } from "@/ui/i18n";
 import { Appear } from "@/ui/motion";
 import { palette, radius, space, type } from "@/theme";
 
@@ -38,8 +38,8 @@ type Notice = {
 };
 
 export function ServiceNotice() {
-  const { me } = useSession();
   const [notices, setNotices] = useState<Notice[]>([]);
+  const french = useLang() === "fr";
 
   useEffect(() => {
     let alive = true;
@@ -53,8 +53,6 @@ export function ServiceNotice() {
       alive = false;
     };
   }, []);
-
-  const french = me?.language === "fr";
 
   const shown = notices
     .map((n) => ({ ...n, text: french ? n.messageFr : n.message }))

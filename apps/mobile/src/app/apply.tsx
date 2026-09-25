@@ -35,21 +35,23 @@ import { geo, onboarding } from "@/api/driver";
 import { useSession } from "@/session/SessionProvider";
 import { keyboardBehavior, useScrollPastKeyboard } from "@/ui/keyboard";
 import { Steps } from "@/ui/steps";
+import { S } from "@/content/strings";
+import { useT, type Phrase } from "@/ui/i18n";
 import { palette, radius, space, touch, type } from "@/theme";
 
 const c = palette("light");
 
-function errorFor(err: unknown): string {
-  if (!(err instanceof ApiError)) return "That did not work. Try again.";
+function errorFor(err: unknown): Phrase {
+  if (!(err instanceof ApiError)) return S.driver.didNotWorkTryAgain;
   switch (err.code) {
     case "offline":
-      return "No network. Try again in a moment.";
+      return S.driver.offlineMoment;
     case "plate_taken":
-      return "That plate is already registered. Call us if it is yours.";
+      return S.apply.plateTaken;
     case "bad_cni":
-      return "Check the CNI number — it should be nine digits.";
+      return S.apply.badCni;
     default:
-      return "That did not work. Try again.";
+      return S.driver.didNotWorkTryAgain;
   }
 }
 
@@ -71,6 +73,7 @@ function Details() {
   const router = useRouter();
   const { me, refresh } = useSession();
   const insets = useSafeAreaInsets();
+  const t = useT();
   const scroll = useScrollPastKeyboard();
 
   const [name, setName] = useState(me?.name ?? "");
@@ -79,7 +82,7 @@ function Details() {
   const [zones, setZones] = useState<{ code: string; name: string }[]>([]);
   const [homeZone, setHomeZone] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Phrase | null>(null);
 
   useEffect(() => {
     void geo
@@ -131,59 +134,57 @@ function Details() {
         <Steps step={1} {...(router.canGoBack() ? { onBack: () => router.back() } : {})} />
 
         <View style={styles.intro}>
-          <Text style={styles.h1}>Tell us about you and your taxi</Text>
-          <Text style={styles.sub}>
-            Riders see your name, your rating and your plate number before they get in.
-          </Text>
+          <Text style={styles.h1}>{t(S.apply.title)}</Text>
+          <Text style={styles.sub}>{t(S.apply.why)}</Text>
         </View>
 
         <View style={styles.fields}>
-          <Field label="Full name, as written on your ID">
+          <Field label={t(S.apply.fullName)}>
             <TextInput
               style={[styles.input, name ? styles.inputOn : null]}
               value={name}
               onChangeText={setName}
-              placeholder="Epie Ndive"
+              placeholder={t(S.apply.namePlaceholder)}
               placeholderTextColor={c.muted}
               autoCapitalize="words"
               editable={!busy}
-              accessibilityLabel="Full name"
+              accessibilityLabel={t(S.apply.fullNameShort)}
             />
           </Field>
 
-          <Field label="Mobile number" hint="Already confirmed by SMS">
+          <Field label={t(S.apply.mobile)} hint={t(S.apply.mobileHint)}>
             <View style={styles.readonly}>
               <Text style={styles.readonlyText}>{me?.phone ?? ""}</Text>
             </View>
           </Field>
 
-          <Field label="Plate number on the taxi">
+          <Field label={t(S.apply.plateOnTaxi)}>
             <TextInput
               style={[styles.input, styles.plate, plate ? styles.inputOn : null]}
               value={plate}
               onChangeText={setPlate}
-              placeholder="SW 482 CK"
+              placeholder={t(S.apply.platePlaceholder)}
               placeholderTextColor={c.muted}
               autoCapitalize="characters"
               editable={!busy}
-              accessibilityLabel="Plate number"
+              accessibilityLabel={t(S.apply.plate)}
             />
           </Field>
 
-          <Field label="CNI number" hint="The nine digits on your national ID card">
+          <Field label={t(S.apply.cni)} hint={t(S.apply.cniHint)}>
             <TextInput
               style={[styles.input, cni ? styles.inputOn : null]}
               value={cni}
               onChangeText={(v) => setCni(v.replace(/\D/g, "").slice(0, 9))}
-              placeholder="123456789"
+              placeholder={t(S.apply.cniPlaceholder)}
               placeholderTextColor={c.muted}
               keyboardType="number-pad"
               editable={!busy}
-              accessibilityLabel="CNI number"
+              accessibilityLabel={t(S.apply.cni)}
             />
           </Field>
 
-          <Field label="Where do you usually drive?">
+          <Field label={t(S.apply.whereDrive)}>
             {/* A row of chips rather than a picker: fourteen zones is few enough
                 to show, and a native select on Android is a modal he has to
                 dismiss before he can see what he chose. */}
@@ -207,7 +208,7 @@ function Details() {
           </Field>
         </View>
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? <Text style={styles.error}>{t(error)}</Text> : null}
 
         <View style={styles.spacer} />
 
@@ -215,13 +216,13 @@ function Details() {
           onPress={() => void submit()}
           disabled={busy || !ready}
           accessibilityRole="button"
-          accessibilityLabel="Send my application"
+          accessibilityLabel={t(S.apply.send)}
           style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed, (busy || !ready) && styles.ctaOff]}
         >
           {busy ? (
             <ActivityIndicator color={c.onAction} />
           ) : (
-            <Text style={styles.ctaLabel}>Send my application</Text>
+            <Text style={styles.ctaLabel}>{t(S.apply.send)}</Text>
           )}
         </Pressable>
       </ScrollView>
@@ -233,6 +234,7 @@ function Details() {
 function Pending({ onRefresh, onSignOut }: { onRefresh: () => Promise<void>; onSignOut: () => void }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const t = useT();
   const [refreshing, setRefreshing] = useState(false);
 
   const check = useCallback(async () => {
@@ -255,18 +257,15 @@ function Pending({ onRefresh, onSignOut }: { onRefresh: () => Promise<void>; onS
       <View style={styles.waitingHead}>
         <WaitingClock />
         <View style={styles.waitingWords}>
-          <Text style={styles.h1Centre}>We&apos;re checking your documents</Text>
-          <Text style={styles.subCentre}>
-            Most applications are reviewed within one working day. We&apos;ll text you as soon as
-            it&apos;s done.
-          </Text>
+          <Text style={styles.h1Centre}>{t(S.apply.checking)}</Text>
+          <Text style={styles.subCentre}>{t(S.apply.checkingWhy)}</Text>
         </View>
       </View>
 
       <View style={styles.checklist}>
-        <Progress state="done" label="Details received" />
-        <Progress state="now" label="Our team is reviewing them now" />
-        <Progress state="next" label="You go online and start earning" />
+        <Progress state="done" label={t(S.apply.stepReceived)} />
+        <Progress state="now" label={t(S.apply.stepReviewing)} />
+        <Progress state="next" label={t(S.apply.stepOnline)} />
       </View>
 
       <View style={styles.spacer} />
@@ -274,23 +273,23 @@ function Pending({ onRefresh, onSignOut }: { onRefresh: () => Promise<void>; onS
       <Pressable
         onPress={() => router.push("/documents")}
         accessibilityRole="button"
-        accessibilityLabel="Check or replace my documents"
+        accessibilityLabel={t(S.apply.checkDocuments)}
         style={({ pressed }) => [styles.ghost, pressed && styles.pressed]}
       >
-        <Text style={styles.ghostLabel}>My documents</Text>
+        <Text style={styles.ghostLabel}>{t(S.apply.myDocuments)}</Text>
       </Pressable>
 
       <Pressable
         onPress={check}
         accessibilityRole="button"
-        accessibilityLabel="Check again"
+        accessibilityLabel={t(S.apply.checkAgain)}
         style={({ pressed }) => [styles.ghostQuiet, pressed && styles.pressed]}
       >
-        <Text style={styles.ghostQuietLabel}>Check again</Text>
+        <Text style={styles.ghostQuietLabel}>{t(S.apply.checkAgain)}</Text>
       </Pressable>
 
       <Pressable onPress={onSignOut} accessibilityRole="button" style={styles.signOut}>
-        <Text style={styles.signOutLabel}>Sign out</Text>
+        <Text style={styles.signOutLabel}>{t(S.apply.signOut)}</Text>
       </Pressable>
     </ScrollView>
   );
@@ -298,6 +297,7 @@ function Pending({ onRefresh, onSignOut }: { onRefresh: () => Promise<void>; onS
 
 function Rejected({ onSignOut }: { onSignOut: () => void }) {
   const insets = useSafeAreaInsets();
+  const t = useT();
   return (
     <ScrollView
       style={styles.flex}
@@ -307,23 +307,21 @@ function Rejected({ onSignOut }: { onSignOut: () => void }) {
       ]}
     >
       <View style={styles.waitingWords}>
-        <Text style={styles.h1Centre}>We could not approve this application</Text>
-        <Text style={styles.subCentre}>
-          Call us and we will tell you exactly what was wrong. It is usually a document we could not
-          read.
-        </Text>
+        <Text style={styles.h1Centre}>{t(S.apply.refused)}</Text>
+        <Text style={styles.subCentre}>{t(S.apply.refusedWhy)}</Text>
       </View>
       <View style={styles.spacer} />
       <Pressable onPress={onSignOut} accessibilityRole="button" style={styles.signOut}>
-        <Text style={styles.signOutLabel}>Sign out</Text>
+        <Text style={styles.signOutLabel}>{t(S.apply.signOut)}</Text>
       </Pressable>
     </ScrollView>
   );
 }
 
 function WaitingClock() {
+  const t = useT();
   return (
-    <Svg viewBox="0 0 140 140" width={128} height={128} accessibilityLabel="Under review">
+    <Svg viewBox="0 0 140 140" width={128} height={128} accessibilityLabel={t(S.apply.underReview)}>
       <Circle cx={70} cy={70} r={66} fill={c.actionTint} />
       <Circle cx={70} cy={70} r={50} fill="none" stroke={c.actionBright} strokeWidth={3} strokeDasharray="10 9" />
       <Path d="M70 46 V70 L86 80" fill="none" stroke={c.action} strokeWidth={5} strokeLinecap="round" strokeLinejoin="round" />

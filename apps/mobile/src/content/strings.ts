@@ -172,6 +172,52 @@ export const S = {
       "Vos signalements, et les réponses reçues",
     ),
     signOut: p("Sign out", "Se déconnecter"),
+    saving: p("Saving…", "Enregistrement…"),
+    english: p("English", "English"),
+    french: p("Français", "Français"),
+    terms: p("Terms", "Conditions"),
+    privacyShort: p("Privacy", "Confidentialité"),
+
+    photoAsk: p("Your photo", "Votre photo"),
+    photoAskWhy: p(
+      "The driver coming for you sees this, and nobody else.",
+      "Le chauffeur qui vient vous chercher la voit, et personne d'autre.",
+    ),
+    takeOne: p("Take one now", "En prendre une maintenant"),
+    chooseOne: p("Choose from photos", "Choisir dans la galerie"),
+    cancel: p("Cancel", "Annuler"),
+    removeAsk: p("Remove your photo?", "Retirer votre photo ?"),
+    removeWhy: p(
+      "Drivers will have only your name to go on.",
+      "Les chauffeurs n'auront que votre nom.",
+    ),
+    remove: p("Remove", "Retirer"),
+
+    offline: p(
+      "No network. Try again when you have signal.",
+      "Pas de réseau. Réessayez quand vous aurez du signal.",
+    ),
+    notAnImage: p(
+      "That file is not a photo. Take one with the camera.",
+      "Ce fichier n'est pas une photo. Prenez-en une avec l'appareil.",
+    ),
+    tooLarge: p(
+      "That photo is too big. Take a new one rather than sending an original.",
+      "Cette photo est trop grande. Reprenez-en une plutôt que d'envoyer l'originale.",
+    ),
+    didNotWork: p("That did not work. Try again.", "Cela n'a pas fonctionné. Réessayez."),
+    needCamera: p(
+      "We need the camera to take your photo.",
+      "Nous avons besoin de l'appareil photo pour prendre votre photo.",
+    ),
+    needPhotos: p(
+      "We need permission to open your photos.",
+      "Nous avons besoin de votre autorisation pour ouvrir vos photos.",
+    ),
+    nameTooShort: p(
+      "Type the name a driver should call you.",
+      "Écrivez le nom par lequel un chauffeur doit vous appeler.",
+    ),
   },
 
   confirm: {
@@ -202,6 +248,18 @@ export const S = {
     ),
     alreadyRiding: p("You already have a ride running.", "Vous avez déjà une course en cours."),
     didNotWork: p("That did not work. Try again.", "Cela n'a pas fonctionné. Réessayez."),
+    needCamera: p(
+      "We need the camera to take your photo.",
+      "Nous avons besoin de l'appareil photo pour prendre votre photo.",
+    ),
+    needPhotos: p(
+      "We need permission to open your photos.",
+      "Nous avons besoin de votre autorisation pour ouvrir vos photos.",
+    ),
+    nameTooShort: p(
+      "Type the name a driver should call you.",
+      "Écrivez le nom par lequel un chauffeur doit vous appeler.",
+    ),
   },
 
   /**
@@ -481,6 +539,18 @@ export const S = {
     tripOver: p("That ride has already finished.", "Cette course est déjà terminée."),
     notYours: p("That ride is not yours.", "Cette course n'est pas la vôtre."),
     didNotWork: p("That did not work. Try again.", "Cela n'a pas fonctionné. Réessayez."),
+    needCamera: p(
+      "We need the camera to take your photo.",
+      "Nous avons besoin de l'appareil photo pour prendre votre photo.",
+    ),
+    needPhotos: p(
+      "We need permission to open your photos.",
+      "Nous avons besoin de votre autorisation pour ouvrir vos photos.",
+    ),
+    nameTooShort: p(
+      "Type the name a driver should call you.",
+      "Écrivez le nom par lequel un chauffeur doit vous appeler.",
+    ),
   },
 
   /**
@@ -513,6 +583,115 @@ export const S = {
       "A person reads this and answers you within a day. You will find the answer under “What you told us” in your account.",
       "Une personne le lit et vous répond dans la journée. Vous trouverez la réponse sous « Ce que vous nous avez dit » dans votre compte.",
     ),
+  },
+
+  /**
+   * Coming to drive.
+   *
+   * Three steps: who you are, your papers, then the waiting. Written for a man
+   * who owns a taxi and has been asked for documents by an office before, so
+   * every field says what it wants and why.
+   */
+  apply: {
+    title: p("Tell us about you and your taxi", "Parlez-nous de vous et de votre taxi"),
+    why: p(
+      "Riders see your name, your rating and your plate number before they get in.",
+      "Les passagers voient votre nom, votre note et votre plaque avant de monter.",
+    ),
+    fullName: p("Full name, as written on your ID", "Nom complet, tel qu'écrit sur votre pièce"),
+    fullNameShort: p("Full name", "Nom complet"),
+    namePlaceholder: p("Epie Ndive", "Epie Ndive"),
+    mobile: p("Mobile number", "Numéro de téléphone"),
+    mobileHint: p("Already confirmed by SMS", "Déjà confirmé par SMS"),
+    plateOnTaxi: p("Plate number on the taxi", "Numéro de plaque du taxi"),
+    plate: p("Plate number", "Numéro de plaque"),
+    platePlaceholder: p("SW 482 CK", "SW 482 CK"),
+    cni: p("CNI number", "Numéro de CNI"),
+    cniHint: p(
+      "The nine digits on your national ID card",
+      "Les neuf chiffres de votre carte nationale d'identité",
+    ),
+    cniPlaceholder: p("123456789", "123456789"),
+    whereDrive: p("Where do you usually drive?", "Où conduisez-vous d'habitude ?"),
+    send: p("Send my application", "Envoyer ma demande"),
+
+    checking: p("We're checking your documents", "Nous vérifions vos documents"),
+    checkingWhy: p(
+      "Most applications are reviewed within one working day. We'll text you as soon as it's done.",
+      "La plupart des demandes sont traitées en un jour ouvrable. Nous vous enverrons un SMS dès que ce sera fait.",
+    ),
+    stepReceived: p("Details received", "Informations reçues"),
+    stepReviewing: p("Our team is reviewing them now", "Notre équipe les examine en ce moment"),
+    stepOnline: p("You go online and start earning", "Vous passez en ligne et commencez à gagner"),
+    myDocuments: p("My documents", "Mes documents"),
+    checkDocuments: p("Check or replace my documents", "Vérifier ou remplacer mes documents"),
+    checkAgain: p("Check again", "Vérifier à nouveau"),
+    signOut: p("Sign out", "Se déconnecter"),
+    underReview: p("Under review", "En cours d'examen"),
+
+    refused: p("We could not approve this application", "Nous n'avons pas pu approuver cette demande"),
+    refusedWhy: p(
+      "Call us and we will tell you exactly what was wrong. It is usually a document we could not read.",
+      "Appelez-nous et nous vous dirons exactement ce qui n'allait pas. C'est généralement un document illisible.",
+    ),
+
+    plateTaken: p(
+      "That plate is already registered. Call us if it is yours.",
+      "Cette plaque est déjà enregistrée. Appelez-nous si elle est à vous.",
+    ),
+    badCni: p(
+      "Check the CNI number — it should be nine digits.",
+      "Vérifiez le numéro de CNI — il doit comporter neuf chiffres.",
+    ),
+  },
+
+  /** The three papers, and why each is wanted. */
+  documents: {
+    title: p("Your documents", "Vos documents"),
+    why: p(
+      "Take a clear photo of each one. Only the FakoRide team can see them.",
+      "Prenez une photo nette de chacun. Seule l'équipe FakoRide peut les voir.",
+    ),
+
+    nationalId: p("National ID card", "Carte nationale d'identité"),
+    registration: p("Car registration document", "Carte grise du véhicule"),
+    facePhoto: p("Photo of your face", "Photo de votre visage"),
+    tapToPhoto: p("Tap to take a photo", "Touchez pour prendre une photo"),
+    ridersSee: p(
+      "Riders see this before they get in",
+      "Les passagers la voient avant de monter",
+    ),
+    sent: p("Sent", "Envoyé"),
+    sending: p("Sending…", "Envoi…"),
+    replace: p("Replace", "Remplacer"),
+    replaceThis: p("Replace {what}", "Remplacer : {what}"),
+    photographThis: p("Take a photo of your {what}", "Photographiez votre {what}"),
+
+    advice: p(
+      "Blurry or cut-off photos slow down your approval. Shoot in good light, flat on a table.",
+      "Les photos floues ou coupées retardent votre validation. Photographiez à la lumière, à plat sur une table.",
+    ),
+    submit: p("Submit for review", "Soumettre pour vérification"),
+    countSent: p("{n} of {total} sent", "{n} sur {total} envoyés"),
+
+    needCamera: p(
+      "We need the camera to take a photo of your documents.",
+      "Nous avons besoin de l'appareil photo pour photographier vos documents.",
+    ),
+    notAnImage: p(
+      "That file is not a photo. Use the camera.",
+      "Ce fichier n'est pas une photo. Utilisez l'appareil photo.",
+    ),
+    tooLarge: p(
+      "That photo is too large. Take it again.",
+      "Cette photo est trop grande. Reprenez-la.",
+    ),
+    storageDown: p(
+      "We cannot take documents right now. Try again shortly.",
+      "Nous ne pouvons pas recevoir de documents pour l'instant. Réessayez sous peu.",
+    ),
+    notOpen: p("This application is closed. Call us.", "Cette demande est close. Appelez-nous."),
+    didNotSend: p("That did not send. Try again.", "L'envoi a échoué. Réessayez."),
   },
 
   /**

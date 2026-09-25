@@ -16,10 +16,9 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { CaretLeftIcon } from "@/ui/icons";
-import { useSession } from "@/session/SessionProvider";
 import { Press } from "@/ui/motion";
 import { S } from "@/content/strings";
-import { useT } from "@/ui/i18n";
+import { useLang, useT, type Lang } from "@/ui/i18n";
 import { palette, radius, space, touch, type } from "@/theme";
 
 const c = palette("light");
@@ -46,8 +45,8 @@ export type Translated = {
  * this from the welcome screen, before they agree to it.
  */
 export function LegalDoc({ doc }: { doc: Translated }) {
-  const { me } = useSession();
-  const [lang, setLang] = useState<"en" | "fr">(me?.language === "fr" ? "fr" : "en");
+  // Opened in the account's language, then switchable on the page itself.
+  const [lang, setLang] = useState<Lang>(useLang());
   const d = doc[lang];
 
   return (
