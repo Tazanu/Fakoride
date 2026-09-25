@@ -109,6 +109,7 @@ export const S = {
       "Vous avez un taxi ? Transportez des passagers et gardez chaque franc de la course.",
     ),
     goTo: p("Go to {place}", "Aller à {place}"),
+    goToFor: p("Go to {place}, {n} francs", "Aller à {place}, {n} francs"),
     placeAndFare: p("{place}, {n} francs", "{place}, {n} francs"),
 
     needLocation: p(

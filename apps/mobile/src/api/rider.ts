@@ -138,10 +138,35 @@ export type Quote = {
   source: "FIELD" | "FORMULA";
 };
 
+/** One row of the price list from where she is standing. */
+export type FareFrom = {
+  code: string;
+  name: string;
+  priceXaf: number;
+  mobilePriceXaf: number;
+  hillFare: boolean;
+  distanceKm: number;
+  source: "FIELD" | "FORMULA";
+};
+
 export const fares = {
   quote: (params: { fromLat: number; fromLng: number; toZone: string }) =>
     api.get<Quote>(
       `/fares/quote?fromLat=${params.fromLat}&fromLng=${params.fromLng}&toZone=${encodeURIComponent(params.toZone)}`,
+    ),
+
+  /**
+   * Every fare out of one zone, in one request.
+   *
+   * The endpoint's own comment says "this is the home screen", and for a long
+   * time the home screen did not ask it: she saw a price for the places she
+   * had been before and nothing at all for anywhere new. Anonymous, because
+   * the price list is the argument for the app and should not need an account.
+   */
+  from: (zoneCode: string) =>
+    api.get<{ from: { code: string; name: string }; destinations: FareFrom[] }>(
+      `/fares/from/${encodeURIComponent(zoneCode)}`,
+      { anonymous: true },
     ),
 };
 

@@ -25,6 +25,7 @@ import { ClockIcon, CrosshairIcon, HouseIcon, ListIcon, MagnifyingGlassIcon } fr
 import { ApiError } from "@/api/client";
 import {
   demand,
+  fares,
   geo,
   trips,
   type Landmark,
@@ -57,6 +58,14 @@ export default function Book() {
   const [repeats, setRepeats] = useState<Repeat[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
   const [nearby, setNearby] = useState<number | null>(null);
+  /**
+   * What every destination costs from where she is standing.
+   *
+   * Keyed by zone code. The whole argument for this app over the roadside is
+   * a price she can see before she gets in, and until this was fetched she
+   * could see one only for places she had already been.
+   */
+  const [priced, setPriced] = useState<Record<string, number>>({});
   const [error, setError] = useState<Phrase | null>(null);
   const [locating, setLocating] = useState(true);
   const [query, setQuery] = useState("");
@@ -91,7 +100,17 @@ export default function Book() {
         trips.repeats(next.lat, next.lng),
         demand.nearby(next.lat, next.lng),
       ]);
-      if (place.status === "fulfilled") setHere(place.value);
+      if (place.status === "fulfilled") {
+        setHere(place.value);
+        // One request for the whole list, once we know which zone she is in.
+        // A price missing is a row without a number, never a blocked screen.
+        void fares
+          .from(place.value.zone.code)
+          .then((r) =>
+            setPriced(Object.fromEntries(r.destinations.map((d) => [d.code, d.priceXaf]))),
+          )
+          .catch(() => undefined);
+      }
       if (repeat.status === "fulfilled") setRepeats(repeat.value.repeats);
       if (count.status === "fulfilled") setNearby(count.value.driversNearby);
       if (place.status === "rejected") {
@@ -327,7 +346,11 @@ export default function Book() {
                 onPress={() => choose(p.zone, p.name)}
                 disabled={!fix}
                 accessibilityRole="button"
-                accessibilityLabel={t(S.home.goTo, { place: p.name })}
+                accessibilityLabel={
+                  priced[p.zone] === undefined
+                    ? t(S.home.goTo, { place: p.name })
+                    : t(S.home.goToFor, { place: p.name, n: priced[p.zone] })
+                }
                 style={({ pressed }) => [
                   styles.row,
                   (i > 0 || shownRepeats.length > 0) && styles.rowRuled,
@@ -346,6 +369,9 @@ export default function Book() {
                     <Text style={styles.rowSub}>{p.zoneName}</Text>
                   ) : null}
                 </View>
+                {priced[p.zone] !== undefined ? (
+                  <Text style={styles.rowFare}>{xaf(priced[p.zone]!)}</Text>
+                ) : null}
               </Pressable>
             </Appear>
           ))}
@@ -358,7 +384,11 @@ export default function Book() {
                   onPress={() => choose(z.code, z.name)}
                   disabled={!fix}
                   accessibilityRole="button"
-                  accessibilityLabel={t(S.home.goTo, { place: z.name })}
+                  accessibilityLabel={
+                    priced[z.code] === undefined
+                      ? t(S.home.goTo, { place: z.name })
+                      : t(S.home.goToFor, { place: z.name, n: priced[z.code] })
+                  }
                   style={({ pressed }) => [styles.row, ruled && styles.rowRuled, pressed && styles.rowPressed]}
                 >
                   <View style={[styles.tile, styles.tilePlain]}>
@@ -375,6 +405,9 @@ export default function Book() {
                       <Text style={styles.rowSub}>{z.town}</Text>
                     ) : null}
                   </View>
+                  {priced[z.code] !== undefined ? (
+                    <Text style={styles.rowFare}>{xaf(priced[z.code]!)}</Text>
+                  ) : null}
                 </Pressable>
               </Appear>
             );
