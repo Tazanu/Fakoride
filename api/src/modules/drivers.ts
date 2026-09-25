@@ -84,7 +84,7 @@ export function driversRouter(): Router {
         id: driver.id,
         status: driver.status,
         // Say plainly what happens next; a driver waiting in silence is a driver lost.
-        next: "Bring your CNI and bike papers to be checked. We call you within two days.",
+        next: "Send photos of your CNI and the vehicle papers. Most are reviewed within one working day.",
       });
     }),
   );
