@@ -281,6 +281,82 @@ check("and he cannot go online", stillBlocked.status === 403, JSON.stringify(sti
 const record = await call("GET", `/admin/drivers/${applicant.id}`, { token: adminToken });
 check("the reason is kept, in words a person can read back to him", record.body.history?.[0]?.note?.includes("does not match"), JSON.stringify(record.body.history?.[0]));
 
+console.log("\n=== ID photos, kept in the database ===");
+/*
+ * Until now no suite uploaded anything: every driver was verified with the
+ * missing-documents override, so the path that stores an ID card had never run
+ * end to end. The runner starts the API with DOCUMENT_STORE=postgres — what
+ * production uses — so these bytes go into StoredFile, not onto a disk.
+ */
+const upload = async (path, token, bytes, type = "image/jpeg", method = "PUT") => {
+  const res = await fetch(`${API}${path}`, {
+    method,
+    headers: { "content-type": type, authorization: `Bearer ${token}` },
+    body: bytes,
+  });
+  const text = await res.text();
+  try {
+    return { status: res.status, body: JSON.parse(text) };
+  } catch {
+    return { status: res.status, body: { raw: text } };
+  }
+};
+const fetchBytes = async (path, token) => {
+  const res = await fetch(`${API}${path}`, { headers: { authorization: `Bearer ${token}` } });
+  return { status: res.status, headers: res.headers, bytes: Buffer.from(await res.arrayBuffer()) };
+};
+/** A JPEG as far as anybody sniffing the first bytes can tell, and unique to this run. */
+const jpeg = (tag) => Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.from(`fako-${tag}-${nonce}-`.repeat(20)), Buffer.from([0xff, 0xd9])]);
+const png = (tag) => Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from(`fako-${tag}-${nonce}-`.repeat(20))]);
+
+const DOC_PHONE = `+2376777${String(nonce).slice(0, 4)}3`;
+const DOC_PLATE = `SW ${String(nonce).slice(-3)} DC`;
+const docToken = await signIn(DOC_PHONE, "DRIVER", "Ewane Mbua");
+await call("POST", "/drivers/apply", {
+  token: docToken,
+  body: { name: "Ewane Mbua", plate: DOC_PLATE, cniNumber: `9${nonce}0003`, homeZone: "MOLYKO" },
+});
+const docQueue = await call("GET", "/admin/drivers", { token: adminToken });
+const docDriver = docQueue.body.drivers.find((d) => d.plate === DOC_PLATE);
+
+const idCard = jpeg("id");
+const sent = await upload("/drivers/me/documents/NATIONAL_ID", docToken, idCard);
+check("a driver can send a photo of his ID card", sent.status === 201 && sent.body.uploaded === true, JSON.stringify(sent.body));
+
+const docKey = sql(`SELECT key FROM "DriverDocument" WHERE "driverId"='${docDriver.id}' AND kind='NATIONAL_ID'`);
+const inDb = sql(`SELECT "byteSize" FROM "StoredFile" WHERE key='${docKey}'`);
+check("the bytes are in the database, not on a disk", inDb === String(idCard.length), `${inDb} vs ${idCard.length}`);
+
+const script = Buffer.from("<script>alert(1)</script>".repeat(4));
+const disguised = await upload("/drivers/me/documents/VEHICLE_REGISTRATION", docToken, script, "image/jpeg");
+check("a file that only claims to be a JPEG is refused", disguised.status === 415 && disguised.body.error?.code === "not_an_image", JSON.stringify(disguised.body));
+
+const opsView = await fetchBytes(`/admin/drivers/${docDriver.id}/documents/NATIONAL_ID`, adminToken);
+check("ops gets back exactly the bytes he sent", opsView.status === 200 && opsView.bytes.equals(idCard), `${opsView.status} ${opsView.bytes.length}B`);
+check("and it is never cached", /no-store/.test(opsView.headers.get("cache-control") ?? ""), opsView.headers.get("cache-control"));
+
+const selfView = await fetchBytes(`/admin/drivers/${docDriver.id}/documents/NATIONAL_ID`, docToken);
+check("the driver himself cannot use the ops route", selfView.status === 403, String(selfView.status));
+
+const reshot = png("id-again");
+await upload("/drivers/me/documents/NATIONAL_ID", docToken, reshot, "image/png");
+const oldGone = sql(`SELECT count(*) FROM "StoredFile" WHERE key='${docKey}'`);
+check("a reshoot replaces the old photo rather than piling up", oldGone === "0", oldGone);
+const reshotView = await fetchBytes(`/admin/drivers/${docDriver.id}/documents/NATIONAL_ID`, adminToken);
+check("and ops now sees the new one", reshotView.bytes.equals(reshot) && reshotView.headers.get("content-type") === "image/png", reshotView.headers.get("content-type"));
+
+console.log("\n=== a rider's face, same store ===");
+const face = jpeg("face");
+const faceSent = await upload("/me/photo", docToken, face);
+check("a photo of yourself is accepted", faceSent.status === 200 || faceSent.status === 201, JSON.stringify(faceSent.body));
+const faceKey = sql(`SELECT "photoKey" FROM "User" WHERE phone='${DOC_PHONE}'`);
+check("and kept in the database too", sql(`SELECT count(*) FROM "StoredFile" WHERE key='${faceKey}'`) === "1", faceKey);
+const faceBack = await fetchBytes("/me/photo", docToken);
+check("you get your own photo back unchanged", faceBack.status === 200 && faceBack.bytes.equals(face), `${faceBack.status} ${faceBack.bytes.length}B`);
+const faceGone = await call("DELETE", "/me/photo", { token: docToken });
+check("removing it is allowed", faceGone.status === 200 || faceGone.status === 204, String(faceGone.status));
+check("and the bytes are actually deleted, not just unlinked", sql(`SELECT count(*) FROM "StoredFile" WHERE key='${faceKey}'`) === "0");
+
 console.log("\n=== guessing a login code ===");
 /*
  * Asking for codes was always limited. Answering was not: a million codes and

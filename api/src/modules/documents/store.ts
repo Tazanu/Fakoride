@@ -9,18 +9,24 @@
  *      authenticated ops route that streams the bytes.
  *   2. The key is generated, never derived from anything the driver sent. A
  *      filename from a phone is user input and belongs nowhere near a path.
- *   3. The store is behind a port, like payments and SMS, so moving from a disk
- *      to R2 is a config change rather than an edit to every call site.
+ *   3. The store is behind a port, like payments and SMS, so where the bytes
+ *      live is a config value rather than an edit to every call site.
  *
- * `local` writes to a directory outside the repo and is what development uses.
- * `r2` is the production adapter and deliberately throws until it is wired —
- * an adapter that silently does nothing is worse than one that refuses.
+ *   local     a directory outside the repo, on this machine. Development only;
+ *             the API refuses to start with it in production, where a redeploy
+ *             on most hosts wipes the disk and every ID card with it.
+ *   postgres  the StoredFile table. Backed up with everything else, nothing to
+ *             provision, nothing billed separately, and no bucket that can be
+ *             left public by mistake. The price is database size: a driver's
+ *             three photos are about 2 MB, which on a small plan is room for a
+ *             few hundred drivers before the plan has to grow.
  */
 
 import { createHash, randomBytes } from "node:crypto";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { env } from "../../env";
+import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../lib/http";
 import { logger } from "../../lib/logger";
 
@@ -130,22 +136,36 @@ class LocalDocumentStore implements DocumentStore {
   }
 }
 
-class R2DocumentStore implements DocumentStore {
-  async put(): Promise<string> {
-    throw new ApiError(503, "storage_unavailable", "Document storage is not configured yet.");
+class PostgresDocumentStore implements DocumentStore {
+  async put(bytes: Buffer, contentType: string): Promise<string> {
+    // The same shape of key as the disk store, so a document's key says nothing
+    // about which store holds it and nothing about who it belongs to.
+    const ext = ALLOWED.get(contentType) ?? "bin";
+    const key = `${randomBytes(1).toString("hex")}/${randomBytes(24).toString("hex")}.${ext}`;
+    // Copied into a plain Uint8Array: Prisma's type will not take a Buffer that
+    // might be backed by shared memory, and a few megabytes is a cheap copy.
+    await prisma.storedFile.create({
+      data: { key, contentType, bytes: new Uint8Array(bytes), byteSize: bytes.length },
+    });
+    return key;
   }
-  async get(): Promise<StoredDocument> {
-    throw new ApiError(503, "storage_unavailable", "Document storage is not configured yet.");
+
+  async get(key: string): Promise<StoredDocument> {
+    const row = await prisma.storedFile.findUnique({ where: { key } });
+    if (!row) throw new ApiError(404, "no_document", "That document is not here any more.");
+    // Prisma hands bytes back as a Uint8Array; the routes stream a Buffer.
+    const bytes = Buffer.from(row.bytes.buffer, row.bytes.byteOffset, row.bytes.byteLength);
+    return { bytes, contentType: row.contentType };
   }
-  async remove(): Promise<void> {
-    // TODO: wire R2 here. Keep the interface: put returns a key, get streams it
-    // back, and nothing is ever made publicly readable.
-    throw new ApiError(503, "storage_unavailable", "Document storage is not configured yet.");
+
+  async remove(key: string): Promise<void> {
+    // deleteMany rather than delete: removing what is already gone is not an error.
+    await prisma.storedFile.deleteMany({ where: { key } });
   }
 }
 
 export const documents: DocumentStore =
-  env.DOCUMENT_STORE === "local" ? new LocalDocumentStore() : new R2DocumentStore();
+  env.DOCUMENT_STORE === "postgres" ? new PostgresDocumentStore() : new LocalDocumentStore();
 
 if (env.DOCUMENT_STORE === "local") {
   logger.warn(

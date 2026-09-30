@@ -57,10 +57,9 @@ const schema = z.object({
    * Where driver documents are kept.
    *
    * `local` writes to DOCUMENT_DIR on this machine and is for development only.
-   * `r2` is the production adapter and refuses until it is wired, which is the
-   * honest failure — a store that silently drops an ID photograph is worse.
+   * `postgres` keeps the bytes in the database, and is what production uses.
    */
-  DOCUMENT_STORE: z.enum(["local", "r2"]).default("local"),
+  DOCUMENT_STORE: z.enum(["local", "postgres"]).default("local"),
   /** Outside the repo by default. Never served statically, never committed. */
   DOCUMENT_DIR: z.string().default(".uploads"),
   /** A phone photo is 2-4 MB. Six leaves room without inviting an upload bomb. */
@@ -87,6 +86,9 @@ const checked = schema.superRefine((e, ctx) => {
   }
   if (e.MOMO_PROVIDER === "fake") {
     ctx.addIssue({ code: "custom", path: ["MOMO_PROVIDER"], message: "is fake in production — no money would ever move" });
+  }
+  if (e.DOCUMENT_STORE === "local") {
+    ctx.addIssue({ code: "custom", path: ["DOCUMENT_STORE"], message: "is local in production — ID photos would sit on a disk a redeploy can wipe" });
   }
   if (e.JWT_SECRET.length < 32) {
     ctx.addIssue({ code: "custom", path: ["JWT_SECRET"], message: "must be at least 32 characters in production" });

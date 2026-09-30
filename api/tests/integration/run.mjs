@@ -214,6 +214,9 @@ const server = spawn(process.execPath, [TSX, "src/server.ts"], {
     NODE_ENV: "development",
     // Never the real provider: a test run must not be able to move money.
     MOMO_PROVIDER: "fake",
+    // What production uses. The run's own database holds the photos, and they
+    // go when it is dropped — nothing is left on this machine's disk.
+    DOCUMENT_STORE: "postgres",
     FAPSHI_WEBHOOK_SECRET: WEBHOOK_SECRET,
     // In production a payment is given 45 seconds to arrive on its own before
     // we chase the provider. A test should not sit through that, and the code
