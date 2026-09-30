@@ -15,7 +15,8 @@
     "typecheck": "tsc -p tsconfig.check.json",
     "admin:grant": "tsx scripts/grant-admin.ts",
     "seed:application": "tsx scripts/seed-application.ts",
-    "test:integration": "node tests/integration/run.mjs"
+    "test:integration": "node tests/integration/run.mjs",
+    "fapshi:check": "tsx scripts/fapshi-check.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.2.1",

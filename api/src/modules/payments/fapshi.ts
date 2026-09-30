@@ -59,8 +59,10 @@ export class FapshiProvider implements PaymentProvider {
     private readonly apiUser: string,
     private readonly apiKey: string,
     sandbox: boolean,
+    /** Tests only: a local stand-in that speaks Fapshi's contract. */
+    baseUrl?: string,
   ) {
-    this.baseUrl = sandbox ? SANDBOX_BASE : LIVE_BASE;
+    this.baseUrl = baseUrl ?? (sandbox ? SANDBOX_BASE : LIVE_BASE);
   }
 
   private async request<T>(path: string, init: RequestInit): Promise<T> {
