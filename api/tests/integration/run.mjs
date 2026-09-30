@@ -21,6 +21,7 @@
  */
 
 import { spawn, execFileSync } from "node:child_process";
+import { connect } from "node:net";
 import { createWriteStream, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -162,7 +163,17 @@ guardDatabaseUrl();
 // An API already answering on this port would be the one the suites talk to —
 // the dev server, on the dev database — while the one started below fails to
 // bind and nobody notices. Stop the dev server first.
-if (await fetch(`${API}/health`).then(() => true, () => false)) {
+// A bare socket rather than fetch: exiting straight after a fetch leaves its
+// keep-alive handle closing, and Node on Windows aborts on that.
+const portTaken = await new Promise((resolve) => {
+  const probe = connect({ host: "127.0.0.1", port: Number(new URL(API).port) });
+  probe.once("connect", () => {
+    probe.destroy();
+    resolve(true);
+  });
+  probe.once("error", () => resolve(false));
+});
+if (portTaken) {
   console.error(`Something is already answering on ${API}. Stop the dev API (npm run dev) and run this again.`);
   process.exit(2);
 }

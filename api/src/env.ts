@@ -16,9 +16,15 @@ const schema = z.object({
   JWT_SECRET: z.string().min(16, "JWT_SECRET must be at least 16 characters"),
   JWT_TTL: z.string().default("30d"),
 
-  SMS_PROVIDER: z.enum(["console", "local"]).default("console"),
-  SMS_API_KEY: z.string().optional(),
-  SMS_SENDER_ID: z.string().default("FAKORIDE"),
+  /** See lib/sms.ts. `console` sends nothing and is refused in production. */
+  SMS_PROVIDER: z.enum(["console", "orange"]).default("console"),
+  /** From the app registered on developer.orange.com. */
+  ORANGE_SMS_CLIENT_ID: z.string().optional(),
+  ORANGE_SMS_CLIENT_SECRET: z.string().optional(),
+  /** Cameroon's development sender address. Orange assigns this, not us. */
+  ORANGE_SMS_SENDER_ADDRESS: z.string().default("tel:+2370000"),
+  /** Only once Orange has approved the name. Unapproved, it is left off. */
+  ORANGE_SMS_SENDER_NAME: z.string().optional(),
 
   /**
    * "fake" moves no money and is the only safe default: an environment with no
@@ -66,7 +72,28 @@ const schema = z.object({
   DISPATCH_RADIUS_M: z.coerce.number().int().default(2500),
 });
 
-const parsed = schema.safeParse(process.env);
+/**
+ * Settings that are fine on a laptop and wrong in front of real people.
+ *
+ * Each of these fails quietly in production rather than loudly: the console SMS
+ * sender logs a code nobody reads, so nobody can sign in; the fake payment
+ * provider says every charge succeeded, so riders ride free and drivers are
+ * "paid" nothing. Better the API refuses to start than starts like that.
+ */
+const checked = schema.superRefine((e, ctx) => {
+  if (e.NODE_ENV !== "production") return;
+  if (e.SMS_PROVIDER === "console") {
+    ctx.addIssue({ code: "custom", path: ["SMS_PROVIDER"], message: "is console in production — no sign-in code would ever be sent" });
+  }
+  if (e.MOMO_PROVIDER === "fake") {
+    ctx.addIssue({ code: "custom", path: ["MOMO_PROVIDER"], message: "is fake in production — no money would ever move" });
+  }
+  if (e.JWT_SECRET.length < 32) {
+    ctx.addIssue({ code: "custom", path: ["JWT_SECRET"], message: "must be at least 32 characters in production" });
+  }
+});
+
+const parsed = checked.safeParse(process.env);
 
 if (!parsed.success) {
   const issues = parsed.error.issues.map((i) => `  ${i.path.join(".")}: ${i.message}`).join("\n");

@@ -19,6 +19,7 @@ import { ApiError, asyncHandler } from "../lib/http";
 import { normalisePhone as parsePhone } from "../lib/phone";
 import { signToken, requireAuth } from "../middleware/auth";
 import { logger } from "../lib/logger";
+import { smsSender } from "../lib/sms";
 
 const OTP_TTL_SECONDS = 5 * 60;
 const OTP_MAX_PER_HOUR = 5;
@@ -33,27 +34,6 @@ const OTP_MAX_PER_HOUR = 5;
  * hour at a million-to-one, which is a lock rather than a speed bump.
  */
 const OTP_MAX_WRONG = 5;
-
-export interface SmsSender {
-  send(to: string, message: string): Promise<void>;
-}
-
-class ConsoleSmsSender implements SmsSender {
-  async send(to: string, message: string): Promise<void> {
-    logger.info({ to, message }, "SMS (console sender — no message was actually sent)");
-  }
-}
-
-class LocalAggregatorSmsSender implements SmsSender {
-  async send(_to: string, _message: string): Promise<void> {
-    // TODO: wire the chosen Cameroonian aggregator here once one is priced.
-    // Keep the interface: one call, one message, throw on failure.
-    throw new ApiError(503, "sms_unavailable", "SMS provider is not configured yet.");
-  }
-}
-
-export const smsSender: SmsSender =
-  env.SMS_PROVIDER === "console" ? new ConsoleSmsSender() : new LocalAggregatorSmsSender();
 
 /**
  * Whether /otp/request hands the code straight back to the caller.
