@@ -9,10 +9,13 @@
  * suspended in Postgres but still sitting in the Redis geo set, a trip re-offered
  * to the driver who just walked away, a share link that leaks a PIN.
  *
- * It RESETS THE DATABASE first. That is the point — every suite below asserts on
- * exact counts, and a suite that passes only on a fresh database but is run
- * against a dirty one tells you nothing. Never point this at anything but the
- * local docker-compose stack.
+ * Every run gets a database of its own: created empty, migrated, seeded, and
+ * dropped at the end. Every suite below asserts on exact counts, so it needs a
+ * clean one — and it used to get that by resetting whatever DATABASE_URL named,
+ * which was the same database the phone was being tested against. Running the
+ * tests wiped the rider you had just signed up. Now nothing that existed before
+ * the run is touched: the only database this ever drops is the one it made,
+ * and Redis is a separate numbered database for the same reason.
  *
  *   docker compose up -d      # from the repo root, first
  */
@@ -36,6 +39,11 @@ const SUITES = [
   "04-money.mjs",
   "05-remaining-surface.mjs",
 ];
+
+/** Each run's own database. The prefix is what the drop below checks for. */
+const RUN_DB_PREFIX = "fako_ride_it_";
+/** Redis database 0 is the one the running dev API uses; the tests take 9. */
+const TEST_REDIS_DB = 9;
 
 /** Fixed, so the money suite can post a webhook the server will actually trust. */
 const WEBHOOK_SECRET = "integration-webhook-secret";
@@ -88,6 +96,40 @@ async function flushRedis() {
   }
 }
 
+/** Runs one statement against the local container's maintenance database. */
+function psql(statement) {
+  execFileSync("docker", ["exec", "fako-postgres", "psql", "-U", DB_USER, "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-tAc", statement], {
+    stdio: "pipe",
+    encoding: "utf8",
+  });
+}
+
+function createRunDatabase(name) {
+  process.stdout.write(`  create ${name}... `);
+  try {
+    psql(`CREATE DATABASE ${name}`);
+    console.log("done");
+  } catch (err) {
+    console.log("FAILED");
+    console.error(`  ${err.stderr || err.message}`);
+    process.exit(1);
+  }
+}
+
+/** Drops the database this run created, and nothing else, ever. */
+function dropRunDatabase(name) {
+  if (!name.startsWith(RUN_DB_PREFIX)) {
+    console.error(`refusing to drop ${name}: it was not created by this run`);
+    return;
+  }
+  try {
+    psql(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+    console.log(`  dropped ${name}`);
+  } catch (err) {
+    console.error(`  could not drop ${name}: ${err.stderr || err.message}`);
+  }
+}
+
 function guardDatabaseUrl() {
   const url = process.env.DATABASE_URL ?? "";
   const local = url.includes("localhost") || url.includes("127.0.0.1");
@@ -117,8 +159,31 @@ async function waitForHealth(deadlineMs) {
 import "dotenv/config";
 guardDatabaseUrl();
 
-console.log("Resetting the development database.\n");
-run([PRISMA, "migrate", "reset", "--force", "--skip-generate"], "  migrate reset");
+// An API already answering on this port would be the one the suites talk to —
+// the dev server, on the dev database — while the one started below fails to
+// bind and nobody notices. Stop the dev server first.
+if (await fetch(`${API}/health`).then(() => true, () => false)) {
+  console.error(`Something is already answering on ${API}. Stop the dev API (npm run dev) and run this again.`);
+  process.exit(2);
+}
+
+// Everything below — the migrations, the seed, the server, every suite's SQL —
+// reads DATABASE_URL, so pointing it at the run's own database here is enough.
+const devUrl = new URL(process.env.DATABASE_URL);
+const DB_USER = decodeURIComponent(devUrl.username);
+const RUN_DB = `${RUN_DB_PREFIX}${Date.now()}`;
+const runUrl = new URL(devUrl);
+runUrl.pathname = `/${RUN_DB}`;
+process.env.DATABASE_URL = runUrl.toString();
+
+const redisUrl = new URL(process.env.REDIS_URL);
+redisUrl.pathname = `/${TEST_REDIS_DB}`;
+process.env.REDIS_URL = redisUrl.toString();
+
+console.log(`A fresh database for this run; ${devUrl.pathname.slice(1)} is not touched.\n`);
+createRunDatabase(RUN_DB);
+process.on("exit", () => dropRunDatabase(RUN_DB));
+run([PRISMA, "migrate", "deploy"], "  migrate deploy");
 await flushRedis();
 run([TSX, "prisma/seed.ts"], "  seed");
 run([TSX, "scripts/grant-admin.ts", ADMIN_PHONE, "Ops Desk"], "  grant ops admin");

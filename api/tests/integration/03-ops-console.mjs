@@ -78,8 +78,10 @@ const sql = (q) =>
     encoding: "utf8",
   }).trim();
 
+/** The numbered Redis database the API under test is using — the runner gives it its own. */
+const REDIS_DB = new URL(process.env.REDIS_URL ?? "redis://localhost:6379").pathname.slice(1) || "0";
 const redisCmd = (...args) =>
-  execSync(`docker exec fako-redis redis-cli ${args.join(" ")}`, { encoding: "utf8" }).trim();
+  execSync(`docker exec fako-redis redis-cli -n ${REDIS_DB} ${args.join(" ")}`, { encoding: "utf8" }).trim();
 
 console.log("\n=== who may open the console ===");
 const adminToken = await signIn("+237600000099", "RIDER", "Ops Desk");

@@ -81,8 +81,10 @@ const sql = (q) =>
     encoding: "utf8",
   }).trim();
 
+/** The numbered Redis database the API under test is using — the runner gives it its own. */
+const REDIS_DB = new URL(process.env.REDIS_URL ?? "redis://localhost:6379").pathname.slice(1) || "0";
 const redisCmd = (...args) =>
-  execSync(`docker exec fako-redis redis-cli ${args.join(" ")}`, { encoding: "utf8" }).trim();
+  execSync(`docker exec fako-redis redis-cli -n ${REDIS_DB} ${args.join(" ")}`, { encoding: "utf8" }).trim();
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -278,6 +280,46 @@ check("and he cannot go online", stillBlocked.status === 403, JSON.stringify(sti
 
 const record = await call("GET", `/admin/drivers/${applicant.id}`, { token: adminToken });
 check("the reason is kept, in words a person can read back to him", record.body.history?.[0]?.note?.includes("does not match"), JSON.stringify(record.body.history?.[0]));
+
+console.log("\n=== guessing a login code ===");
+/*
+ * Asking for codes was always limited. Answering was not: a million codes and
+ * nothing counting the misses. Five attempts at a code, then it is gone — and
+ * the attempts are counted before they are compared, so a burst sent all at
+ * once cannot slip the right one in before the first miss burns it.
+ */
+const GUESSED = `+2376790${String(nonce).slice(0, 4)}7`;
+await call("POST", "/auth/otp/request", { body: { phone: GUESSED } });
+await new Promise((r) => setTimeout(r, 250));
+const realCode = otpFromLog(GUESSED);
+const wrongOnes = Array.from({ length: 5 }, (_, i) => String((Number(realCode) + i + 1) % 1_000_000).padStart(6, "0"));
+
+const answers = [];
+for (const code of wrongOnes) answers.push(await call("POST", "/auth/otp/verify", { body: { phone: GUESSED, code } }));
+check("the first four misses are just wrong", answers.slice(0, 4).every((a) => a.body.error?.code === "wrong_code"), JSON.stringify(answers.map((a) => a.body.error?.code)));
+check("the fifth burns the code", answers[4].status === 429 && answers[4].body.error?.code === "too_many_attempts", JSON.stringify(answers[4].body));
+
+const tooLate = await call("POST", "/auth/otp/verify", { body: { phone: GUESSED, code: realCode } });
+check("after that even the right code is refused", tooLate.status === 400 && !tooLate.body.token, JSON.stringify(tooLate.body));
+
+// A burst: forty at once, the right code among them near the end.
+await call("POST", "/auth/otp/request", { body: { phone: GUESSED } });
+await new Promise((r) => setTimeout(r, 250));
+const burstCode = otpFromLog(GUESSED);
+const burst = Array.from({ length: 40 }, (_, i) =>
+  i === 35 ? burstCode : String((Number(burstCode) + i + 1) % 1_000_000).padStart(6, "0"),
+);
+const burstAnswers = await Promise.all(burst.map((code) => call("POST", "/auth/otp/verify", { body: { phone: GUESSED, code } })));
+const looked = burstAnswers.filter((a) => a.body.token || a.body.error?.code === "wrong_code").length;
+check("of forty guesses sent at once, at most five are ever compared", looked <= 5, `${looked} compared`);
+
+// And a person who mistypes once still gets in.
+await call("POST", "/auth/otp/request", { body: { phone: GUESSED } });
+await new Promise((r) => setTimeout(r, 250));
+const honest = otpFromLog(GUESSED);
+await call("POST", "/auth/otp/verify", { body: { phone: GUESSED, code: String((Number(honest) + 1) % 1_000_000).padStart(6, "0") } });
+const second = await call("POST", "/auth/otp/verify", { body: { phone: GUESSED, code: honest } });
+check("one typo and then the right code still signs in", Boolean(second.body.token), JSON.stringify(second.body));
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail === 0 ? 0 : 1);
