@@ -153,6 +153,11 @@ model User {
   /// by us, to people entitled to see them, and never linked publicly.
   photoKey  String?
   photoAt   DateTime?
+  /// The Expo push token of the phone this account last signed in on, or null.
+  /// Unique: a token is a phone, and a phone passed to somebody else must not
+  /// go on receiving the first owner's rides. Registering it moves it.
+  pushToken   String?   @unique
+  pushTokenAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

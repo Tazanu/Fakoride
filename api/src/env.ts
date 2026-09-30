@@ -65,6 +65,11 @@ const schema = z.object({
   /** A phone photo is 2-4 MB. Six leaves room without inviting an upload bomb. */
   DOCUMENT_MAX_BYTES: z.coerce.number().int().default(6 * 1024 * 1024),
 
+  /** Expo's push endpoint. Overridden only by the test suite, which runs a stand-in. */
+  EXPO_PUSH_URL: z.string().url().default("https://exp.host/--/api/v2/push/send"),
+  /** Only if "enhanced push security" is switched on for the Expo project. */
+  EXPO_ACCESS_TOKEN: z.string().optional(),
+
   ACCESS_FEE_XAF: z.coerce.number().int().default(500),
   MOBILE_PAYMENT_DISCOUNT_XAF: z.coerce.number().int().default(15),
   OFFER_TTL_SECONDS: z.coerce.number().int().default(12),

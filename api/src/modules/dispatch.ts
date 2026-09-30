@@ -9,12 +9,13 @@
  * a driver having to move once for us to see him again.
  */
 
-import { redis, offerKey } from "../lib/redis";
+import { redis, driverOfferKey, offerKey } from "../lib/redis";
 import { prisma } from "../lib/prisma";
 import { env } from "../env";
 import { logger } from "../lib/logger";
 import { clearDriverPosition, nearbyDriverIds } from "../lib/presence";
 import { emitToDriver, emitToRider } from "../realtime";
+import { francs, notify } from "../lib/push";
 
 export type Candidate = { driverId: string; distanceM: number };
 
@@ -127,6 +128,7 @@ export async function offerToNextDriver(tripId: string): Promise<boolean> {
       needsHelmet: trip.needsHelmet,
       womanDriverOnly: trip.womanDriverOnly,
     });
+    notify(trip.riderId, "no_driver", {}, { tripId });
     logger.info({ tripId }, "no driver available");
     return false;
   }
@@ -143,7 +145,7 @@ export async function offerToNextDriver(tripId: string): Promise<boolean> {
 
   await redis.set(offerKey(tripId), candidate.driverId, "EX", env.OFFER_TTL_SECONDS + 3);
 
-  emitToDriver(candidate.driverId, "trip:offer", {
+  const offer = {
     tripId,
     priceXaf: trip.priceXaf,
     pickupLabel: trip.pickupLabel,
@@ -154,7 +156,30 @@ export async function offerToNextDriver(tripId: string): Promise<boolean> {
     // hand it over when he gets there.
     needsHelmet: trip.needsHelmet,
     expiresInSeconds: env.OFFER_TTL_SECONDS,
-  });
+  };
+  emitToDriver(candidate.driverId, "trip:offer", offer);
+
+  // Kept by driver as well, so an app opened from the notification can fetch it.
+  await redis.set(
+    driverOfferKey(candidate.driverId),
+    JSON.stringify({ ...offer, expiresAt: Date.now() + env.OFFER_TTL_SECONDS * 1000 }),
+    "EX",
+    env.OFFER_TTL_SECONDS + 3,
+  );
+
+  // And to the phone, for when the app is not open — which is most of the time
+  // a driver is waiting. Its life is the offer's: arriving after it has expired
+  // would send him to a ride that has already gone to somebody else.
+  const offered = await prisma.driver.findUnique({ where: { id: candidate.driverId }, select: { userId: true } });
+  if (offered) {
+    notify(
+      offered.userId,
+      "offer",
+      { price: francs(trip.priceXaf), pickup: trip.pickupLabel, drop: trip.dropLabel },
+      { tripId },
+      env.OFFER_TTL_SECONDS,
+    );
+  }
 
   logger.info({ tripId, driverId: candidate.driverId }, "trip offered");
   return true;

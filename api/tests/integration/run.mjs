@@ -22,6 +22,7 @@
 
 import { spawn, execFileSync } from "node:child_process";
 import { connect } from "node:net";
+import { createServer } from "node:http";
 import { createWriteStream, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -39,6 +40,7 @@ const SUITES = [
   "03-ops-console.mjs",
   "04-money.mjs",
   "05-remaining-surface.mjs",
+  "06-push.mjs",
 ];
 
 /** Each run's own database. The prefix is what the drop below checks for. */
@@ -203,6 +205,43 @@ const logDir = mkdtempSync(join(tmpdir(), "fako-integration-"));
 const logPath = join(logDir, "server.log");
 const logFile = createWriteStream(logPath);
 
+/*
+ * A stand-in for Expo's push service.
+ *
+ * A test run must never wake a real phone, so the API is pointed here instead.
+ * It records every message and answers the way Expo does — including, for any
+ * token with "gone" in it, the DeviceNotRegistered error a phone gives once the
+ * app has been uninstalled. The suites read what arrived from /__received.
+ */
+const pushed = [];
+const pushStandIn = createServer((req, res) => {
+  if (req.method === "GET" && req.url === "/__received") {
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify(pushed));
+    return;
+  }
+  const chunks = [];
+  req.on("data", (c) => chunks.push(c));
+  req.on("end", () => {
+    const messages = JSON.parse(Buffer.concat(chunks).toString("utf8") || "[]");
+    pushed.push(...messages);
+    res.setHeader("content-type", "application/json");
+    res.end(
+      JSON.stringify({
+        data: messages.map((m) =>
+          String(m.to).includes("gone")
+            ? { status: "error", message: `"${m.to}" is not a registered push notification recipient`, details: { error: "DeviceNotRegistered" } }
+            : { status: "ok", id: `ticket-${pushed.length}` },
+        ),
+      }),
+    );
+  });
+});
+await new Promise((resolve) => pushStandIn.listen(0, "127.0.0.1", resolve));
+const PUSH_STANDIN = `http://127.0.0.1:${pushStandIn.address().port}`;
+// Serves while the suites run, and does not hold the runner open after them.
+pushStandIn.unref();
+
 console.log("\nStarting the API.");
 const server = spawn(process.execPath, [TSX, "src/server.ts"], {
   stdio: ["ignore", "pipe", "pipe"],
@@ -223,6 +262,8 @@ const server = spawn(process.execPath, [TSX, "src/server.ts"], {
     // path being exercised is identical either way.
     PAYMENT_RECONCILE_AFTER_SECONDS: "1",
     PAYMENT_JOB_INTERVAL_SECONDS: "1",
+    // Never Expo itself: a test run must not wake a real phone.
+    EXPO_PUSH_URL: `${PUSH_STANDIN}/--/api/v2/push/send`,
   },
 });
 server.stdout.pipe(logFile);
@@ -259,7 +300,7 @@ for (const suite of SUITES) {
   console.log(`\n${"=".repeat(60)}\n${suite}\n${"=".repeat(60)}`);
   const result = spawn(process.execPath, [join(import.meta.dirname, suite), logPath], {
     stdio: "inherit",
-    env: { ...process.env, FAPSHI_WEBHOOK_SECRET: WEBHOOK_SECRET },
+    env: { ...process.env, FAPSHI_WEBHOOK_SECRET: WEBHOOK_SECRET, PUSH_STANDIN },
   });
   const code = await new Promise((resolve) => result.on("exit", resolve));
   if (code !== 0) failed += 1;

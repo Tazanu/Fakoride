@@ -28,6 +28,7 @@ import { tripShareRouter } from "./share";
 import { tripSosRouter } from "./safety";
 import { tripPhotoRouter } from "./profile";
 import { emitToDriver, emitToRider, emitToTrip } from "../realtime";
+import { notify } from "../lib/push";
 import { logger } from "../lib/logger";
 
 const createSchema = z.object({
@@ -348,6 +349,7 @@ export function tripsRouter(): Router {
       await redis.set(driverActiveTripKey(driver.id), trip.id, "EX", 4 * 3600);
 
       emitToRider(trip.riderId, "trip:accepted", { tripId: trip.id, driverId: driver.id });
+      notify(trip.riderId, "accepted", { plate: driver.plate, pickup: trip.pickupLabel }, { tripId: trip.id });
       emitToTrip(trip.id, "trip:status", { tripId: trip.id, status: "ACCEPTED" });
       res.json({ status: updated.status, pickupLabel: updated.pickupLabel, priceXaf: updated.priceXaf });
     }),
@@ -363,6 +365,7 @@ export function tripsRouter(): Router {
 
       await transition(trip.id, "ARRIVED", driver.id, { arrivedAt: new Date() });
       emitToRider(trip.riderId, "trip:arrived", { tripId: trip.id });
+      notify(trip.riderId, "arrived", { plate: driver.plate, pickup: trip.pickupLabel }, { tripId: trip.id });
       emitToTrip(trip.id, "trip:status", { tripId: trip.id, status: "ARRIVED" });
       res.json({ status: "ARRIVED" });
     }),
@@ -496,6 +499,7 @@ export function tripsRouter(): Router {
       await redis.del(offerKey(trip.id), driverActiveTripKey(cancellingDriverId));
 
       emitToRider(trip.riderId, "trip:driver_cancelled", { tripId: trip.id });
+      notify(trip.riderId, "driver_cancelled", {}, { tripId: trip.id });
       const requeued = await offerToNextDriver(trip.id);
       res.json({ status: requeued ? "OFFERED" : "NO_DRIVER_FOUND", requeued });
     }),

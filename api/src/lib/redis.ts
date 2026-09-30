@@ -29,6 +29,15 @@ export const driverActiveTripKey = (driverId: string) => `driver:${driverId}:tri
 /** OTP codes, hashed, short-lived. */
 export const otpKey = (phone: string) => `otp:${phone}`;
 
+/**
+ * The offer a driver is holding, by driver rather than by trip.
+ *
+ * The socket event is gone the moment it is sent. A driver whose phone was in
+ * his pocket taps the notification, the app opens, and it needs a way to ask
+ * "what was I just offered" — this is what answers.
+ */
+export const driverOfferKey = (driverId: string) => `driver:${driverId}:offer`;
+
 /** Rate limit bucket for OTP requests per phone. */
 export const otpThrottleKey = (phone: string) => `otp:throttle:${phone}`;
 /** Wrong guesses at the code currently issued to this number. Dies with the code. */

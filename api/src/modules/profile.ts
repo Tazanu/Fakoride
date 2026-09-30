@@ -30,6 +30,7 @@ import { prisma } from "../lib/prisma";
 import { ApiError, asyncHandler, param } from "../lib/http";
 import { logger } from "../lib/logger";
 import { requireAuth } from "../middleware/auth";
+import { EXPO_TOKEN } from "../lib/push";
 import { assertAcceptable, documents, fingerprint } from "./documents/store";
 
 /**
@@ -83,6 +84,44 @@ export function profileRouter(): Router {
    * the same handling as a driver's ID, because the difference between the two
    * is what they are for, not how much care they deserve.
    */
+  /**
+   * The phone to wake when the app is not open.
+   *
+   * One phone per account, and one account per phone. Registering a token that
+   * another account holds takes it from them: a phone handed to a cousin must
+   * stop receiving the first owner's ride offers the moment the cousin signs in.
+   */
+  router.put(
+    "/push-token",
+    requireAuth(),
+    asyncHandler(async (req, res) => {
+      const { token } = z
+        .object({ token: z.string().regex(EXPO_TOKEN, "That is not an Expo push token.") })
+        .parse(req.body);
+      await prisma.$transaction([
+        prisma.user.updateMany({
+          where: { pushToken: token, id: { not: req.user!.sub } },
+          data: { pushToken: null, pushTokenAt: null },
+        }),
+        prisma.user.update({
+          where: { id: req.user!.sub },
+          data: { pushToken: token, pushTokenAt: new Date() },
+        }),
+      ]);
+      res.json({ registered: true });
+    }),
+  );
+
+  /** On sign-out. A signed-out phone gets nothing. */
+  router.delete(
+    "/push-token",
+    requireAuth(),
+    asyncHandler(async (req, res) => {
+      await prisma.user.update({ where: { id: req.user!.sub }, data: { pushToken: null, pushTokenAt: null } });
+      res.status(204).end();
+    }),
+  );
+
   router.put(
     "/photo",
     requireAuth(),

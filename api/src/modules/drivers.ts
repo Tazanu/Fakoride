@@ -14,6 +14,7 @@ import { requireAuth } from "../middleware/auth";
 import { setDriverPosition, clearDriverPosition } from "../lib/presence";
 import { driverBalance, ensureAccessFee, todaySummary, weeklyEarnings } from "./ledger";
 import { resolveZoneForPoint } from "./geo";
+import { redis, driverOfferKey, offerKey } from "../lib/redis";
 
 const applySchema = z.object({
   name: z.string().trim().min(2).max(60),
@@ -53,6 +54,40 @@ export function driversRouter(): Router {
 
   // His own documents. Mounted here so the whole driver surface is one prefix.
   router.use("/me/documents", driverDocumentsRouter());
+
+  /**
+   * The ride he is being offered right now, or null.
+   *
+   * The socket event is the normal way an offer arrives, and it is gone the
+   * moment it is sent. A driver whose phone was in his pocket gets the push
+   * instead, taps it, and the app opens with no idea what it was woken for.
+   * This is how it finds out — with the seconds actually left on the clock,
+   * not the twelve it started with.
+   */
+  router.get(
+    "/me/offer",
+    requireAuth("DRIVER"),
+    asyncHandler(async (req, res) => {
+      const driver = await prisma.driver.findUnique({ where: { userId: req.user!.sub }, select: { id: true } });
+      if (!driver) throw new ApiError(404, "no_driver", "This account is not a driver.");
+
+      const raw = await redis.get(driverOfferKey(driver.id));
+      if (!raw) {
+        res.json({ offer: null });
+        return;
+      }
+      const { expiresAt, ...offer } = JSON.parse(raw) as { tripId: string; expiresAt: number };
+      const left = Math.floor((expiresAt - Date.now()) / 1000);
+      // Still his only if the trip's own offer record still names him: accepted,
+      // declined, or moved on to somebody else all clear or change that.
+      const holder = await redis.get(offerKey(offer.tripId));
+      if (holder !== driver.id || left <= 0) {
+        res.json({ offer: null });
+        return;
+      }
+      res.json({ offer: { ...offer, expiresInSeconds: left } });
+    }),
+  );
 
   /** Apply to drive. Verification is a human step — nothing here grants access. */
   router.post(
