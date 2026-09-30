@@ -61,6 +61,8 @@ function errorFor(err: unknown): Phrase {
       return S.signIn.tooManyCodes;
     case "wrong_code":
       return S.signIn.wrongCode;
+    case "too_many_attempts":
+      return S.signIn.tooManyAttempts;
     case "code_expired":
       return S.signIn.codeExpired;
     case "sms_unavailable":
@@ -129,6 +131,11 @@ export default function SignIn() {
       setError(errorFor(err));
       setCode("");
       setDevCode(null);
+      // This code is dead either way. Back to the number, still filled in, so
+      // the one tap that fixes it — "Send me the code" — is the next thing seen.
+      if (err instanceof ApiError && (err.code === "too_many_attempts" || err.code === "code_expired")) {
+        setStep("phone");
+      }
     } finally {
       setBusy(false);
     }

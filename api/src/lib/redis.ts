@@ -31,6 +31,8 @@ export const otpKey = (phone: string) => `otp:${phone}`;
 
 /** Rate limit bucket for OTP requests per phone. */
 export const otpThrottleKey = (phone: string) => `otp:throttle:${phone}`;
+/** Wrong guesses at the code currently issued to this number. Dies with the code. */
+export const otpAttemptsKey = (phone: string) => `otp:attempts:${phone}`;
 
 export async function disconnectRedis(): Promise<void> {
   await redis.quit();

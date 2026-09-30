@@ -14,7 +14,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { env } from "../env";
 import { prisma } from "../lib/prisma";
-import { redis, otpKey, otpThrottleKey } from "../lib/redis";
+import { redis, otpAttemptsKey, otpKey, otpThrottleKey } from "../lib/redis";
 import { ApiError, asyncHandler } from "../lib/http";
 import { normalisePhone as parsePhone } from "../lib/phone";
 import { signToken, requireAuth } from "../middleware/auth";
@@ -22,6 +22,17 @@ import { logger } from "../lib/logger";
 
 const OTP_TTL_SECONDS = 5 * 60;
 const OTP_MAX_PER_HOUR = 5;
+/**
+ * Wrong answers allowed against one code before it is thrown away.
+ *
+ * Without this the only limit was on *asking* for codes. Answering was free:
+ * a million six-digit codes, five minutes each, and nothing counting the
+ * misses — at a hundred guesses a second somebody gets into a chosen account
+ * within about a day, and the ops console signs in the same way. Five misses
+ * and the code is gone; with five codes an hour that is twenty-five guesses an
+ * hour at a million-to-one, which is a lock rather than a speed bump.
+ */
+const OTP_MAX_WRONG = 5;
 
 export interface SmsSender {
   send(to: string, message: string): Promise<void>;
@@ -108,7 +119,12 @@ export function authRouter(): Router {
       }
 
       const code = generateCode();
-      await redis.set(otpKey(phone), hashCode(code), "EX", OTP_TTL_SECONDS);
+      // A new code starts with a clean count; the old one's misses die with it.
+      await redis
+        .multi()
+        .set(otpKey(phone), hashCode(code), "EX", OTP_TTL_SECONDS)
+        .del(otpAttemptsKey(phone))
+        .exec();
       await smsSender.send(phone, `${code} is your Fako Ride code. It expires in 5 minutes.`);
 
       // `devCode` is absent in every configuration but the local one — see
@@ -130,13 +146,36 @@ export function authRouter(): Router {
       const stored = await redis.get(otpKey(phone));
       if (!stored) throw new ApiError(400, "code_expired", "That code has expired. Ask for a new one.");
 
+      // Every attempt takes a number before anything is compared — the right
+      // code included. Counting only the misses would let a burst of guesses
+      // sent at once all get past the check above before the first miss burned
+      // the code, and the right one among them would sign in. Numbered first,
+      // only the first OTP_MAX_WRONG attempts at a code are ever looked at.
+      const counted = await redis
+        .multi()
+        .incr(otpAttemptsKey(phone))
+        .expire(otpAttemptsKey(phone), OTP_TTL_SECONDS)
+        .exec();
+      const attempt = Number(counted?.[0]?.[1] ?? 0);
+      if (attempt > OTP_MAX_WRONG) {
+        await redis.del(otpKey(phone));
+        throw new ApiError(429, "too_many_attempts", "Too many wrong codes. Ask for a new one.");
+      }
+
       const supplied = hashCode(body.code);
       const ok =
         stored.length === supplied.length &&
         crypto.timingSafeEqual(Buffer.from(stored), Buffer.from(supplied));
-      if (!ok) throw new ApiError(400, "wrong_code", "That code is not right.");
+      if (!ok) {
+        if (attempt >= OTP_MAX_WRONG) {
+          await redis.del(otpKey(phone));
+          logger.warn({ phone }, "auth: code burned after too many wrong guesses");
+          throw new ApiError(429, "too_many_attempts", "Too many wrong codes. Ask for a new one.");
+        }
+        throw new ApiError(400, "wrong_code", "That code is not right.");
+      }
 
-      await redis.del(otpKey(phone), otpThrottleKey(phone));
+      await redis.del(otpKey(phone), otpThrottleKey(phone), otpAttemptsKey(phone));
 
       const user = await prisma.user.upsert({
         where: { phone },

@@ -76,6 +76,10 @@ export const S = {
       "Trop de codes demandés. Réessayez dans une heure.",
     ),
     wrongCode: p("That code is not right.", "Ce code n'est pas correct."),
+    tooManyAttempts: p(
+      "Too many wrong codes. Ask for a new one.",
+      "Trop de codes erronés. Demandez-en un nouveau.",
+    ),
     codeExpired: p(
       "That code has expired. Ask for a new one.",
       "Ce code a expiré. Demandez-en un nouveau.",
