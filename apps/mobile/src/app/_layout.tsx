@@ -8,8 +8,9 @@
  * cheap handsets a student on the Molyko corridor is carrying.
  */
 
-import { useEffect } from "react";
-import { Stack } from "expo-router";
+import { useEffect, useRef } from "react";
+import { Stack, useRootNavigationState, useRouter } from "expo-router";
+import * as Notifications from "expo-notifications";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import * as SplashScreen from "expo-splash-screen";
@@ -21,10 +22,42 @@ import {
   Manrope_600SemiBold,
   Manrope_700Bold,
 } from "@expo-google-fonts/manrope";
-import { SessionProvider } from "@/session/SessionProvider";
+import { SessionProvider, useSession } from "@/session/SessionProvider";
 import { palette } from "@/theme";
 
 void SplashScreen.preventAutoHideAsync();
+
+/**
+ * Where a tapped notification takes you.
+ *
+ * An offer opens the driver's home, which fetches the offer he was woken for.
+ * Anything about a trip opens that trip. Handled once per notification, and
+ * only once the navigator exists — navigating before the root has mounted is
+ * an error expo-router throws rather than ignores.
+ */
+function NotificationRouting() {
+  const response = Notifications.useLastNotificationResponse();
+  const router = useRouter();
+  const ready = Boolean(useRootNavigationState()?.key);
+  const { me } = useSession();
+  const handled = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!response || !me || !ready) return;
+    const id = response.notification.request.identifier;
+    if (handled.current === id) return;
+    handled.current = id;
+
+    const data = response.notification.request.content.data as { kind?: string; tripId?: string };
+    if (data.kind === "offer") {
+      if (me.driver) router.replace("/(driver)");
+    } else if (typeof data.tripId === "string") {
+      router.push({ pathname: "/(rider)/trip/[id]", params: { id: data.tripId } });
+    }
+  }, [response, me, ready, router]);
+
+  return null;
+}
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
@@ -61,6 +94,7 @@ export default function RootLayout() {
             animation: "fade",
           }}
         />
+        <NotificationRouting />
       </SessionProvider>
     </SafeAreaProvider>
   );

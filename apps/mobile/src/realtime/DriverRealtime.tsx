@@ -26,7 +26,7 @@ import {
 import { AppState, Vibration } from "react-native";
 import * as Haptics from "expo-haptics";
 import { connectSocket, closeSocket } from "./socket";
-import type { TripOffer } from "@/api/driver";
+import { shift, type TripOffer } from "@/api/driver";
 import { useSession } from "@/session/SessionProvider";
 
 type RealtimeState = {
@@ -70,6 +70,31 @@ export function DriverRealtime({ children }: { children: ReactNode }) {
   }, []);
 
   const acknowledgeCancellation = useCallback(() => setCancelledTripId(null), []);
+
+  /**
+   * Ask the server what he is being offered.
+   *
+   * The socket event is the normal way an offer arrives, and it is lost if the
+   * app was asleep when it was sent. He was woken by the push instead, tapped
+   * it, and the app opens here — so it asks. No vibration: the phone already
+   * buzzed once for this offer.
+   */
+  const isDriver = Boolean(me?.driver);
+  const recoverOffer = useCallback(async () => {
+    if (!isDriver) return;
+    try {
+      const { offer: held } = await shift.currentOffer();
+      if (!held) return;
+      setOffer((current) => (current?.tripId === held.tripId ? current : held));
+      if (expiry.current) clearTimeout(expiry.current);
+      expiry.current = setTimeout(() => {
+        Vibration.cancel();
+        setOffer(null);
+      }, held.expiresInSeconds * 1000);
+    } catch {
+      // Offline, or not a driver yet. The socket will bring the next one.
+    }
+  }, [isDriver]);
 
   useEffect(() => {
     if (!me?.driver) {
@@ -150,9 +175,13 @@ export function DriverRealtime({ children }: { children: ReactNode }) {
     const sub = AppState.addEventListener("change", (next) => {
       if (next !== "active") return;
       void connectSocket().then((socket) => setConnected(socket?.connected ?? false));
+      void recoverOffer();
     });
+    // And once on opening: a cold start from a tapped notification never
+    // passes through "active" as a change.
+    void recoverOffer();
     return () => sub.remove();
-  }, []);
+  }, [recoverOffer]);
 
   const value = useMemo(
     () => ({ offer, clearOffer, cancelledTripId, acknowledgeCancellation, connected }),

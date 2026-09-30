@@ -27,7 +27,14 @@
       "expo-router",
       "expo-status-bar",
       "expo-secure-store",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#0F5F58"
+        }
+      ]
     ],
     "scheme": "fakoride",
     "experiments": {

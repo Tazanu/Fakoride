@@ -75,3 +75,9 @@ export const profile = {
 
   removePhoto: () => api.delete<{ removed: true }>("/me/photo"),
 };
+
+/** The phone to wake when the app is not open. See notifications/push.ts. */
+export const pushToken = {
+  register: (token: string) => api.put<{ registered: true }>("/me/push-token", { token }),
+  unregister: () => api.delete<null>("/me/push-token"),
+};

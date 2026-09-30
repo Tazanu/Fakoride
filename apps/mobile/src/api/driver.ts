@@ -65,6 +65,14 @@ export type ZoneDemand = {
 };
 
 export const shift = {
+  /**
+   * The offer he is holding right now, with the seconds actually left.
+   *
+   * For an app opened from a notification: the socket event that carried the
+   * offer was sent while the app was asleep, and is gone.
+   */
+  currentOffer: () => api.get<{ offer: TripOffer | null }>("/drivers/me/offer"),
+
   goOnline: (lat: number, lng: number) =>
     api.post<{ online: true; zone: { code: string; name: string } }>("/drivers/online", { lat, lng }),
 

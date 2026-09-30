@@ -18,6 +18,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { auth, type Me } from "@/api/session";
 import { ApiError, clearToken, getToken, setToken, setUnauthorisedHandler } from "@/api/client";
+import { registerForPush, unregisterForPush } from "@/notifications/push";
 
 type SessionState = {
   /** Null until the stored token has been checked. Drives the splash. */
@@ -65,6 +66,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     void load();
   }, [load]);
 
+  // Every time somebody is signed in on this phone, tell the server where to
+  // reach them. Cheap, idempotent, and it moves the phone to whoever signed in
+  // last — which is what a phone handed to somebody else should do.
+  const signedIn = me?.id ?? null;
+  useEffect(() => {
+    if (signedIn) void registerForPush();
+  }, [signedIn]);
+
   useEffect(() => {
     // The client calls this when the API rejects our token outright.
     setUnauthorisedHandler(() => {
@@ -83,6 +92,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setStaleOffline(false);
       },
       signOut: async () => {
+        // While the token still works: afterwards the server cannot tell whose
+        // phone this was, and it would go on receiving that account's rides.
+        await unregisterForPush();
         await clearToken();
         setMe(null);
       },
