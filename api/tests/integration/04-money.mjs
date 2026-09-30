@@ -192,68 +192,80 @@ check("but the trip itself stays completed — the ride happened", tripStill ===
 
 console.log("\n=== the webhook ===");
 /*
- * A rider whose payment will never settle by itself.
+ * A webhook is a prompt to go and ask the provider, never a statement to be
+ * believed. Two riders make that testable without racing the reconciler:
  *
- * The fake provider resolves a charge asynchronously, so a webhook test using
- * an ordinary rider races it — and when the provider wins, the ledger is already
- * credited and the stored reference is the provider’s, not the webhook’s. The
- * assertions below then pass or fail on timing, and the webhook path they exist
- * to cover is never exercised at all.
- *
- * A number ending 11 stays PENDING forever in the fake provider — the
- * stuck-payment case. That makes the webhook the only thing that can settle this
- * charge, which is exactly what these assertions mean to prove.
+ *   stuck   a number ending 11, which the fake provider keeps PENDING forever.
+ *           Anything that settles it must have believed the webhook's body.
+ *   target  an ordinary number, which the provider settles after ~150 ms and
+ *           the reconciler would only notice after a full second. A webhook
+ *           sent in between is the thing that settles it.
  */
-const WEBHOOK_RIDER = `+2376711${String(nonce).slice(0, -2)}11`;
-const webhookRiderToken = await signIn(WEBHOOK_RIDER, "RIDER", "Adeline");
-const target = await call("POST", "/trips", {
-  token: webhookRiderToken,
-  body: { pickupLat: CHECKPOINT.lat, pickupLng: CHECKPOINT.lng, toZone: "MALINGO", paymentMethod: "MOMO" },
-});
-await call("POST", `/trips/${target.body.id}/accept`, { token: driverToken });
-await call("POST", `/trips/${target.body.id}/start`, { token: driverToken, body: { pin: target.body.pin } });
-const targetDone = await call("POST", `/trips/${target.body.id}/complete`, { token: driverToken });
-const paymentId = targetDone.body.payment.id;
-const transId = sql(`SELECT "providerTransId" FROM "Payment" WHERE id='${paymentId}'`);
+async function completedMomoTrip(phone, name) {
+  const token = await signIn(phone, "RIDER", name);
+  const trip = await call("POST", "/trips", {
+    token,
+    body: { pickupLat: CHECKPOINT.lat, pickupLng: CHECKPOINT.lng, toZone: "MALINGO", paymentMethod: "MOMO" },
+  });
+  await call("POST", `/trips/${trip.body.id}/accept`, { token: driverToken });
+  await call("POST", `/trips/${trip.body.id}/start`, { token: driverToken, body: { pin: trip.body.pin } });
+  const done = await call("POST", `/trips/${trip.body.id}/complete`, { token: driverToken });
+  const paymentId = done.body.payment.id;
+  const transId = sql(`SELECT "providerTransId" FROM "Payment" WHERE id='${paymentId}'`);
+  return { trip: trip.body, paymentId, transId };
+}
+
+const stuck = await completedMomoTrip(`+2376711${String(nonce).slice(0, -2)}11`, "Adeline");
 
 const noSecret = await call("POST", "/payments/webhook", {
-  body: { transId, status: "SUCCESSFUL", externalId: paymentId },
+  body: { transId: stuck.transId, status: "SUCCESSFUL", externalId: stuck.paymentId },
 });
 check("a webhook with no secret is refused", noSecret.status === 401, JSON.stringify(noSecret.body));
 
 const wrongSecret = await call("POST", "/payments/webhook", {
   headers: { "x-wh-secret": "not-the-secret-at-all-no" },
-  body: { transId, status: "SUCCESSFUL", externalId: paymentId },
+  body: { transId: stuck.transId, status: "SUCCESSFUL", externalId: stuck.paymentId },
 });
 check("a webhook with the wrong secret is refused", wrongSecret.status === 401, JSON.stringify(wrongSecret.body));
 
-const forgedLedger = sql(`SELECT count(*) FROM "LedgerEntry" WHERE "tripId"='${target.body.id}'`);
-check("a forged webhook credits nobody", forgedLedger === "0", forgedLedger);
+// The right secret, and a lie: SUCCESSFUL, for money the provider never took.
+const lie = await call("POST", "/payments/webhook", {
+  headers: { "x-wh-secret": WEBHOOK_SECRET },
+  body: { transId: stuck.transId, status: "SUCCESSFUL", externalId: stuck.paymentId, amount: 99999 },
+});
+check("a webhook with the secret is still only a prompt", lie.body.matched === true && lie.body.status === "PENDING", JSON.stringify(lie.body));
+const lieLedger = sql(`SELECT count(*) FROM "LedgerEntry" WHERE "tripId"='${stuck.trip.id}'`);
+check("a secret-holder claiming success the provider never confirmed credits nobody", lieLedger === "0", lieLedger);
+
+// Nine digits, and ending in 5 so the fake provider neither fails (00) nor stalls (11) it.
+const target = await completedMomoTrip(`+2376766${String(nonce).slice(0, -1)}5`, "Beatrice");
+// Past the provider's 150 ms, well short of the reconciler's one second.
+await new Promise((r) => setTimeout(r, 350));
 
 const good = await call("POST", "/payments/webhook", {
   headers: { "x-wh-secret": WEBHOOK_SECRET },
-  body: { transId, status: "SUCCESSFUL", externalId: paymentId, financialTransId: "MP26091500001" },
+  body: { transId: target.transId, status: "SUCCESSFUL", externalId: target.paymentId, financialTransId: "FORGED-REF" },
 });
-check("the real webhook is accepted and matched", good.body.matched === true, JSON.stringify(good.body));
+check("the real webhook settles it, on the provider's word", good.body.matched === true && good.body.status === "SUCCESSFUL", JSON.stringify(good.body));
 
-const credited = sql(`SELECT count(*) FROM "LedgerEntry" WHERE "tripId"='${target.body.id}'`);
+const credited = sql(`SELECT count(*) FROM "LedgerEntry" WHERE "tripId"='${target.trip.id}'`);
 check("it credits the fare", credited === "1", credited);
 
 const replay = await call("POST", "/payments/webhook", {
   headers: { "x-wh-secret": WEBHOOK_SECRET },
-  body: { transId, status: "SUCCESSFUL", externalId: paymentId, financialTransId: "MP26091500001" },
+  body: { transId: target.transId, status: "SUCCESSFUL", externalId: target.paymentId },
 });
 check("a replay is accepted without complaint", replay.body.matched === true);
-const afterReplay = sql(`SELECT count(*) FROM "LedgerEntry" WHERE "tripId"='${target.body.id}'`);
+const afterReplay = sql(`SELECT count(*) FROM "LedgerEntry" WHERE "tripId"='${target.trip.id}'`);
 check("but pays exactly once", afterReplay === "1", afterReplay);
 
-const operatorRef = sql(`SELECT "financialTransId" FROM "Payment" WHERE id='${paymentId}'`);
-check("the operator's own reference is kept, for disputes", operatorRef === "MP26091500001", operatorRef);
+const operatorRef = sql(`SELECT "financialTransId" FROM "Payment" WHERE id='${target.paymentId}'`);
+check("the operator's reference is the provider's, not the webhook's", operatorRef === `fin_${target.transId}`, operatorRef);
 
 console.log("\n=== cashing out ===");
 const balance = await call("GET", "/drivers/me/balance", { token: driverToken });
 const owed = balance.body.payableXaf;
-check("we are holding both settled mobile fares", owed === momoTrip.priceXaf + target.body.priceXaf, `${owed}`);
+check("we are holding both settled mobile fares", owed === momoTrip.priceXaf + target.trip.priceXaf, `${owed}`);
 
 const greedy = await call("POST", "/drivers/me/cashout", { token: driverToken, body: { amountXaf: owed + 5000 } });
 check("he cannot take out more than we hold", greedy.status === 400 && greedy.body.error.code === "payout_refused", JSON.stringify(greedy.body));

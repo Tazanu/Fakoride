@@ -427,6 +427,21 @@ export async function applyProviderStatus(
   // A settled failure only changes if the provider now says the money moved.
   if (isTerminal(payment.status) && result.status !== "SUCCESSFUL") return payment;
 
+  // The provider moved a different sum from the one we asked for. Settling it
+  // would write our figure into the ledger over a transfer that was not that
+  // figure, so it stays where it is and a person looks at it.
+  if (
+    result.status === "SUCCESSFUL" &&
+    result.amountXaf !== undefined &&
+    result.amountXaf !== payment.amountXaf
+  ) {
+    logger.error(
+      { paymentId: payment.id, expected: payment.amountXaf, reported: result.amountXaf },
+      "payment: provider reports a different amount — NOT settled, needs a person",
+    );
+    return payment;
+  }
+
   if (result.status !== "SUCCESSFUL") {
     const updated = await prisma.payment.update({
       where: { id: payment.id },
@@ -555,6 +570,23 @@ async function onFailure(payment: Payment): Promise<void> {
 }
 
 // --- reconciliation ---------------------------------------------------------
+
+/**
+ * Ask the provider what happened to one payment, and apply its answer.
+ *
+ * What the webhook calls. A webhook is a message that says "go and look", not
+ * a statement to be believed: its only proof is a shared secret, and a secret
+ * leaks — a log line, a screenshot of the dashboard, a former contractor. Taken
+ * at its word it would let whoever holds the secret mark any pending fare paid.
+ * Asked about by our stored reference, the provider can only tell us the truth
+ * about transactions that are really ours.
+ */
+export async function verifyWithProvider(paymentId: string): Promise<Payment | null> {
+  const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
+  if (!payment?.providerTransId) return payment;
+  const result = await payments.status(payment.providerTransId);
+  return applyProviderStatus(payment.id, result);
+}
 
 /**
  * Ask the provider about payments we have not heard back on.

@@ -14,13 +14,14 @@ import { ApiError, asyncHandler, param } from "../../lib/http";
 import { requireAuth } from "../../middleware/auth";
 import { logger } from "../../lib/logger";
 import { payments } from "./index";
-import { normaliseStatus, PaymentProviderError } from "./provider";
+import { PaymentProviderError } from "./provider";
 import {
   applyProviderStatus,
   collectAccessFee,
   driverPayable,
   requestPayout,
   runAccessFeeCollection,
+  verifyWithProvider,
 } from "./service";
 
 /** Fapshi posts the payment-status body; these are the fields we act on. */
@@ -87,17 +88,18 @@ export function paymentsWebhookRouter(): Router {
         return;
       }
 
-      await applyProviderStatus(payment.id, {
-        transId: body.transId,
-        status: normaliseStatus(body.status),
-        amountXaf: body.amount,
-        financialTransId: body.financialTransId,
-        externalId: body.externalId,
-        reason: body.reason,
-        confirmedAt: body.dateConfirmed,
-      });
-
-      res.json({ received: true, matched: true });
+      // What the body says happened is not used. It is a prompt to go and ask:
+      // the answer comes from the provider, about our own stored reference.
+      try {
+        const updated = await verifyWithProvider(payment.id);
+        res.json({ received: true, matched: true, status: updated?.status ?? payment.status });
+      } catch (err) {
+        if (!(err instanceof PaymentProviderError)) throw err;
+        // The provider could not be asked just now. 200 all the same, so the
+        // webhook is not retried into a storm; the reconciler asks again shortly.
+        logger.warn({ paymentId: payment.id, err: err.message }, "webhook: could not verify with the provider yet");
+        res.json({ received: true, matched: true, status: payment.status, verified: false });
+      }
     }),
   );
 
