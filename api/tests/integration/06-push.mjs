@@ -194,6 +194,30 @@ const second = await call("POST", "/trips", {
 await new Promise((r) => setTimeout(r, 600));
 check("a signed-out phone is sent nothing, even with a ride on offer", second.body.status === "OFFERED" && (await pushesTo(DRIVER_TOKEN)).length === before, `${second.body.status}, ${(await pushesTo(DRIVER_TOKEN)).length - before} new`);
 await call("POST", `/trips/${second.body.id}/cancel`, { token: riderToken, body: { reason: "test over" } });
+
+console.log("\n=== finishing a ride twice ===");
+/*
+ * A double-tap on FINISH RIDE, or a retry after a timeout. Reading "is it still
+ * in progress?" and then marking it complete were two steps, so every request
+ * that arrived together passed the first — and each one completed the trip,
+ * counted it, and charged for it again.
+ */
+await call("POST", "/drivers/online", { token: driverToken, body: BOKWAONGO });
+const twice = await call("POST", "/trips", {
+  token: riderToken,
+  body: { pickupLat: BOKWAONGO.lat, pickupLng: BOKWAONGO.lng, toZone: "MOLYKO", paymentMethod: "MOMO" },
+});
+await call("POST", `/trips/${twice.body.id}/accept`, { token: driverToken });
+await call("POST", `/trips/${twice.body.id}/start`, { token: driverToken, body: { pin: twice.body.pin } });
+const tripsBefore = Number(sql(`SELECT "tripCount" FROM "Driver" WHERE id='${driver.id}'`));
+
+const finishes = await Promise.all(Array.from({ length: 5 }, () => call("POST", `/trips/${twice.body.id}/complete`, { token: driverToken })));
+check("five taps on FINISH RIDE complete it once", finishes.filter((r) => r.status === 200).length === 1, JSON.stringify(finishes.map((r) => r.status)));
+check("the others are told it has already moved on", finishes.filter((r) => r.status === 409).length === 4, JSON.stringify(finishes.map((r) => r.status)));
+check("the ride is counted once", Number(sql(`SELECT "tripCount" FROM "Driver" WHERE id='${driver.id}'`)) === tripsBefore + 1);
+check("its history says COMPLETED once", sql(`SELECT count(*) FROM "TripEvent" WHERE "tripId"='${twice.body.id}' AND status='COMPLETED'`) === "1");
+check("and she is asked to pay once", sql(`SELECT count(*) FROM "Payment" WHERE "tripId"='${twice.body.id}' AND purpose='TRIP_FARE'`) === "1");
+
 await call("POST", "/drivers/offline", { token: driverToken });
 
 console.log(`\n${pass} passed, ${fail} failed\n`);

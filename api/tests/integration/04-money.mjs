@@ -159,7 +159,14 @@ const riderToken = await signIn(PAYING_RIDER, "RIDER", "Mirabel");
 const momoTrip = await ride(riderToken, driverToken, "MOMO", "MILE17");
 check("completing starts a charge rather than finishing one", momoTrip.completion.payment?.status === "PENDING", JSON.stringify(momoTrip.completion.payment));
 
-const beforeLanding = sql(`SELECT count(*) FROM "LedgerEntry" WHERE "tripId"='${momoTrip.id}'`);
+// The rule, read in one snapshot: no credit exists unless the charge has
+// settled. Counting the ledger alone raced the reconciler — on a slow machine
+// the provider (150 ms) and the reconciler (1 s) can both finish before the
+// count does, and the correct credit then looked like an early one. The
+// pending-forever case in the webhook section covers the in-flight state itself.
+const beforeLanding = sql(
+  `SELECT count(*) FROM "LedgerEntry" WHERE "tripId"='${momoTrip.id}' AND NOT EXISTS (SELECT 1 FROM "Payment" WHERE "tripId"='${momoTrip.id}' AND purpose='TRIP_FARE' AND status='SUCCESSFUL')`,
+);
 check("nothing is credited while the money is still in the air", beforeLanding === "0", beforeLanding);
 
 const landed = await settled(momoTrip.completion.payment.id, driverToken);

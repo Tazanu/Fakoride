@@ -13,7 +13,7 @@
 import crypto from "node:crypto";
 import { Router } from "express";
 import { z } from "zod";
-import type { TripStatus } from "@prisma/client";
+import type { Prisma, TripStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { env } from "../env";
 import { ApiError, asyncHandler, param } from "../lib/http";
@@ -55,12 +55,42 @@ function generatePin(): string {
   return String(crypto.randomInt(0, 10_000)).padStart(4, "0");
 }
 
-async function transition(tripId: string, status: TripStatus, actor: string, data: Record<string, unknown> = {}) {
-  const [trip] = await prisma.$transaction([
-    prisma.trip.update({ where: { id: tripId }, data: { status, ...data } }),
-    prisma.tripEvent.create({ data: { tripId, status, actor } }),
-  ]);
-  return trip;
+/**
+ * Move a trip on — only if it is still where the caller saw it.
+ *
+ * This used to read the status, check it, and then write the new one: two
+ * steps, so requests that arrived together all passed the check. Five taps on
+ * FINISH RIDE completed one trip five times — counted five times, logged five
+ * times, and the rider asked to pay more than once.
+ *
+ * Now the check is part of the write. The status moves from one of `from` to
+ * `to` in a single statement, and if somebody else moved it first nothing is
+ * written and the caller is told the trip has moved on. Whatever follows a
+ * transition — the fare, the count, the notifications — therefore runs once.
+ */
+async function transition(
+  tripId: string,
+  from: TripStatus[],
+  to: TripStatus,
+  actor: string,
+  data: Record<string, unknown> = {},
+) {
+  return prisma.$transaction(async (tx) => {
+    const moved = await tx.trip.updateMany({
+      where: { id: tripId, status: { in: from } },
+      data: { status: to, ...data } as Prisma.TripUncheckedUpdateManyInput,
+    });
+    if (moved.count === 0) {
+      const now = await tx.trip.findUnique({ where: { id: tripId }, select: { status: true } });
+      throw new ApiError(
+        409,
+        "wrong_state",
+        `This trip is ${(now?.status ?? "gone").toLowerCase()} and cannot change that way.`,
+      );
+    }
+    await tx.tripEvent.create({ data: { tripId, status: to, actor } });
+    return tx.trip.findUniqueOrThrow({ where: { id: tripId } });
+  });
 }
 
 /** Load a trip and check the caller is actually part of it. */
@@ -341,7 +371,7 @@ export function tripsRouter(): Router {
       }
       await redis.del(offerKey(trip.id));
 
-      const updated = await transition(trip.id, "ACCEPTED", driver.id, {
+      const updated = await transition(trip.id, ["OFFERED"], "ACCEPTED", driver.id, {
         driverId: driver.id,
         acceptedAt: new Date(),
       });
@@ -365,7 +395,7 @@ export function tripsRouter(): Router {
       if (trip.driverId !== driver.id) throw new ApiError(403, "not_yours", "That trip is not yours.");
       expectStatus(trip.status, ["ACCEPTED"]);
 
-      await transition(trip.id, "ARRIVED", driver.id, { arrivedAt: new Date() });
+      await transition(trip.id, ["ACCEPTED"], "ARRIVED", driver.id, { arrivedAt: new Date() });
       emitToRider(trip.riderId, "trip:arrived", { tripId: trip.id });
       notify(trip.riderId, "arrived", { plate: driver.plate, pickup: trip.pickupLabel }, { tripId: trip.id });
       emitToTrip(trip.id, "trip:status", { tripId: trip.id, status: "ARRIVED" });
@@ -393,7 +423,10 @@ export function tripsRouter(): Router {
         throw new ApiError(400, "wrong_pin", "That code does not match. Ask the rider to read it again.");
       }
 
-      await transition(trip.id, "IN_PROGRESS", driver.id, { pinVerified: true, startedAt: new Date() });
+      await transition(trip.id, ["ACCEPTED", "ARRIVED"], "IN_PROGRESS", driver.id, {
+        pinVerified: true,
+        startedAt: new Date(),
+      });
       emitToRider(trip.riderId, "trip:started", { tripId: trip.id });
       emitToTrip(trip.id, "trip:status", { tripId: trip.id, status: "IN_PROGRESS" });
       res.json({ status: "IN_PROGRESS" });
@@ -408,7 +441,7 @@ export function tripsRouter(): Router {
       if (trip.driverId !== driver.id) throw new ApiError(403, "not_yours", "That trip is not yours.");
       expectStatus(trip.status, ["IN_PROGRESS"]);
 
-      await transition(trip.id, "COMPLETED", driver.id, { completedAt: new Date() });
+      await transition(trip.id, ["IN_PROGRESS"], "COMPLETED", driver.id, { completedAt: new Date() });
       // Cash is already in his hand, so that entry is written now. A mobile
       // fare only becomes a ledger entry when the provider confirms it landed —
       // completing the trip must not depend on Fapshi being reachable from the
@@ -449,7 +482,7 @@ export function tripsRouter(): Router {
       if (!byRider && !byDriver) throw new ApiError(403, "not_yours", "That trip is not yours.");
 
       if (byRider) {
-        await transition(trip.id, "CANCELLED_BY_RIDER", req.user!.sub, {
+        await transition(trip.id, ["REQUESTED", "OFFERED", "ACCEPTED", "ARRIVED"], "CANCELLED_BY_RIDER", req.user!.sub, {
           cancelledAt: new Date(),
           cancelReason: reason ?? null,
         });

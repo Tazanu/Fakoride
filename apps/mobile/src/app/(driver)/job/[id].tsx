@@ -59,7 +59,9 @@ function errorFor(err: unknown): Phrase {
       return S.driver.offlineMoment;
     case "wrong_pin":
       return S.job.wrongPin;
-    case "bad_state":
+    // The API's word for "somebody already moved this trip on". This read
+    // "bad_state" for a long time, so the message never once appeared.
+    case "wrong_state":
       return S.job.movedOn;
     default:
       return S.driver.didNotWorkTryAgain;
@@ -166,6 +168,8 @@ export default function Trip() {
       await load();
     } catch (err) {
       setError(errorFor(err));
+      // A second tap that lost the race: show where the trip actually is now.
+      if (err instanceof ApiError && err.code === "wrong_state") await load();
     } finally {
       setBusy(false);
     }
