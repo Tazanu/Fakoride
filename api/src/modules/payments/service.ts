@@ -21,6 +21,7 @@
 
 import { Prisma, type Payment, type PaymentStatus } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
+import { oneAtATime } from "../../lib/locks";
 import { env } from "../../env";
 import { logger } from "../../lib/logger";
 import { emitToDriver, emitToRider } from "../../realtime";
@@ -100,29 +101,6 @@ export type AccessFeeOutcome =
   | { kind: "already_paid" }
   | { kind: "no_charge" }
   | { kind: "below_floor"; amountXaf: number };
-
-/**
- * One caller at a time for one key, while `decide` runs.
- *
- * "Is a payment already in flight? If not, record one" is two steps, and two
- * requests can both pass the first before either reaches the second. That is
- * how five cash-outs sent at once became four payouts of the same balance, and
- * how the background fee job and a manual sweep could both put a USSD prompt
- * on one driver's phone for one day's fee.
- *
- * A Postgres advisory lock held for the length of a transaction makes the pair
- * atomic: the second caller waits, then sees the row the first one wrote. It
- * holds across API instances, because the lock lives in the database. The call
- * to the provider happens afterwards, outside the lock, so a slow provider
- * never keeps anybody else waiting.
- */
-async function oneAtATime<T>(key: string, decide: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
-  return prisma.$transaction(async (tx) => {
-    // FROM, not a bare SELECT: the function returns void, which Prisma cannot read.
-    await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext(${key}))`;
-    return decide(tx);
-  });
-}
 
 /**
  * Debit one day's access fee from the driver's own MoMo, and say what happened.

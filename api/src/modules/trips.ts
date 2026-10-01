@@ -30,6 +30,7 @@ import { tripSosRouter } from "./safety";
 import { tripPhotoRouter } from "./profile";
 import { emitToDriver, emitToRider, emitToTrip } from "../realtime";
 import { notify } from "../lib/push";
+import { oneAtATime } from "../lib/locks";
 import { logger } from "../lib/logger";
 
 const createSchema = z.object({
@@ -133,24 +134,37 @@ export function tripsRouter(): Router {
       const priceXaf = body.paymentMethod === "CASH" ? quote.priceXaf : quote.mobilePriceXaf;
       const near = body.pickupLabel ? null : await nearestLandmark(body.pickupLat, body.pickupLng);
 
-      const trip = await prisma.trip.create({
-        data: {
-          riderId: req.user!.sub,
-          fromZoneId: fromZone.id,
-          toZoneId: toZone.id,
-          pickupLat: body.pickupLat,
-          pickupLng: body.pickupLng,
-          pickupLabel: body.pickupLabel ?? placeLabel(near?.landmark.name, fromZone.name),
-          dropLat: body.dropLat ?? toZone.centroidLat,
-          dropLng: body.dropLng ?? toZone.centroidLng,
-          dropLabel: body.dropLabel ?? toZone.name,
-          priceXaf,
-          paymentMethod: body.paymentMethod,
-          vehicleType: body.vehicleType,
-          needsHelmet: body.needsHelmet,
-          womanDriverOnly: body.womanDriverOnly,
-          pin: generatePin(),
-        },
+      // One live ride per rider. This was never checked — the app had words for
+      // "you already have a ride running" and the API never said it — so a
+      // double-tap booked two rides and sent two drivers to one person. Under
+      // a lock per rider, so taps that arrive together cannot both pass.
+      const trip = await oneAtATime(`book:${req.user!.sub}`, async (tx) => {
+        const running = await tx.trip.findFirst({
+          where: { riderId: req.user!.sub, status: { in: ["REQUESTED", "OFFERED", "ACCEPTED", "ARRIVED", "IN_PROGRESS"] } },
+          select: { id: true },
+        });
+        if (running) {
+          throw new ApiError(409, "trip_in_progress", "You already have a ride running.", { tripId: running.id });
+        }
+        return tx.trip.create({
+          data: {
+            riderId: req.user!.sub,
+            fromZoneId: fromZone.id,
+            toZoneId: toZone.id,
+            pickupLat: body.pickupLat,
+            pickupLng: body.pickupLng,
+            pickupLabel: body.pickupLabel ?? placeLabel(near?.landmark.name, fromZone.name),
+            dropLat: body.dropLat ?? toZone.centroidLat,
+            dropLng: body.dropLng ?? toZone.centroidLng,
+            dropLabel: body.dropLabel ?? toZone.name,
+            priceXaf,
+            paymentMethod: body.paymentMethod,
+            vehicleType: body.vehicleType,
+            needsHelmet: body.needsHelmet,
+            womanDriverOnly: body.womanDriverOnly,
+            pin: generatePin(),
+          },
+        });
       });
       await prisma.tripEvent.create({ data: { tripId: trip.id, status: "REQUESTED", actor: req.user!.sub } });
 
