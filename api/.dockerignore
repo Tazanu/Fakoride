@@ -1,0 +1,10 @@
+# Never into the image: secrets, uploads, and anything built on this machine.
+.env
+.env.*
+!.env.example
+.uploads
+node_modules
+dist
+tests
+scripts
+*.log
