@@ -272,7 +272,16 @@ check("we are holding both settled mobile fares", owed === momoTrip.priceXaf + t
 const greedy = await call("POST", "/drivers/me/cashout", { token: driverToken, body: { amountXaf: owed + 5000 } });
 check("he cannot take out more than we hold", greedy.status === 400 && greedy.body.error.code === "payout_refused", JSON.stringify(greedy.body));
 
-const cashout = await call("POST", "/drivers/me/cashout", { token: driverToken });
+// Five at once: a double-tap on a slow line, a retry after a timeout. Checking
+// "is one already in flight?" and then creating one is two steps, and five
+// requests can all pass the first before any reaches the second.
+const burst = await Promise.all(Array.from({ length: 5 }, () => call("POST", "/drivers/me/cashout", { token: driverToken })));
+const accepted = burst.filter((r) => r.status === 201);
+check("five cash-outs at once send money exactly once", accepted.length === 1, JSON.stringify(burst.map((r) => r.status)));
+check("the rest are told one is already on its way", burst.filter((r) => r.status === 409).length === 4, JSON.stringify(burst.map((r) => r.status)));
+const paidOutRows = sql(`SELECT count(*) FROM "Payment" WHERE "driverId"='${applicant.id}' AND purpose='DRIVER_PAYOUT'`);
+check("and only one payout exists", paidOutRows === "1", paidOutRows);
+const cashout = accepted[0] ?? burst[0];
 check("cashing out is accepted for the whole balance", cashout.status === 201 && cashout.body.amountXaf === owed, JSON.stringify(cashout.body));
 
 const doubleSpend = await call("POST", "/drivers/me/cashout", { token: driverToken });
@@ -333,7 +342,10 @@ await call("POST", "/drivers/online", { token: brokeToken2, body: CHECKPOINT });
 sql(`UPDATE "AccessFeeCharge" SET "serviceDate" = "serviceDate" - INTERVAL '1 day' WHERE "driverId"='${brokeDriver.id}'`);
 const brokeChargeId = sql(`SELECT id FROM "AccessFeeCharge" WHERE "driverId"='${brokeDriver.id}' LIMIT 1`);
 
-const firstSweep = await call("POST", "/admin/access-fees/collect", { token: adminToken });
+// Five sweeps at once, on top of the background job that runs every second.
+// Each one asks "is a prompt already on his phone?" — and only one may answer no.
+const sweeps = await Promise.all(Array.from({ length: 5 }, () => call("POST", "/admin/access-fees/collect", { token: adminToken })));
+const firstSweep = sweeps[0];
 /*
  * `due`, not `attempted`.
  *

@@ -102,6 +102,29 @@ export type AccessFeeOutcome =
   | { kind: "below_floor"; amountXaf: number };
 
 /**
+ * One caller at a time for one key, while `decide` runs.
+ *
+ * "Is a payment already in flight? If not, record one" is two steps, and two
+ * requests can both pass the first before either reaches the second. That is
+ * how five cash-outs sent at once became four payouts of the same balance, and
+ * how the background fee job and a manual sweep could both put a USSD prompt
+ * on one driver's phone for one day's fee.
+ *
+ * A Postgres advisory lock held for the length of a transaction makes the pair
+ * atomic: the second caller waits, then sees the row the first one wrote. It
+ * holds across API instances, because the lock lives in the database. The call
+ * to the provider happens afterwards, outside the lock, so a slow provider
+ * never keeps anybody else waiting.
+ */
+async function oneAtATime<T>(key: string, decide: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+  return prisma.$transaction(async (tx) => {
+    // FROM, not a bare SELECT: the function returns void, which Prisma cannot read.
+    await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext(${key}))`;
+    return decide(tx);
+  });
+}
+
+/**
  * Debit one day's access fee from the driver's own MoMo, and say what happened.
  *
  * The charge row was raised the moment he went online; this is the separate act
@@ -117,66 +140,76 @@ export async function collectAccessFeeOutcome(
     include: { driver: { include: { user: { select: { name: true, phone: true } } } } },
   });
   if (!charge) return { kind: "no_charge" };
-  if (charge.paid) return { kind: "already_paid" };
 
-  const inFlight = await prisma.payment.findFirst({
-    where: { accessFeeChargeId, status: { notIn: ["FAILED", "EXPIRED"] } },
-  });
-  if (inFlight) return { kind: "in_flight", payment: inFlight };
+  // Everything that decides whether to ask his phone for money, under one lock
+  // per charge. Only the decision; the asking happens after the lock is gone.
+  type Decision = AccessFeeOutcome | { kind: "create"; payment: Payment };
+  const decided = await oneAtATime(`access-fee:${accessFeeChargeId}`, async (tx): Promise<Decision> => {
+    const fresh = await tx.accessFeeCharge.findUnique({ where: { id: accessFeeChargeId }, select: { paid: true } });
+    if (!fresh) return { kind: "no_charge" };
+    if (fresh.paid) return { kind: "already_paid" };
 
-  /**
-   * Back off after a refusal.
-   *
-   * Every attempt puts a USSD prompt on a real person's handset. Without this,
-   * a driver whose MoMo is empty gets one every time the sweep runs — every
-   * thirty seconds, all day, for 500 francs he does not have. That is how an
-   * app gets uninstalled.
-   *
-   * `force` is how ops overrides it from the console, which is the right
-   * escape hatch: a person has decided to try again, usually because the driver
-   * is on the phone saying he has topped up.
-   */
-  if (!opts.force) {
-    // Anything not terminal was caught by the in-flight check above, so every
-    // row here is a refusal.
-    const attempts = await prisma.payment.findMany({
-      where: { accessFeeChargeId },
-      orderBy: { createdAt: "desc" },
-      select: { createdAt: true },
+    const inFlight = await tx.payment.findFirst({
+      where: { accessFeeChargeId, status: { notIn: ["FAILED", "EXPIRED"] } },
     });
+    if (inFlight) return { kind: "in_flight", payment: inFlight };
 
-    if (attempts.length >= env.ACCESS_FEE_MAX_ATTEMPTS) {
-      // Stop asking. Somebody has to talk to him now, and the ops queue shows
-      // the failure with its reason.
-      return { kind: "exhausted", attempts: attempts.length };
+    /**
+     * Back off after a refusal.
+     *
+     * Every attempt puts a USSD prompt on a real person's handset. Without this,
+     * a driver whose MoMo is empty gets one every time the sweep runs — every
+     * thirty seconds, all day, for 500 francs he does not have. That is how an
+     * app gets uninstalled.
+     *
+     * `force` is how ops overrides it from the console, which is the right
+     * escape hatch: a person has decided to try again, usually because the driver
+     * is on the phone saying he has topped up.
+     */
+    if (!opts.force) {
+      // Anything not terminal was caught by the in-flight check above, so every
+      // row here is a refusal.
+      const attempts = await tx.payment.findMany({
+        where: { accessFeeChargeId },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      });
+
+      if (attempts.length >= env.ACCESS_FEE_MAX_ATTEMPTS) {
+        // Stop asking. Somebody has to talk to him now, and the ops queue shows
+        // the failure with its reason.
+        return { kind: "exhausted", attempts: attempts.length };
+      }
+
+      const last = attempts[0]?.createdAt;
+      const waitMs = env.ACCESS_FEE_RETRY_AFTER_MINUTES * 60_000;
+      if (last && Date.now() - last.getTime() < waitMs) {
+        return { kind: "deferred", retryAfter: new Date(last.getTime() + waitMs) };
+      }
     }
 
-    const last = attempts[0]?.createdAt;
-    const waitMs = env.ACCESS_FEE_RETRY_AFTER_MINUTES * 60_000;
-    if (last && Date.now() - last.getTime() < waitMs) {
-      return { kind: "deferred", retryAfter: new Date(last.getTime() + waitMs) };
+    if (charge.amountXaf < MIN_TRANSFER_XAF) {
+      logger.error({ accessFeeChargeId, amountXaf: charge.amountXaf }, "access fee is below the mobile money floor");
+      return { kind: "below_floor", amountXaf: charge.amountXaf };
     }
-  }
 
-  if (charge.amountXaf < MIN_TRANSFER_XAF) {
-    logger.error({ accessFeeChargeId, amountXaf: charge.amountXaf }, "access fee is below the mobile money floor");
-    return { kind: "below_floor", amountXaf: charge.amountXaf };
-  }
-
-  const payment = await prisma.payment.create({
-    data: {
-      purpose: "ACCESS_FEE",
-      amountXaf: charge.amountXaf,
-      phone: charge.driver.user.phone,
-      driverId: charge.driverId,
-      accessFeeChargeId,
-      provider: payments.name,
-    },
+    const payment = await tx.payment.create({
+      data: {
+        purpose: "ACCESS_FEE",
+        amountXaf: charge.amountXaf,
+        phone: charge.driver.user.phone,
+        driverId: charge.driverId,
+        accessFeeChargeId,
+        provider: payments.name,
+      },
+    });
+    return { kind: "create", payment };
   });
 
+  if (decided.kind !== "create") return decided;
   return {
     kind: "charged",
-    payment: await initiate(payment, "collect", {
+    payment: await initiate(decided.payment, "collect", {
       message: `Fako Ride access fee for ${serviceDateKey(charge.serviceDate)}`,
       name: charge.driver.user.name ?? undefined,
     }),
@@ -327,31 +360,35 @@ export async function requestPayout(driverId: string, amountXaf?: number): Promi
     include: { user: { select: { name: true, phone: true } } },
   });
 
-  const { payableXaf } = await driverPayable(driverId);
-  const amount = amountXaf ?? payableXaf;
+  // One at a time per driver, or concurrent requests all pass the balance
+  // check and each sends the whole balance. Under the lock the second request
+  // sees the first one's payout row and is turned away.
+  const payment = await oneAtATime(`payout:${driverId}`, async (tx) => {
+    const inFlight = await tx.payment.findFirst({
+      where: { driverId, purpose: "DRIVER_PAYOUT", status: { notIn: ["FAILED", "EXPIRED"] }, confirmedAt: null },
+    });
+    if (inFlight) throw new PaymentProviderError("A payout is already on its way.", false, 409);
 
-  if (amount <= 0) throw new PaymentProviderError("There is nothing to send yet.", false, 400);
-  if (amount > payableXaf) {
-    throw new PaymentProviderError(`We are only holding ${payableXaf} XAF for you.`, false, 400);
-  }
-  if (amount < MIN_TRANSFER_XAF) {
-    throw new PaymentProviderError(`Mobile money will not move less than ${MIN_TRANSFER_XAF} XAF.`, false, 400);
-  }
+    const { payableXaf } = await driverPayable(driverId);
+    const amount = amountXaf ?? payableXaf;
 
-  // One at a time, or two concurrent requests both pass the balance check.
-  const inFlight = await prisma.payment.findFirst({
-    where: { driverId, purpose: "DRIVER_PAYOUT", status: { notIn: ["FAILED", "EXPIRED"] }, confirmedAt: null },
-  });
-  if (inFlight) throw new PaymentProviderError("A payout is already on its way.", false, 409);
+    if (amount <= 0) throw new PaymentProviderError("There is nothing to send yet.", false, 400);
+    if (amount > payableXaf) {
+      throw new PaymentProviderError(`We are only holding ${payableXaf} XAF for you.`, false, 400);
+    }
+    if (amount < MIN_TRANSFER_XAF) {
+      throw new PaymentProviderError(`Mobile money will not move less than ${MIN_TRANSFER_XAF} XAF.`, false, 400);
+    }
 
-  const payment = await prisma.payment.create({
-    data: {
-      purpose: "DRIVER_PAYOUT",
-      amountXaf: amount,
-      phone: driver.user.phone,
-      driverId,
-      provider: payments.name,
-    },
+    return tx.payment.create({
+      data: {
+        purpose: "DRIVER_PAYOUT",
+        amountXaf: amount,
+        phone: driver.user.phone,
+        driverId,
+        provider: payments.name,
+      },
+    });
   });
 
   const sent = await initiate(payment, "payout", {
