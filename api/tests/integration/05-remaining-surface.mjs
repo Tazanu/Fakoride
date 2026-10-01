@@ -15,7 +15,11 @@ const CHECKPOINT = { lat: 4.1531, lng: 9.2764 };
 /** Between Checkpoint and Molyko, so resolution has to actually choose. */
 const SOMEWHERE = { lat: 4.1543, lng: 9.2752 };
 
-const nonce = String(Date.now()).slice(-5);
+// Ending in 7, always. The fake payment provider fails a number ending 00 and
+// leaves one ending 11 pending forever; when this came straight off the clock,
+// about two runs in a hundred drew one and a dozen money checks failed for no
+// reason in the code.
+const nonce = `${String(Date.now()).slice(-4)}7`;
 const DRIVER_PHONE = `+2376733${nonce}`;
 const DRIVER_PLATE = `SW ${nonce} R`;
 const REJECT_PHONE = `+2376744${nonce}`;
@@ -59,10 +63,27 @@ function otpFromLog(phone) {
   if (!m.length) throw new Error(`no OTP for ${phone}`);
   return m[m.length - 1][2];
 }
+/** How many codes the server has logged for this number so far. */
+const codesLogged = (phone) =>
+  [...readFileSync(LOG, "utf8").matchAll(/"to":"(\+237\d+)","message":"(\d{6})/g)].filter((m) => m[1] === phone).length;
+
+/**
+ * Ask for a code and wait until the server has logged it.
+ *
+ * This used to sleep 250 ms and hope. The log line lands a moment after the
+ * response, and on a slow machine the moment is longer than that — the suite
+ * then threw "no OTP" and died without a summary line.
+ */
+async function requestCode(phone) {
+  const seen = codesLogged(phone);
+  await call("POST", "/auth/otp/request", { body: { phone } });
+  const until = Date.now() + 5000;
+  while (codesLogged(phone) <= seen && Date.now() < until) await new Promise((r) => setTimeout(r, 50));
+}
+
 
 async function signIn(phone, role, name) {
-  await call("POST", "/auth/otp/request", { body: { phone } });
-  await new Promise((r) => setTimeout(r, 250));
+  await requestCode(phone);
   const v = await call("POST", "/auth/otp/verify", { body: { phone, code: otpFromLog(phone), role, name } });
   if (v.status !== 200) throw new Error(JSON.stringify(v.body));
   return v.body.token;
@@ -367,8 +388,7 @@ console.log("\n=== guessing a login code ===");
  * once cannot slip the right one in before the first miss burns it.
  */
 const GUESSED = `+2376790${String(nonce).slice(0, 4)}7`;
-await call("POST", "/auth/otp/request", { body: { phone: GUESSED } });
-await new Promise((r) => setTimeout(r, 250));
+await requestCode(GUESSED);
 const realCode = otpFromLog(GUESSED);
 const wrongOnes = Array.from({ length: 5 }, (_, i) => String((Number(realCode) + i + 1) % 1_000_000).padStart(6, "0"));
 
@@ -381,8 +401,7 @@ const tooLate = await call("POST", "/auth/otp/verify", { body: { phone: GUESSED,
 check("after that even the right code is refused", tooLate.status === 400 && !tooLate.body.token, JSON.stringify(tooLate.body));
 
 // A burst: forty at once, the right code among them near the end.
-await call("POST", "/auth/otp/request", { body: { phone: GUESSED } });
-await new Promise((r) => setTimeout(r, 250));
+await requestCode(GUESSED);
 const burstCode = otpFromLog(GUESSED);
 const burst = Array.from({ length: 40 }, (_, i) =>
   i === 35 ? burstCode : String((Number(burstCode) + i + 1) % 1_000_000).padStart(6, "0"),
@@ -392,8 +411,7 @@ const looked = burstAnswers.filter((a) => a.body.token || a.body.error?.code ===
 check("of forty guesses sent at once, at most five are ever compared", looked <= 5, `${looked} compared`);
 
 // And a person who mistypes once still gets in.
-await call("POST", "/auth/otp/request", { body: { phone: GUESSED } });
-await new Promise((r) => setTimeout(r, 250));
+await requestCode(GUESSED);
 const honest = otpFromLog(GUESSED);
 await call("POST", "/auth/otp/verify", { body: { phone: GUESSED, code: String((Number(honest) + 1) % 1_000_000).padStart(6, "0") } });
 const second = await call("POST", "/auth/otp/verify", { body: { phone: GUESSED, code: honest } });

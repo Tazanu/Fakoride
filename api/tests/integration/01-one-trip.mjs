@@ -51,11 +51,32 @@ function otpFromLog(phone) {
   if (mine.length === 0) throw new Error(`no OTP in log for ${phone}`);
   return mine[mine.length - 1][2];
 }
+/** How many codes the server has logged for this number so far. */
+const codesLogged = (phone) =>
+  [...readFileSync(LOG, "utf8").matchAll(/"to":"(\+237\d+)","message":"(\d{6})/g)].filter((m) => m[1] === phone).length;
+
+/**
+ * Ask for a code and wait until the server has logged it.
+ *
+ * This used to sleep 250 ms and hope. The log line lands a moment after the
+ * response, and on a slow machine the moment is longer than that — the suite
+ * then threw "no OTP" and died without a summary line.
+ */
+async function requestCode(phone) {
+  const seen = codesLogged(phone);
+  await call("POST", "/auth/otp/request", { body: { phone } });
+  const until = Date.now() + 5000;
+  while (codesLogged(phone) <= seen && Date.now() < until) await new Promise((r) => setTimeout(r, 50));
+}
+
 
 async function signIn(phone, role, name) {
+  const seen = codesLogged(phone);
   const requested = await call("POST", "/auth/otp/request", { body: { phone } });
   if (requested.status !== 200) throw new Error(`otp request failed: ${JSON.stringify(requested.body)}`);
-  await new Promise((r) => setTimeout(r, 250)); // let pino flush
+  // Until pino has flushed the line, not a fixed guess at how long that takes.
+  const until = Date.now() + 5000;
+  while (codesLogged(phone) <= seen && Date.now() < until) await new Promise((r) => setTimeout(r, 50));
   const code = otpFromLog(phone);
   const verified = await call("POST", "/auth/otp/verify", { body: { phone, code, role, name } });
   if (verified.status !== 200) throw new Error(`otp verify failed: ${JSON.stringify(verified.body)}`);

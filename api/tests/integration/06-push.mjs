@@ -20,7 +20,11 @@ const BOKWAONGO = { lat: 4.17, lng: 9.236 };
 /** Eight kilometres from anybody: the dispatcher will find nobody here. */
 const MUTENGENE = { lat: 4.0925, lng: 9.3153 };
 
-const nonce = String(Date.now()).slice(-5);
+// Ending in 7, always. The fake payment provider fails a number ending 00 and
+// leaves one ending 11 pending forever; when this came straight off the clock,
+// about two runs in a hundred drew one and a dozen money checks failed for no
+// reason in the code.
+const nonce = `${String(Date.now()).slice(-4)}7`;
 const DRIVER_PHONE = `+2376788${nonce}`;
 const DRIVER_PLATE = `SW ${nonce} P`;
 const RIDER_PHONE = `+2376799${nonce}`;
@@ -66,10 +70,27 @@ function otpFromLog(phone) {
   if (!m.length) throw new Error(`no OTP for ${phone}`);
   return m[m.length - 1][2];
 }
+/** How many codes the server has logged for this number so far. */
+const codesLogged = (phone) =>
+  [...readFileSync(LOG, "utf8").matchAll(/"to":"(\+237\d+)","message":"(\d{6})/g)].filter((m) => m[1] === phone).length;
+
+/**
+ * Ask for a code and wait until the server has logged it.
+ *
+ * This used to sleep 250 ms and hope. The log line lands a moment after the
+ * response, and on a slow machine the moment is longer than that — the suite
+ * then threw "no OTP" and died without a summary line.
+ */
+async function requestCode(phone) {
+  const seen = codesLogged(phone);
+  await call("POST", "/auth/otp/request", { body: { phone } });
+  const until = Date.now() + 5000;
+  while (codesLogged(phone) <= seen && Date.now() < until) await new Promise((r) => setTimeout(r, 50));
+}
+
 
 async function signIn(phone, role, name) {
-  await call("POST", "/auth/otp/request", { body: { phone } });
-  await new Promise((r) => setTimeout(r, 250));
+  await requestCode(phone);
   const v = await call("POST", "/auth/otp/verify", { body: { phone, code: otpFromLog(phone), role, name } });
   if (v.status !== 200) throw new Error(JSON.stringify(v.body));
   return v.body.token;
@@ -217,6 +238,29 @@ check("the others are told it has already moved on", finishes.filter((r) => r.st
 check("the ride is counted once", Number(sql(`SELECT "tripCount" FROM "Driver" WHERE id='${driver.id}'`)) === tripsBefore + 1);
 check("its history says COMPLETED once", sql(`SELECT count(*) FROM "TripEvent" WHERE "tripId"='${twice.body.id}' AND status='COMPLETED'`) === "1");
 check("and she is asked to pay once", sql(`SELECT count(*) FROM "Payment" WHERE "tripId"='${twice.body.id}' AND purpose='TRIP_FARE'`) === "1");
+
+console.log("\n=== booking twice ===");
+// "Find me a taxi", tapped five times on a slow line. Booking never checked for
+// a ride already running, so each tap was a ride, and a driver sent for each.
+const bookings = await Promise.all(Array.from({ length: 5 }, () => call("POST", "/trips", {
+  token: riderToken,
+  body: { pickupLat: BOKWAONGO.lat, pickupLng: BOKWAONGO.lng, toZone: "MOLYKO", paymentMethod: "CASH" },
+})));
+const booked = bookings.filter((r) => r.status === 201);
+check("five taps on Find me a taxi book one ride", booked.length === 1, JSON.stringify(bookings.map((r) => r.status)));
+check("the rest are told she already has one running", bookings.filter((r) => r.status === 409 && r.body.error?.code === "trip_in_progress").length === 4, JSON.stringify(bookings.map((r) => r.body.error?.code ?? r.status)));
+const again = await call("POST", "/trips", {
+  token: riderToken,
+  body: { pickupLat: BOKWAONGO.lat, pickupLng: BOKWAONGO.lng, toZone: "MOLYKO", paymentMethod: "CASH" },
+});
+check("and so is a second booking made later, while the first is live", again.status === 409 && again.body.error?.code === "trip_in_progress", JSON.stringify(again.body));
+await call("POST", `/trips/${booked[0]?.body.id}/cancel`, { token: riderToken, body: { reason: "test over" } });
+const afterCancel = await call("POST", "/trips", {
+  token: riderToken,
+  body: { pickupLat: BOKWAONGO.lat, pickupLng: BOKWAONGO.lng, toZone: "MOLYKO", paymentMethod: "CASH" },
+});
+check("once it is over she can book again", afterCancel.status === 201, JSON.stringify(afterCancel.status));
+await call("POST", `/trips/${afterCancel.body.id}/cancel`, { token: riderToken, body: { reason: "test over" } });
 
 await call("POST", "/drivers/offline", { token: driverToken });
 

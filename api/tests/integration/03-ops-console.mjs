@@ -14,7 +14,11 @@ const CHECKPOINT = { lat: 4.1531, lng: 9.2764 };
 
 // A fresh applicant every run: the queue only holds drivers nobody has decided
 // about yet, so re-running with the same person would find an empty queue.
-const nonce = String(Date.now()).slice(-6);
+// Ending in 7, always. The fake payment provider fails a number ending 00 and
+// leaves one ending 11 pending forever; when this came straight off the clock,
+// about two runs in a hundred drew one and a dozen money checks failed for no
+// reason in the code.
+const nonce = `${String(Date.now()).slice(-5)}7`;
 const APPLICANT_PHONE = `+2376700${nonce.slice(-5)}`;
 const APPLICANT_PLATE = `SW ${nonce.slice(0, 4)} X`;
 const APPLICANT_CNI = `555${nonce}`;
@@ -56,10 +60,27 @@ function otpFromLog(phone) {
   if (!m.length) throw new Error(`no OTP for ${phone}`);
   return m[m.length - 1][2];
 }
+/** How many codes the server has logged for this number so far. */
+const codesLogged = (phone) =>
+  [...readFileSync(LOG, "utf8").matchAll(/"to":"(\+237\d+)","message":"(\d{6})/g)].filter((m) => m[1] === phone).length;
+
+/**
+ * Ask for a code and wait until the server has logged it.
+ *
+ * This used to sleep 250 ms and hope. The log line lands a moment after the
+ * response, and on a slow machine the moment is longer than that — the suite
+ * then threw "no OTP" and died without a summary line.
+ */
+async function requestCode(phone) {
+  const seen = codesLogged(phone);
+  await call("POST", "/auth/otp/request", { body: { phone } });
+  const until = Date.now() + 5000;
+  while (codesLogged(phone) <= seen && Date.now() < until) await new Promise((r) => setTimeout(r, 50));
+}
+
 
 async function signIn(phone, role, name) {
-  await call("POST", "/auth/otp/request", { body: { phone } });
-  await new Promise((r) => setTimeout(r, 250));
+  await requestCode(phone);
   const v = await call("POST", "/auth/otp/verify", { body: { phone, code: otpFromLog(phone), role, name } });
   if (v.status !== 200) throw new Error(JSON.stringify(v.body));
   return v.body.token;
@@ -193,6 +214,9 @@ const backOn = await call("POST", "/trips", {
   body: { pickupLat: CHECKPOINT.lat, pickupLng: CHECKPOINT.lng, toZone: "UB" },
 });
 check("and she is offered trips again", backOn.body.status === "OFFERED", JSON.stringify(backOn.body.status));
+// Done with. A rider has one live ride at a time, so it has to end before
+// the live-board section below books her another.
+await call("POST", `/trips/${backOn.body.id}/cancel`, { token: riderToken, body: { reason: "test over" } });
 
 const trail = await call("GET", `/admin/drivers/${grace.id}`, { token: adminToken });
 check("every decision is kept, newest first", trail.body.history?.map((h) => h.action).join(",") === "REINSTATED,SUSPENDED,VERIFIED", JSON.stringify(trail.body.history?.map((h) => h.action)));
