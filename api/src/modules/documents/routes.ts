@@ -22,6 +22,7 @@ import { prisma } from "../../lib/prisma";
 import { ApiError, asyncHandler, param } from "../../lib/http";
 import { logger } from "../../lib/logger";
 import { requireAuth } from "../../middleware/auth";
+import { rateLimit, RULES } from "../../middleware/rateLimit";
 import { assertAcceptable, documents, fingerprint } from "./store";
 
 /** Every kind a driver must supply before anybody is dispatched to him. */
@@ -88,6 +89,9 @@ export function driverDocumentsRouter(): Router {
   router.put(
     "/:kind",
     requireAuth("DRIVER"),
+    // Before the body is read: an over-limit upload is refused without the
+    // server taking in six megabytes first.
+    rateLimit(RULES.uploads),
     raw({ type: ["image/jpeg", "image/png", "image/webp"], limit: env.DOCUMENT_MAX_BYTES }),
     asyncHandler(async (req, res) => {
       const kind = readKind(param(req, "kind"));

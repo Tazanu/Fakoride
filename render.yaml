@@ -26,6 +26,11 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # Render puts one proxy in front. Trusting it is what lets the rate limits
+      # see the real caller; without it every request seems to come from Render,
+      # and the first flood would lock out the whole country.
+      - key: TRUST_PROXY
+        value: "1"
 
       # Neon's *direct* connection string, not the "-pooler" one: Prisma's
       # migrations take a lock the pooler cannot hold. Keep ?sslmode=require.

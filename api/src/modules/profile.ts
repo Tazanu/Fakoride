@@ -30,6 +30,7 @@ import { prisma } from "../lib/prisma";
 import { ApiError, asyncHandler, param } from "../lib/http";
 import { logger } from "../lib/logger";
 import { requireAuth } from "../middleware/auth";
+import { rateLimit, RULES } from "../middleware/rateLimit";
 import { EXPO_TOKEN } from "../lib/push";
 import { assertAcceptable, documents, fingerprint } from "./documents/store";
 
@@ -78,13 +79,6 @@ export function profileRouter(): Router {
   );
 
   /**
-   * Send your photograph.
-   *
-   * Raw body, not multipart, and the bytes are sniffed rather than trusted —
-   * the same handling as a driver's ID, because the difference between the two
-   * is what they are for, not how much care they deserve.
-   */
-  /**
    * The phone to wake when the app is not open.
    *
    * One phone per account, and one account per phone. Registering a token that
@@ -129,9 +123,17 @@ export function profileRouter(): Router {
     }),
   );
 
+  /**
+   * Send your photograph.
+   *
+   * Raw body, not multipart, and the bytes are sniffed rather than trusted —
+   * the same handling as a driver's ID, because the difference between the two
+   * is what they are for, not how much care they deserve.
+   */
   router.put(
     "/photo",
     requireAuth(),
+    rateLimit(RULES.uploads),
     raw({ type: ["image/jpeg", "image/png", "image/webp"], limit: PHOTO_MAX_BYTES }),
     asyncHandler(async (req, res) => {
       const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);

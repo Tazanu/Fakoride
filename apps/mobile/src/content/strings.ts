@@ -76,6 +76,10 @@ export const S = {
       "Trop de codes demandés. Réessayez dans une heure.",
     ),
     wrongCode: p("That code is not right.", "Ce code n'est pas correct."),
+    rateLimited: p(
+      "Too many tries from this connection. Wait a few minutes and try again.",
+      "Trop d'essais depuis cette connexion. Attendez quelques minutes et réessayez.",
+    ),
     tooManyAttempts: p(
       "Too many wrong codes. Ask for a new one.",
       "Trop de codes erronés. Demandez-en un nouveau.",
@@ -263,6 +267,10 @@ export const S = {
       "Nous n'avons pas encore de tarif pour ce trajet.",
     ),
     alreadyRiding: p("You already have a ride running.", "Vous avez déjà une course en cours."),
+    rateLimited: p(
+      "That is a lot of bookings in a short time. Wait a few minutes.",
+      "Cela fait beaucoup de réservations en peu de temps. Attendez quelques minutes.",
+    ),
     didNotWork: p("That did not work. Try again.", "Cela n'a pas fonctionné. Réessayez."),
     needCamera: p(
       "We need the camera to take your photo.",

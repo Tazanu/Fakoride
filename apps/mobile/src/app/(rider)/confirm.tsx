@@ -58,6 +58,8 @@ function errorFor(err: unknown): Phrase {
       return S.confirm.noFare;
     case "trip_in_progress":
       return S.confirm.alreadyRiding;
+    case "rate_limited":
+      return S.confirm.rateLimited;
     default:
       return S.confirm.didNotWork;
   }

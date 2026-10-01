@@ -18,6 +18,7 @@ import { prisma } from "../lib/prisma";
 import { env } from "../env";
 import { ApiError, asyncHandler, param } from "../lib/http";
 import { requireAuth } from "../middleware/auth";
+import { rateLimit, RULES } from "../middleware/rateLimit";
 import { redis, offerKey, driverActiveTripKey } from "../lib/redis";
 import { resolveZoneForPoint, nearestLandmark, placeLabel } from "./geo";
 import { quoteZonePair } from "./fares";
@@ -84,6 +85,7 @@ export function tripsRouter(): Router {
   router.post(
     "/",
     requireAuth("RIDER", "ADMIN"),
+    rateLimit(RULES.bookings),
     asyncHandler(async (req, res) => {
       const body = createSchema.parse(req.body);
 

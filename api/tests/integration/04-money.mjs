@@ -46,6 +46,8 @@ async function call(method, path, { token, body, headers } = {}) {
     headers: {
       ...(body ? { "content-type": "application/json" } : {}),
       ...(token ? { authorization: `Bearer ${token}` } : {}),
+      // Each suite arrives from its own address, as separate people would.
+      ...(process.env.SUITE_IP ? { "x-forwarded-for": process.env.SUITE_IP } : {}),
       ...(headers ?? {}),
     },
     ...(body ? { body: JSON.stringify(body) } : {}),

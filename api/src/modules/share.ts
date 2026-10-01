@@ -24,6 +24,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { ApiError, asyncHandler, param } from "../lib/http";
 import { requireAuth } from "../middleware/auth";
+import { rateLimit, RULES } from "../middleware/rateLimit";
 import { driverPosition } from "../lib/presence";
 
 /** Hard ceiling on a link's life, however long the trip runs. */
@@ -66,6 +67,7 @@ export function tripShareRouter(): Router {
   router.post(
     "/",
     requireAuth("RIDER", "ADMIN"),
+    rateLimit(RULES.shareLinks),
     asyncHandler(async (req, res) => {
       const body = createSchema.parse(req.body ?? {});
       const tripId = param(req, "id");

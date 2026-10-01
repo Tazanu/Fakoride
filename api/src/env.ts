@@ -65,6 +65,16 @@ const schema = z.object({
   /** A phone photo is 2-4 MB. Six leaves room without inviting an upload bomb. */
   DOCUMENT_MAX_BYTES: z.coerce.number().int().default(6 * 1024 * 1024),
 
+  /**
+   * How many proxies sit in front of the API. Render puts one there, and
+   * without trusting it every request seems to come from Render itself — one
+   * address for the whole country, so the first flood would lock everybody out.
+   * Zero locally, where nothing is in front and the header could be forged.
+   */
+  TRUST_PROXY: z.coerce.number().int().min(0).default(0),
+  /** Scales every rate limit at once — 3 for a launch day on campus Wi-Fi. */
+  RATE_LIMIT_MULTIPLIER: z.coerce.number().positive().default(1),
+
   /** Expo's push endpoint. Overridden only by the test suite, which runs a stand-in. */
   EXPO_PUSH_URL: z.string().url().default("https://exp.host/--/api/v2/push/send"),
   /** Only if "enhanced push security" is switched on for the Expo project. */

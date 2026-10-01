@@ -16,6 +16,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { ApiError, asyncHandler, param } from "../lib/http";
 import { requireAuth } from "../middleware/auth";
+import { rateLimit, RULES } from "../middleware/rateLimit";
 import { emitToOps } from "../realtime";
 import { logger } from "../lib/logger";
 
@@ -107,6 +108,7 @@ export function complaintsRouter(): Router {
   router.post(
     "/",
     requireAuth(),
+    rateLimit(RULES.complaints),
     asyncHandler(async (req, res) => {
       const body = complaintSchema.parse(req.body);
 

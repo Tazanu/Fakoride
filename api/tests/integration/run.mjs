@@ -262,6 +262,9 @@ const server = spawn(process.execPath, [TSX, "src/server.ts"], {
     // path being exercised is identical either way.
     PAYMENT_RECONCILE_AFTER_SECONDS: "1",
     PAYMENT_JOB_INTERVAL_SECONDS: "1",
+    // As on Render: one proxy in front, so X-Forwarded-For names the caller.
+    // The suites use it to arrive from addresses of their own.
+    TRUST_PROXY: "1",
     // Never Expo itself: a test run must not wake a real phone.
     EXPO_PUSH_URL: `${PUSH_STANDIN}/--/api/v2/push/send`,
   },
@@ -296,11 +299,11 @@ if (!(await waitForHealth(HEALTH_TIMEOUT_MS))) {
 console.log(`  up at ${API}\n`);
 
 let failed = 0;
-for (const suite of SUITES) {
+for (const [index, suite] of SUITES.entries()) {
   console.log(`\n${"=".repeat(60)}\n${suite}\n${"=".repeat(60)}`);
   const result = spawn(process.execPath, [join(import.meta.dirname, suite), logPath], {
     stdio: "inherit",
-    env: { ...process.env, FAPSHI_WEBHOOK_SECRET: WEBHOOK_SECRET, PUSH_STANDIN },
+    env: { ...process.env, FAPSHI_WEBHOOK_SECRET: WEBHOOK_SECRET, PUSH_STANDIN, SUITE_IP: `10.0.0.${index + 1}` },
   });
   const code = await new Promise((resolve) => result.on("exit", resolve));
   if (code !== 0) failed += 1;

@@ -63,6 +63,8 @@ function errorFor(err: unknown): Phrase {
       return S.signIn.wrongCode;
     case "too_many_attempts":
       return S.signIn.tooManyAttempts;
+    case "rate_limited":
+      return S.signIn.rateLimited;
     case "code_expired":
       return S.signIn.codeExpired;
     case "sms_unavailable":

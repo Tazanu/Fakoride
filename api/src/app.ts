@@ -4,6 +4,7 @@ import helmet from "helmet";
 import pinoHttp from "pino-http";
 import { env } from "./env";
 import { logger } from "./lib/logger";
+import { rateLimit, RULES } from "./middleware/rateLimit";
 import { errorHandler, notFoundHandler } from "./lib/http";
 import { authRouter } from "./modules/auth";
 import { geoRouter } from "./modules/geo";
@@ -19,15 +20,22 @@ import { driverPaymentsRouter, paymentsWebhookRouter } from "./modules/payments/
 
 export function createApp(): express.Express {
   const app = express();
+  app.set("trust proxy", env.TRUST_PROXY);
 
   app.use(helmet());
   app.use(cors({ origin: true }));
   app.use(express.json({ limit: "256kb" }));
   app.use(pinoHttp({ logger }));
 
+  // Before the limiter, both. Render asks for /health every few seconds, and
+  // the webhook is the payment provider — authenticated by its secret and
+  // checked against the provider itself, so a burst of them is not a flood.
   app.get("/health", (_req, res) => {
     res.json({ ok: true, service: "fako-ride-api", env: env.NODE_ENV });
   });
+  app.use("/payments", paymentsWebhookRouter());
+
+  app.use(rateLimit(RULES.everything));
 
   app.use("/auth", authRouter());
   app.use("/geo", geoRouter());
@@ -42,8 +50,6 @@ export function createApp(): express.Express {
   app.use("/complaints", complaintsRouter());
   // Unauthenticated: the person watching a trip opens a link, nothing more.
   app.use("/share", publicShareRouter());
-  // The provider calls this. Authenticated by a shared secret, not a token.
-  app.use("/payments", paymentsWebhookRouter());
 
   app.use(notFoundHandler);
   app.use(errorHandler);

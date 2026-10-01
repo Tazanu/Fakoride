@@ -40,6 +40,8 @@ async function call(method, path, { token, body } = {}) {
     headers: {
       ...(body ? { "content-type": "application/json" } : {}),
       ...(token ? { authorization: `Bearer ${token}` } : {}),
+      // Each suite arrives from its own address, as separate people would.
+      ...(process.env.SUITE_IP ? { "x-forwarded-for": process.env.SUITE_IP } : {}),
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
@@ -468,6 +470,74 @@ await call("POST", "/auth/sign-out", { token: oldPhone, body: { pushToken: `Expo
 check("does not silence the phone that replaced it", sql(`SELECT "pushToken" FROM "User" WHERE phone='${SESSION_PHONE}'`) === `ExponentPushToken[new-${nonce}]`);
 await call("POST", "/auth/sign-out", { token: newPhone, body: { pushToken: `ExponentPushToken[new-${nonce}]` } });
 check("while signing out on the registered phone forgets it", sql(`SELECT coalesce("pushToken", 'none') FROM "User" WHERE phone='${SESSION_PHONE}'`) === "none");
+
+console.log("\n=== how often anybody may ask ===");
+/*
+ * Each check arrives from an address of its own, so it measures one limit and
+ * nothing else. The numbers are the production defaults.
+ */
+const hit = async (path, ip, { method = "GET", token, body } = {}) => {
+  const res = await fetch(`${API}${path}`, {
+    method,
+    headers: {
+      "x-forwarded-for": ip,
+      ...(body ? { "content-type": "application/json" } : {}),
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  await res.arrayBuffer();
+  return res;
+};
+/** Sends n requests, a few at a time, and returns their statuses in order. */
+async function many(n, send) {
+  const statuses = [];
+  for (let i = 0; i < n; i += 25) {
+    const batch = await Promise.all(Array.from({ length: Math.min(25, n - i) }, (_, j) => send(i + j)));
+    statuses.push(...batch.map((r) => r.status));
+  }
+  return statuses;
+}
+const runIp = (n) => `10.9.${Number(nonce) % 250}.${n}`;
+/**
+ * The windows are fixed — every minute, every hour, on the clock. A burst that
+ * straddles a boundary would see its count reset halfway and pass or fail on
+ * luck, so each one waits for a clear stretch first.
+ */
+async function clearOfBoundary(windowSeconds, needSeconds = 15) {
+  const ms = windowSeconds * 1000;
+  const left = ms - (Date.now() % ms);
+  if (left < needSeconds * 1000) await new Promise((r) => setTimeout(r, left + 250));
+}
+
+// Everything, from one address: 300 a minute.
+await clearOfBoundary(60);
+const flood = await many(301, () => hit("/geo/zones", runIp(1)));
+check("one address gets 300 requests a minute", flood.slice(0, 300).every((s) => s === 200), JSON.stringify(flood.slice(0, 300).filter((s) => s !== 200).slice(0, 3)));
+check("and the 301st is told to wait", flood[300] === 429, String(flood[300]));
+const waited = await hit("/geo/zones", runIp(1));
+check("with how long to wait", Number(waited.headers.get("retry-after")) > 0 && Number(waited.headers.get("retry-after")) <= 60, waited.headers.get("retry-after"));
+check("while a different address is not affected", (await hit("/geo/zones", runIp(2))).status === 200);
+
+// Render's health check is never limited.
+const health = await many(320, () => hit("/health", runIp(3)));
+check("the health check is never limited", health.every((s) => s === 200), JSON.stringify([...new Set(health)]));
+
+// Sign-in codes cost an SMS each: 60 an hour from one address, whatever the numbers.
+await clearOfBoundary(3600);
+const codes = await many(61, (i) => hit("/auth/otp/request", runIp(4), { method: "POST", body: { phone: `6990${String(nonce).slice(0, 2)}${String(i).padStart(3, "0")}` } }));
+// Counted, not positional: the last batch goes out together and any one of it
+// may be the request that arrives sixty-first.
+check("one address can ask for 60 codes an hour, to different numbers", codes.filter((s) => s === 200).length === 60, JSON.stringify(codes.filter((s) => s !== 200)));
+check("but not 61 — each one is an SMS we pay for", codes.filter((s) => s === 429).length === 1, JSON.stringify(codes.filter((s) => s !== 200)));
+
+// Signed in, the count follows the account, not the address.
+const counted = await signIn(`+2376833${String(nonce).slice(0, 4)}9`, "RIDER", "Counted Rider");
+await clearOfBoundary(60);
+const fromA = await many(300, () => hit("/auth/me", runIp(5), { token: counted }));
+check("an account is allowed its 300 a minute", fromA.every((s) => s === 200), JSON.stringify([...new Set(fromA)]));
+const fromB = await hit("/auth/me", runIp(6), { token: counted });
+check("and changing network does not reset it — the account is what is counted", fromB.status === 429, String(fromB.status));
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail === 0 ? 0 : 1);

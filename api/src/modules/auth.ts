@@ -19,6 +19,7 @@ import { ApiError, asyncHandler } from "../lib/http";
 import { normalisePhone as parsePhone } from "../lib/phone";
 import { requireAuth, revokeAllSessions, revokeSession, signToken } from "../middleware/auth";
 import { endAllSessions, endSession } from "../realtime";
+import { rateLimit, RULES } from "../middleware/rateLimit";
 import { logger } from "../lib/logger";
 import { smsSender } from "../lib/sms";
 
@@ -90,6 +91,7 @@ export function authRouter(): Router {
 
   router.post(
     "/otp/request",
+    rateLimit(RULES.codeRequests),
     asyncHandler(async (req, res) => {
       const phone = normalisePhone(requestSchema.parse(req.body).phone);
 
@@ -120,6 +122,7 @@ export function authRouter(): Router {
 
   router.post(
     "/otp/verify",
+    rateLimit(RULES.codeGuesses),
     asyncHandler(async (req, res) => {
       const body = verifySchema.parse(req.body);
       const phone = normalisePhone(body.phone);
