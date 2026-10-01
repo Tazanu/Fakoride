@@ -8,6 +8,7 @@
 
 import type { Server as HttpServer } from "node:http";
 import { Server as SocketServer, type Socket } from "socket.io";
+import { env } from "./env";
 import { prisma } from "./lib/prisma";
 import { assertLive, verifyToken } from "./middleware/auth";
 import { setDriverPosition } from "./lib/presence";
@@ -28,7 +29,9 @@ const state = new WeakMap<Socket, SocketState>();
 
 export function initRealtime(server: HttpServer): SocketServer {
   io = new SocketServer(server, {
-    cors: { origin: true },
+    // The same rule as the HTTP side. The app speaks websocket, which a
+    // browser does not hold to CORS — but every socket still needs a token.
+    cors: { origin: env.CORS_ORIGINS.length > 0 ? env.CORS_ORIGINS : false },
     // Cheap keepalives: the driver's data bundle is money out of his pocket.
     pingInterval: 25_000,
     pingTimeout: 20_000,

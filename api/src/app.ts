@@ -23,7 +23,9 @@ export function createApp(): express.Express {
   app.set("trust proxy", env.TRUST_PROXY);
 
   app.use(helmet());
-  app.use(cors({ origin: true }));
+  // Every origin used to be welcome. Nothing calls this API from another
+  // website, so by default no other website may — see CORS_ORIGINS.
+  app.use(cors({ origin: env.CORS_ORIGINS.length > 0 ? env.CORS_ORIGINS : false }));
   app.use(express.json({ limit: "256kb" }));
   app.use(pinoHttp({ logger }));
 

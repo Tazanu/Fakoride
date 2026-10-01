@@ -72,6 +72,16 @@ const schema = z.object({
    * Zero locally, where nothing is in front and the header could be forged.
    */
   TRUST_PROXY: z.coerce.number().int().min(0).default(0),
+  /**
+   * Websites allowed to call the API from a browser, comma-separated. Empty by
+   * default, because nothing needs to: the app is not a browser, the ops
+   * console reaches the API through a same-origin proxy, and a share link is
+   * opened directly rather than fetched from another site.
+   */
+  CORS_ORIGINS: z
+    .string()
+    .default("")
+    .transform((v) => v.split(",").map((o) => o.trim()).filter(Boolean)),
   /** Scales every rate limit at once — 3 for a launch day on campus Wi-Fi. */
   RATE_LIMIT_MULTIPLIER: z.coerce.number().positive().default(1),
 

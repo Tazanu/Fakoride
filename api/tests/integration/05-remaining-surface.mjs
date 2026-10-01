@@ -539,5 +539,17 @@ check("an account is allowed its 300 a minute", fromA.every((s) => s === 200), J
 const fromB = await hit("/auth/me", runIp(6), { token: counted });
 check("and changing network does not reset it — the account is what is counted", fromB.status === 429, String(fromB.status));
 
+console.log("\n=== other websites ===");
+// Every origin used to be welcome. A page on another site, running in the
+// browser of somebody signed in to the ops console, must not be able to read
+// the API's answers.
+const fromElsewhere = await fetch(`${API}/geo/zones`, { headers: { origin: "https://evil.example" } });
+check("a page on another website is not given the answer", fromElsewhere.headers.get("access-control-allow-origin") === null, fromElsewhere.headers.get("access-control-allow-origin"));
+const preflight = await fetch(`${API}/auth/me`, {
+  method: "OPTIONS",
+  headers: { origin: "https://evil.example", "access-control-request-method": "GET", "access-control-request-headers": "authorization" },
+});
+check("nor allowed to send a token", preflight.headers.get("access-control-allow-origin") === null && preflight.headers.get("access-control-allow-headers") === null, JSON.stringify([preflight.headers.get("access-control-allow-origin"), preflight.headers.get("access-control-allow-headers")]));
+
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail === 0 ? 0 : 1);
