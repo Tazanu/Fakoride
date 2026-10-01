@@ -192,10 +192,23 @@ check("it shows the live position", watched.body.position !== null, JSON.stringi
 const mine = await call("GET", `/trips/${tripId}/share`, { token: riderToken });
 check("the rider is told who is watching, and that it was opened", mine.body.shares?.[0]?.sharedWith === "Mum" && mine.body.shares?.[0]?.viewCount === 1, JSON.stringify(mine.body));
 
+// What Mum actually sees: she taps the link in a browser, which asks for HTML.
+const BROWSER = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";
+const page = await fetch(`${API}/share/${share.body.token}`, { headers: { accept: BROWSER } });
+const pageHtml = await page.text();
+check("a browser gets a page, not JSON", page.status === 200 && page.headers.get("content-type")?.startsWith("text/html"), page.headers.get("content-type"));
+check("saying where the ride is going, and with whom", pageHtml.includes("SW 4192 B") && pageHtml.includes("Ernest"));
+check("and still never the PIN or a phone number", !pageHtml.includes(pin) && !pageHtml.includes("+237"));
+check("refreshing itself while the ride is live", pageHtml.includes('http-equiv="refresh"'));
+check("and kept out of every cache", page.headers.get("cache-control") === "no-store", page.headers.get("cache-control"));
+
 const revoked = await call("DELETE", `/trips/${tripId}/share/${share.body.token}`, { token: riderToken });
 check("the rider can take the link back", revoked.body.revoked === true);
 const dead = await call("GET", `/share/${share.body.token}`);
 check("a revoked link stops working", dead.status === 404 && dead.body.error.code === "link_dead");
+const deadPage = await fetch(`${API}/share/${share.body.token}`, { headers: { accept: BROWSER } });
+const deadHtml = await deadPage.text();
+check("and in a browser it says so, in both languages", deadPage.status === 404 && deadHtml.includes("no longer active") && deadHtml.includes("plus actif"));
 
 console.log("\n=== SOS ===");
 const sos = await call("POST", `/trips/${tripId}/sos`, { token: riderToken, body: { ...CHECKPOINT, note: "test" } });

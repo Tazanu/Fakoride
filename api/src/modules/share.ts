@@ -24,6 +24,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { ApiError, asyncHandler, param } from "../lib/http";
 import { requireAuth } from "../middleware/auth";
+import { renderGonePage, renderSharePage } from "./share-page";
 import { rateLimit, RULES } from "../middleware/rateLimit";
 import { driverPosition } from "../lib/presence";
 
@@ -152,6 +153,13 @@ export function publicShareRouter(): Router {
   router.get(
     "/:token",
     asyncHandler(async (req, res) => {
+      // A person tapping the link gets a page; anything asking for JSON — the
+      // app, a test — gets JSON. Browsers ask for HTML first, so they win it.
+      const wantsPage = req.accepts(["json", "html"]) === "html";
+      // Live, and the token is the credential: no copy kept anywhere between.
+      res.setHeader("cache-control", "no-store");
+      res.setHeader("referrer-policy", "no-referrer");
+
       const share = await prisma.tripShare.findUnique({
         where: { token: param(req, "token") },
         include: {
@@ -160,6 +168,8 @@ export function publicShareRouter(): Router {
               driver: { include: { user: { select: { name: true } } } },
               fromZone: { select: { name: true } },
               toZone: { select: { name: true } },
+              // Her language, for the page — not her name, which it never shows.
+              rider: { select: { language: true } },
             },
           },
         },
@@ -167,13 +177,19 @@ export function publicShareRouter(): Router {
 
       // One message for missing, revoked and expired alike: a wrong token must
       // not become a way to learn that a trip exists.
-      const gone = new ApiError(404, "link_dead", "This link is no longer active.");
-      if (!share || share.revokedAt || share.expiresAt < new Date()) throw gone;
+      const goneAway = () => {
+        if (wantsPage) {
+          res.status(404).type("html").send(renderGonePage());
+          return;
+        }
+        throw new ApiError(404, "link_dead", "This link is no longer active.");
+      };
+      if (!share || share.revokedAt || share.expiresAt < new Date()) return goneAway();
 
       const trip = share.trip;
       const ended = isTerminal(trip.status);
       const endedAt = trip.completedAt ?? trip.cancelledAt;
-      if (ended && endedAt && Date.now() - endedAt.getTime() > SHARE_GRACE_MINUTES * 60_000) throw gone;
+      if (ended && endedAt && Date.now() - endedAt.getTime() > SHARE_GRACE_MINUTES * 60_000) return goneAway();
 
       await prisma.tripShare.update({ where: { id: share.id }, data: { viewCount: { increment: 1 } } });
 
@@ -183,6 +199,35 @@ export function publicShareRouter(): Router {
           ? await driverPosition(trip.driverId, trip.vehicleType)
           : null;
 
+      const driver = trip.driver
+        ? {
+            // First name only. Enough to ask after him, not enough to find him.
+            firstName: trip.driver.user.name?.split(" ")[0] ?? null,
+            plate: trip.driver.plate,
+            rating: Number(trip.driver.rating.toFixed(1)),
+            verified: trip.driver.status === "ACTIVE",
+          }
+        : null;
+
+      if (wantsPage) {
+        res.type("html").send(
+          renderSharePage(
+            {
+              status: trip.status,
+              ended,
+              from: trip.pickupLabel,
+              to: trip.dropLabel,
+              driver,
+              position,
+              startedAt: trip.startedAt,
+              completedAt: trip.completedAt,
+            },
+            trip.rider.language,
+          ),
+        );
+        return;
+      }
+
       res.json({
         status: trip.status,
         ended,
@@ -191,15 +236,7 @@ export function publicShareRouter(): Router {
         fromZone: trip.fromZone.name,
         toZone: trip.toZone.name,
         priceXaf: trip.priceXaf,
-        driver: trip.driver
-          ? {
-              // First name only. Enough to ask after him, not enough to find him.
-              firstName: trip.driver.user.name?.split(" ")[0] ?? null,
-              plate: trip.driver.plate,
-              rating: Number(trip.driver.rating.toFixed(1)),
-              verified: trip.driver.status === "ACTIVE",
-            }
-          : null,
+        driver,
         position,
         startedAt: trip.startedAt,
         completedAt: trip.completedAt,
