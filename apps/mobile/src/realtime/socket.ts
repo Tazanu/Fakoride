@@ -29,8 +29,12 @@ export async function connectSocket(): Promise<Socket | null> {
   if (socket) return socket;
 
   socket = io(apiBaseUrl(), {
-    // The server reads `handshake.auth.token`.
-    auth: { token },
+    // The server reads `handshake.auth.token`. A function, not a value, so every
+    // reconnection presents the token held *now* — after "sign out everywhere"
+    // that is a fresh one, and the old one would be refused.
+    auth: (cb) => {
+      void getToken().then((current) => cb({ token: current ?? token }));
+    },
     // No long-polling fallback: it doubles the request count on a bad line and
     // the one place this app runs, websockets work.
     transports: ["websocket"],
@@ -38,6 +42,13 @@ export async function connectSocket(): Promise<Socket | null> {
     reconnectionDelay: 2_000,
     reconnectionDelayMax: 30_000,
     timeout: 20_000,
+  });
+  // The server closes a session's live connection when that session is signed
+  // out, and socket.io does not reconnect after a server-side close on its own.
+  // One attempt: this phone may have been handed a fresh session in the same
+  // moment. A phone that was genuinely signed out is refused, and stops there.
+  socket.on("disconnect", (reason) => {
+    if (reason === "io server disconnect") setTimeout(() => socket?.connect(), 500);
   });
   return socket;
 }

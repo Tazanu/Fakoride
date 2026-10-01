@@ -397,5 +397,77 @@ await call("POST", "/auth/otp/verify", { body: { phone: GUESSED, code: String((N
 const second = await call("POST", "/auth/otp/verify", { body: { phone: GUESSED, code: honest } });
 check("one typo and then the right code still signs in", Boolean(second.body.token), JSON.stringify(second.body));
 
+console.log("\n=== signing out, and meaning it ===");
+/*
+ * "Sign out" used to delete the token from the phone and nothing else: a copy
+ * of it — a stolen phone, a log line — kept working for thirty days. Now the
+ * session ends on the server, and its live connection closes with it.
+ */
+const { io: socketClient } = await import("socket.io-client");
+/** Opens a live connection with a token; resolves once the server has said yes or no. */
+const openSocket = (token) =>
+  new Promise((resolve) => {
+    const sock = socketClient(API, { auth: { token }, transports: ["websocket"], reconnection: false });
+    sock.on("connect", () => resolve({ sock, ok: true }));
+    sock.on("connect_error", (err) => resolve({ sock, ok: false, reason: err.message }));
+  });
+const closedByServer = (sock) =>
+  new Promise((resolve) => {
+    if (!sock.connected) return resolve("already closed");
+    const t = setTimeout(() => resolve(null), 3000);
+    sock.on("disconnect", (reason) => {
+      clearTimeout(t);
+      resolve(reason);
+    });
+  });
+
+const SESSION_PHONE = `+2376822${String(nonce).slice(0, 4)}1`;
+const phoneA = await signIn(SESSION_PHONE, "RIDER", "Session Rider");
+const phoneB = await signIn(SESSION_PHONE, "RIDER", "Session Rider");
+check("one account can be signed in on two phones", (await call("GET", "/auth/me", { token: phoneA })).status === 200 && (await call("GET", "/auth/me", { token: phoneB })).status === 200);
+
+const liveA = await openSocket(phoneA);
+check("each with its own live connection", liveA.ok, liveA.reason);
+const aClosing = closedByServer(liveA.sock);
+
+const out = await call("POST", "/auth/sign-out", { token: phoneA });
+check("signing out is accepted", out.status === 204, String(out.status));
+const afterOut = await call("GET", "/auth/me", { token: phoneA });
+check("and that token is now refused everywhere, not just forgotten on the phone", afterOut.status === 401 && afterOut.body.error?.code === "signed_out", JSON.stringify(afterOut.body));
+check("its live connection is closed by the server", (await aClosing) === "io server disconnect");
+check("the other phone is untouched", (await call("GET", "/auth/me", { token: phoneB })).status === 200);
+const reopenA = await openSocket(phoneA);
+check("a signed-out token cannot open a new live connection", !reopenA.ok, reopenA.reason);
+reopenA.sock.close();
+
+console.log("\n=== the stolen phone ===");
+const stolen = phoneB;
+const inHand = await signIn(SESSION_PHONE, "RIDER", "Session Rider");
+await call("PUT", "/me/push-token", { token: stolen, body: { token: `ExponentPushToken[stolen-${nonce}]` } });
+const liveStolen = await openSocket(stolen);
+const stolenClosing = closedByServer(liveStolen.sock);
+
+const everywhere = await call("POST", "/auth/sign-out-everywhere", { token: inHand });
+check("the owner can sign out every phone at once", everywhere.status === 200 && typeof everywhere.body.token === "string", JSON.stringify(everywhere.body).slice(0, 80));
+check("the stolen phone is refused", (await call("GET", "/auth/me", { token: stolen })).body.error?.code === "signed_out");
+check("its live connection is closed", (await stolenClosing) === "io server disconnect");
+check("it stops receiving the owner's rides", sql(`SELECT coalesce("pushToken", 'none') FROM "User" WHERE phone='${SESSION_PHONE}'`) === "none");
+check("the token the owner used to ask is ended too", (await call("GET", "/auth/me", { token: inHand })).status === 401);
+const fresh = everywhere.body.token;
+check("but the fresh one handed back works, so recovering costs no SMS", (await call("GET", "/auth/me", { token: fresh })).status === 200);
+const liveFresh = await openSocket(fresh);
+check("and can open a live connection", liveFresh.ok, liveFresh.reason);
+liveFresh.sock.close();
+
+console.log("\n=== signing out on an old phone ===");
+const oldPhone = await signIn(SESSION_PHONE, "RIDER", "Session Rider");
+const newPhone = await signIn(SESSION_PHONE, "RIDER", "Session Rider");
+await call("PUT", "/me/push-token", { token: oldPhone, body: { token: `ExponentPushToken[old-${nonce}]` } });
+await call("PUT", "/me/push-token", { token: newPhone, body: { token: `ExponentPushToken[new-${nonce}]` } });
+await call("POST", "/auth/sign-out", { token: oldPhone, body: { pushToken: `ExponentPushToken[old-${nonce}]` } });
+check("does not silence the phone that replaced it", sql(`SELECT "pushToken" FROM "User" WHERE phone='${SESSION_PHONE}'`) === `ExponentPushToken[new-${nonce}]`);
+await call("POST", "/auth/sign-out", { token: newPhone, body: { pushToken: `ExponentPushToken[new-${nonce}]` } });
+check("while signing out on the registered phone forgets it", sql(`SELECT coalesce("pushToken", 'none') FROM "User" WHERE phone='${SESSION_PHONE}'`) === "none");
+
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail === 0 ? 0 : 1);

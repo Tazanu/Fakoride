@@ -112,12 +112,19 @@ export function profileRouter(): Router {
     }),
   );
 
-  /** On sign-out. A signed-out phone gets nothing. */
+  /**
+   * Stop waking this phone. Given the token, only that phone is forgotten —
+   * a request from an old phone must not silence the one that replaced it.
+   */
   router.delete(
     "/push-token",
     requireAuth(),
     asyncHandler(async (req, res) => {
-      await prisma.user.update({ where: { id: req.user!.sub }, data: { pushToken: null, pushTokenAt: null } });
+      const { token } = z.object({ token: z.string().optional() }).parse(req.body ?? {});
+      await prisma.user.updateMany({
+        where: { id: req.user!.sub, ...(token ? { pushToken: token } : {}) },
+        data: { pushToken: null, pushTokenAt: null },
+      });
       res.status(204).end();
     }),
   );

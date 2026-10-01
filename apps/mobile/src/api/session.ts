@@ -66,6 +66,13 @@ export const auth = {
     ),
 
   me: () => api.get<Me>("/auth/me"),
+
+  /** End this session on the server, and forget this phone for push if it holds it. */
+  signOut: (pushToken: string | null) =>
+    api.post<null>("/auth/sign-out", pushToken ? { pushToken } : {}),
+
+  /** End every session; this phone gets a fresh one back. */
+  signOutEverywhere: () => api.post<{ token: string }>("/auth/sign-out-everywhere"),
 };
 
 export const profile = {
@@ -79,5 +86,4 @@ export const profile = {
 /** The phone to wake when the app is not open. See notifications/push.ts. */
 export const pushToken = {
   register: (token: string) => api.put<{ registered: true }>("/me/push-token", { token }),
-  unregister: () => api.delete<null>("/me/push-token"),
 };

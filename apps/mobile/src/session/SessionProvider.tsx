@@ -18,7 +18,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { auth, type Me } from "@/api/session";
 import { ApiError, clearToken, getToken, setToken, setUnauthorisedHandler } from "@/api/client";
-import { registerForPush, unregisterForPush } from "@/notifications/push";
+import { forgetPushToken, registerForPush, registeredPushToken } from "@/notifications/push";
 
 type SessionState = {
   /** Null until the stored token has been checked. Drives the splash. */
@@ -28,6 +28,8 @@ type SessionState = {
   staleOffline: boolean;
   signIn: (token: string, me: Me) => Promise<void>;
   signOut: () => Promise<void>;
+  /** Every other phone signed out; this one keeps going on a fresh session. */
+  signOutEverywhere: () => Promise<void>;
   refresh: () => Promise<void>;
 };
 
@@ -92,11 +94,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setStaleOffline(false);
       },
       signOut: async () => {
-        // While the token still works: afterwards the server cannot tell whose
-        // phone this was, and it would go on receiving that account's rides.
-        await unregisterForPush();
+        // While the token still works, so the server can end the session — a
+        // copy of it anywhere else stops working too. Offline, she is still
+        // signed out here; the session then simply runs out on its own.
+        await auth.signOut(registeredPushToken()).catch(() => undefined);
+        forgetPushToken();
         await clearToken();
         setMe(null);
+      },
+      signOutEverywhere: async () => {
+        const { token } = await auth.signOutEverywhere();
+        await setToken(token);
+        // The server forgot every phone's push registration, this one's too.
+        forgetPushToken();
+        await registerForPush();
       },
       refresh: load,
     }),

@@ -53,7 +53,7 @@ export default function Profile() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const scroll = useScrollPastKeyboard();
-  const { me, refresh, signOut } = useSession();
+  const { me, refresh, signOut, signOutEverywhere } = useSession();
   const t = useT();
 
   const [photo, setPhoto] = useState<string | null>(null);
@@ -333,6 +333,37 @@ export default function Profile() {
       <Pressable onPress={() => void signOut()} accessibilityRole="button" style={styles.signOut}>
         <Text style={styles.signOutLabel}>{t(S.account.signOut)}</Text>
       </Pressable>
+
+      {/*
+        For the phone that was stolen. Signing out only ever reached the phone
+        in your hand; this reaches the others, and keeps this one signed in so
+        recovering from a theft does not cost another SMS code.
+      */}
+      <Pressable
+        onPress={() =>
+          Alert.alert(t(S.account.signOutElsewhereAsk), t(S.account.signOutElsewhereWhy), [
+            { text: t(S.account.cancel), style: "cancel" },
+            {
+              text: t(S.account.signOutElsewhereDo),
+              style: "destructive",
+              onPress: () => {
+                setBusy(true);
+                setError(null);
+                void signOutEverywhere()
+                  .then(() => Alert.alert(t(S.account.signOutElsewhereDone)))
+                  .catch((err: unknown) => setError(errorFor(err)))
+                  .finally(() => setBusy(false));
+              },
+            },
+          ])
+        }
+        disabled={busy}
+        accessibilityRole="button"
+        hitSlop={8}
+        style={styles.elsewhere}
+      >
+        <Text style={styles.elsewhereLabel}>{t(S.account.signOutElsewhere)}</Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -464,4 +495,6 @@ const styles = StyleSheet.create({
 
   signOut: { minHeight: touch.min, alignItems: "center", justifyContent: "center" },
   signOutLabel: { ...type.bodyStrong, color: c.danger },
+  elsewhere: { minHeight: touch.min, alignItems: "center", justifyContent: "center" },
+  elsewhereLabel: { ...type.secondary, color: c.muted, textDecorationLine: "underline" },
 });

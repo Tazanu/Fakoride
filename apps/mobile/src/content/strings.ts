@@ -177,6 +177,17 @@ export const S = {
       "Vos signalements, et les réponses reçues",
     ),
     signOut: p("Sign out", "Se déconnecter"),
+    signOutElsewhere: p("Sign out on every other phone", "Se déconnecter sur tous les autres téléphones"),
+    signOutElsewhereAsk: p("Sign out everywhere else?", "Se déconnecter partout ailleurs ?"),
+    signOutElsewhereWhy: p(
+      "For a phone that was lost or stolen, or one you left signed in. It is signed out at once and stops receiving your rides. This phone stays signed in.",
+      "Pour un téléphone perdu ou volé, ou resté connecté. Il est déconnecté aussitôt et ne reçoit plus vos courses. Ce téléphone reste connecté.",
+    ),
+    signOutElsewhereDo: p("Sign them out", "Les déconnecter"),
+    signOutElsewhereDone: p(
+      "Done. Every other phone is signed out.",
+      "C'est fait. Tous les autres téléphones sont déconnectés.",
+    ),
     saving: p("Saving…", "Enregistrement…"),
     english: p("English", "English"),
     french: p("Français", "Français"),

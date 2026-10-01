@@ -17,7 +17,8 @@ import { prisma } from "../lib/prisma";
 import { redis, otpAttemptsKey, otpKey, otpThrottleKey } from "../lib/redis";
 import { ApiError, asyncHandler } from "../lib/http";
 import { normalisePhone as parsePhone } from "../lib/phone";
-import { signToken, requireAuth } from "../middleware/auth";
+import { requireAuth, revokeAllSessions, revokeSession, signToken } from "../middleware/auth";
+import { endAllSessions, endSession } from "../realtime";
 import { logger } from "../lib/logger";
 import { smsSender } from "../lib/sms";
 
@@ -193,6 +194,57 @@ export function authRouter(): Router {
           driver: user.driver ?? null,
         },
       });
+    }),
+  );
+
+  /**
+   * Sign out on this phone, and mean it.
+   *
+   * The session is ended on the server, so a copy of this token anywhere else
+   * stops working too, and any live connection it opened is closed. The phone
+   * says which push token it holds: only that one is forgotten, so signing out
+   * on an old phone does not silence the new one.
+   */
+  router.post(
+    "/sign-out",
+    requireAuth(),
+    asyncHandler(async (req, res) => {
+      const { pushToken } = z.object({ pushToken: z.string().optional() }).parse(req.body ?? {});
+      await revokeSession(req.user!);
+      if (pushToken) {
+        await prisma.user.updateMany({
+          where: { id: req.user!.sub, pushToken },
+          data: { pushToken: null, pushTokenAt: null },
+        });
+      }
+      if (req.user!.jti) endSession(req.user!.jti);
+      res.status(204).end();
+    }),
+  );
+
+  /**
+   * Sign out on every phone — for the one that was stolen, or left signed in.
+   *
+   * Every session this account has ends now, every live connection closes, and
+   * whichever phone holds the push registration loses it. The phone asking is
+   * handed a fresh session in the same breath, so the owner is not made to pay
+   * for another SMS code to recover from somebody else's theft.
+   */
+  router.post(
+    "/sign-out-everywhere",
+    requireAuth(),
+    asyncHandler(async (req, res) => {
+      const userId = req.user!.sub;
+      await revokeAllSessions(userId);
+      const user = await prisma.user.update({
+        where: { id: userId },
+        data: { pushToken: null, pushTokenAt: null },
+        select: { id: true, role: true, phone: true },
+      });
+      endAllSessions(userId);
+      logger.info({ userId }, "auth: every session ended at the owner's request");
+      // The role as it is now, not as the old token remembered it.
+      res.json({ token: signToken({ sub: user.id, role: user.role, phone: user.phone }) });
     }),
   );
 

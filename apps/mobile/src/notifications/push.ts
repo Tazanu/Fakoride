@@ -87,14 +87,29 @@ export async function devicePushToken(): Promise<string | null> {
   }
 }
 
+/** The token this phone last registered, so signing out can name it. */
+let registered: string | null = null;
+
 /** Tell the server where to reach this account. Safe to call on every sign-in. */
 export async function registerForPush(): Promise<void> {
   const token = await devicePushToken();
   if (!token) return;
-  await pushToken.register(token).catch(() => undefined);
+  await pushToken.register(token).then(
+    () => {
+      registered = token;
+    },
+    () => undefined,
+  );
 }
 
-/** On sign-out, before the session token goes: a signed-out phone gets nothing. */
-export async function unregisterForPush(): Promise<void> {
-  await pushToken.unregister().catch(() => undefined);
+/**
+ * This phone's push token, for sign-out to hand to the server. Only that one is
+ * forgotten there — signing out on an old phone must not silence the new one.
+ */
+export function registeredPushToken(): string | null {
+  return registered;
+}
+
+export function forgetPushToken(): void {
+  registered = null;
 }

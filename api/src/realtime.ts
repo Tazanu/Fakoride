@@ -9,7 +9,7 @@
 import type { Server as HttpServer } from "node:http";
 import { Server as SocketServer, type Socket } from "socket.io";
 import { prisma } from "./lib/prisma";
-import { verifyToken } from "./middleware/auth";
+import { assertLive, verifyToken } from "./middleware/auth";
 import { setDriverPosition } from "./lib/presence";
 import { redis, driverActiveTripKey } from "./lib/redis";
 import { logger } from "./lib/logger";
@@ -21,8 +21,9 @@ const driverRoom = (driverId: string) => `driver:${driverId}`;
 const tripRoom = (tripId: string) => `trip:${tripId}`;
 /** Everyone on the ops console. SOS and complaints land here and nowhere else. */
 const OPS_ROOM = "ops";
+const sessionRoom = (jti: string) => `session:${jti}`;
 
-type SocketState = { userId: string; role: string; driverId?: string; vehicleType?: string };
+type SocketState = { userId: string; role: string; driverId?: string; vehicleType?: string; jti?: string };
 const state = new WeakMap<Socket, SocketState>();
 
 export function initRealtime(server: HttpServer): SocketServer {
@@ -38,8 +39,10 @@ export function initRealtime(server: HttpServer): SocketServer {
       const token = (socket.handshake.auth?.token ?? socket.handshake.query?.token) as string | undefined;
       if (!token) throw new Error("missing token");
       const claims = verifyToken(token);
+      // A signed-out session must not be able to open a live feed either.
+      await assertLive(claims);
 
-      const s: SocketState = { userId: claims.sub, role: claims.role };
+      const s: SocketState = { userId: claims.sub, role: claims.role, ...(claims.jti ? { jti: claims.jti } : {}) };
       if (claims.role === "DRIVER") {
         const driver = await prisma.driver.findUnique({ where: { userId: claims.sub } });
         if (driver) {
@@ -62,6 +65,8 @@ export function initRealtime(server: HttpServer): SocketServer {
     }
 
     socket.join(riderRoom(s.userId));
+    // Its own session's room, so signing out can close exactly this connection.
+    if (s.jti) socket.join(sessionRoom(s.jti));
     if (s.driverId) socket.join(driverRoom(s.driverId));
     if (s.role === "ADMIN") socket.join(OPS_ROOM);
 
@@ -113,6 +118,16 @@ export function initRealtime(server: HttpServer): SocketServer {
 
 export function emitToDriver(driverId: string, event: string, payload: unknown): void {
   io?.to(driverRoom(driverId)).emit(event, payload);
+}
+
+/** Close the live connections one signed-out session opened. */
+export function endSession(jti: string): void {
+  io?.in(sessionRoom(jti)).disconnectSockets(true);
+}
+
+/** Close every live connection an account has. Every socket joins its user's room. */
+export function endAllSessions(userId: string): void {
+  io?.in(riderRoom(userId)).disconnectSockets(true);
 }
 
 export function emitToRider(userId: string, event: string, payload: unknown): void {
