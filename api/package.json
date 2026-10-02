@@ -16,7 +16,8 @@
     "admin:grant": "tsx scripts/grant-admin.ts",
     "seed:application": "tsx scripts/seed-application.ts",
     "test:integration": "node tests/integration/run.mjs",
-    "fapshi:check": "tsx scripts/fapshi-check.ts"
+    "fapshi:check": "tsx scripts/fapshi-check.ts",
+    "setup:production": "tsx scripts/setup-production.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.2.1",
