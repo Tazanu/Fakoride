@@ -68,6 +68,11 @@ services:
       - key: DOCUMENT_STORE
         value: postgres
 
+      # Goes into the links trusted contacts are texted. If Render gives the
+      # service a different address, change this to match.
+      - key: PUBLIC_API_URL
+        value: https://fako-ride-api.onrender.com
+
       # Only if "enhanced push security" is switched on in the Expo project.
       - key: EXPO_ACCESS_TOKEN
         sync: false

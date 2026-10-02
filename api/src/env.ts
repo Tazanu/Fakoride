@@ -82,6 +82,11 @@ const schema = z.object({
     .string()
     .default("")
     .transform((v) => v.split(",").map((o) => o.trim()).filter(Boolean)),
+  /**
+   * Where the API is reachable from the internet. Links the server writes into
+   * text messages — a trusted contact's "follow the ride" — start with this.
+   */
+  PUBLIC_API_URL: z.string().url().default("http://localhost:4000"),
   /** Scales every rate limit at once — 3 for a launch day on campus Wi-Fi. */
   RATE_LIMIT_MULTIPLIER: z.coerce.number().positive().default(1),
 
@@ -114,6 +119,9 @@ const checked = schema.superRefine((e, ctx) => {
   }
   if (e.DOCUMENT_STORE === "local") {
     ctx.addIssue({ code: "custom", path: ["DOCUMENT_STORE"], message: "is local in production — ID photos would sit on a disk a redeploy can wipe" });
+  }
+  if (!e.PUBLIC_API_URL.startsWith("https://")) {
+    ctx.addIssue({ code: "custom", path: ["PUBLIC_API_URL"], message: "must be the https address in production — it goes into links people are texted" });
   }
   if (e.JWT_SECRET.length < 32) {
     ctx.addIssue({ code: "custom", path: ["JWT_SECRET"], message: "must be at least 32 characters in production" });

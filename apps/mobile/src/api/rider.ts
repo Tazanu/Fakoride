@@ -282,7 +282,7 @@ export const trips = {
 
   /** Panic. Sends position with it, because "where" is the whole question. */
   sos: (id: string, body: { lat?: number; lng?: number; note?: string }) =>
-    api.post<{ alertId: string; status: string; next: string }>(`/trips/${id}/sos`, body),
+    api.post<{ alertId: string; status: string; next: string; contactsTold: number }>(`/trips/${id}/sos`, body),
 };
 
 // --- letting somebody watch -------------------------------------------------

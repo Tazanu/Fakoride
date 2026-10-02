@@ -221,8 +221,13 @@ export default function Trip() {
       const fix = await findMe();
       const where = fix ? { lat: fix.lat, lng: fix.lng } : {};
       try {
-        await trips.sos(id, { ...where, note: "rider pressed get help" });
-        Alert.alert(t(S.trip.helpComing), t(S.trip.helpCominWhy));
+        const raised = await trips.sos(id, { ...where, note: "rider pressed get help" });
+        // Say so when her people were texted: knowing they are already
+        // following the ride is part of what calms somebody down.
+        Alert.alert(
+          t(S.trip.helpComing),
+          raised.contactsTold > 0 ? `${t(S.trip.helpCominWhy)}\n\n${t(S.contacts.texted)}` : t(S.trip.helpCominWhy),
+        );
       } catch {
         Alert.alert(t(S.trip.helpFailed), t(S.trip.callPolice));
       }

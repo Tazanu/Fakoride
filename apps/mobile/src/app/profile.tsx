@@ -27,6 +27,7 @@ import { ApiError, fetchPhotoDataUri } from "@/api/client";
 import { profile } from "@/api/session";
 import { S } from "@/content/strings";
 import { useT, type Phrase } from "@/ui/i18n";
+import { TrustedContacts } from "@/ui/trusted-contacts";
 import { uploadProfilePhoto } from "@/api/upload";
 import { useSession } from "@/session/SessionProvider";
 import { Press } from "@/ui/motion";
@@ -269,6 +270,12 @@ export default function Profile() {
       </View>
 
       {error ? <Text style={styles.error}>{t(error)}</Text> : null}
+
+      {/*
+        Who is told when Get help is pressed. Here, saved in advance, because
+        the middle of an emergency is not when anybody can type a number.
+      */}
+      <TrustedContacts />
 
       {/*
         The language switch.

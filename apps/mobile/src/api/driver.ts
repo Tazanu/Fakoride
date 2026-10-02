@@ -147,7 +147,7 @@ export const trips = {
     api.post<{ status: string; requeued?: boolean }>(`/trips/${id}/cancel`, { reason }),
 
   sos: (id: string, body: { lat?: number; lng?: number; note?: string }) =>
-    api.post<{ alertId: string; status: string; next: string }>(`/trips/${id}/sos`, body),
+    api.post<{ alertId: string; status: string; next: string; contactsTold: number }>(`/trips/${id}/sos`, body),
 };
 
 // --- documents --------------------------------------------------------------

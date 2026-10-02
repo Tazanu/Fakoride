@@ -262,6 +262,69 @@ const afterCancel = await call("POST", "/trips", {
 check("once it is over she can book again", afterCancel.status === 201, JSON.stringify(afterCancel.status));
 await call("POST", `/trips/${afterCancel.body.id}/cancel`, { token: riderToken, body: { reason: "test over" } });
 
+console.log("\n=== trusted contacts ===");
+/*
+ * Up to three people, saved in advance, each texted once when she presses Get
+ * help: who, which taxi, and a link to follow the ride. The console SMS sender
+ * writes every text to the server log, which is how these are read back.
+ */
+const MUM = `+2376844${String(nonce).slice(0, 4)}7`;
+const BROTHER = `+2376855${String(nonce).slice(0, 4)}7`;
+/** Every text the server has "sent" to this number, oldest first. */
+const textsTo = (phone) =>
+  [...readFileSync(LOG, "utf8").matchAll(/"to":"(\+237\d+)","message":"((?:[^"\\]|\\.)*)"/g)]
+    .filter((m) => m[1] === phone)
+    .map((m) => JSON.parse(`"${m[2]}"`));
+
+const badNumber = await call("POST", "/me/contacts", { token: riderToken, body: { name: "Mum", phone: "+44 7700 900123" } });
+check("a number that is not Cameroonian is refused", badNumber.status === 400 && badNumber.body.error?.code === "bad_phone", JSON.stringify(badNumber.body));
+const ownNumber = await call("POST", "/me/contacts", { token: riderToken, body: { name: "Me", phone: RIDER_PHONE } });
+check("so is her own", ownNumber.status === 400 && ownNumber.body.error?.code === "own_number", JSON.stringify(ownNumber.body));
+
+const mum = await call("POST", "/me/contacts", { token: riderToken, body: { name: "Mum", phone: MUM.replace("+237", "") } });
+check("she can save a contact, typed the way she would type it", mum.status === 201 && mum.body.phone === MUM, JSON.stringify(mum.body));
+await call("POST", "/me/contacts", { token: riderToken, body: { name: "Brother", phone: BROTHER } });
+const twiceMum = await call("POST", "/me/contacts", { token: riderToken, body: { name: "Mum again", phone: MUM } });
+check("the same number twice is refused", twiceMum.status === 409 && twiceMum.body.error?.code === "already_a_contact", JSON.stringify(twiceMum.body));
+await call("POST", "/me/contacts", { token: riderToken, body: { name: "Aunt", phone: `+2376866${String(nonce).slice(0, 4)}7` } });
+const fourth = await call("POST", "/me/contacts", { token: riderToken, body: { name: "Uncle", phone: `+2376877${String(nonce).slice(0, 4)}7` } });
+check("and a fourth — three is the limit", fourth.status === 409 && fourth.body.error?.code === "too_many_contacts", JSON.stringify(fourth.body));
+const list = await call("GET", "/me/contacts", { token: riderToken });
+check("she sees the three she saved", list.body.contacts?.length === 3, JSON.stringify(list.body));
+const aunt = list.body.contacts.find((c) => c.name === "Aunt");
+const notYours = await call("DELETE", `/me/contacts/${aunt.id}`, { token: driverToken });
+check("nobody else can remove them", notYours.status === 404, String(notYours.status));
+const removed = await call("DELETE", `/me/contacts/${aunt.id}`, { token: riderToken });
+check("she can", removed.status === 204, String(removed.status));
+
+await call("POST", "/drivers/online", { token: driverToken, body: BOKWAONGO });
+const scared = await call("POST", "/trips", {
+  token: riderToken,
+  body: { pickupLat: BOKWAONGO.lat, pickupLng: BOKWAONGO.lng, toZone: "MOLYKO", paymentMethod: "CASH" },
+});
+await call("POST", `/trips/${scared.body.id}/accept`, { token: driverToken });
+await call("POST", `/trips/${scared.body.id}/start`, { token: driverToken, body: { pin: scared.body.pin } });
+
+const alarm = await call("POST", `/trips/${scared.body.id}/sos`, { token: riderToken, body: { lat: BOKWAONGO.lat, lng: BOKWAONGO.lng } });
+check("pressing Get help tells her how many people were texted", alarm.status === 201 && alarm.body.contactsTold === 2, JSON.stringify(alarm.body));
+await new Promise((r) => setTimeout(r, 500));
+const toMum = textsTo(MUM);
+check("her mother gets a text", toMum.length === 1, `${toMum.length}`);
+check("naming her, and the taxi", toMum[0]?.includes("Enanga Mofor") && toMum[0]?.includes(DRIVER_PLATE), toMum[0]);
+check("so does her brother", textsTo(BROTHER).length === 1);
+check("the one she removed does not", textsTo(`+2376866${String(nonce).slice(0, 4)}7`).length === 0);
+
+const link = toMum[0]?.match(/\/share\/([A-Za-z0-9_-]+)/)?.[1];
+const followed = await call("GET", `/share/${link}`);
+check("the link in the text opens the live ride", followed.status === 200 && followed.body.driver?.plate === DRIVER_PLATE, JSON.stringify(followed.body).slice(0, 120));
+check("and carries no PIN and no phone number", !JSON.stringify(followed.body).includes(scared.body.pin) && !JSON.stringify(followed.body).includes("+237"));
+
+const again2 = await call("POST", `/trips/${scared.body.id}/sos`, { token: riderToken, body: {} });
+await new Promise((r) => setTimeout(r, 500));
+check("pressing it again raises the alarm again", again2.status === 201);
+check("but does not text the same people twice", again2.body.contactsTold === 0 && textsTo(MUM).length === 1, JSON.stringify({ told: again2.body.contactsTold, mum: textsTo(MUM).length }));
+
+await call("POST", `/trips/${scared.body.id}/complete`, { token: driverToken });
 await call("POST", "/drivers/offline", { token: driverToken });
 
 console.log(`\n${pass} passed, ${fail} failed\n`);

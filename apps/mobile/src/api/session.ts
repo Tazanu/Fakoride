@@ -83,6 +83,15 @@ export const profile = {
   removePhoto: () => api.delete<{ removed: true }>("/me/photo"),
 };
 
+export type TrustedContact = { id: string; name: string; phone: string };
+
+/** The people texted when Get help is pressed. See ui/trusted-contacts.tsx. */
+export const contacts = {
+  list: () => api.get<{ contacts: TrustedContact[]; max: number }>("/me/contacts"),
+  add: (name: string, phone: string) => api.post<TrustedContact>("/me/contacts", { name, phone }),
+  remove: (id: string) => api.delete<null>(`/me/contacts/${encodeURIComponent(id)}`),
+};
+
 /** The phone to wake when the app is not open. See notifications/push.ts. */
 export const pushToken = {
   register: (token: string) => api.put<{ registered: true }>("/me/push-token", { token }),

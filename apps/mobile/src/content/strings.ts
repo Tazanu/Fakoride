@@ -734,6 +734,31 @@ export const S = {
     OTHER: p("Something else", "Autre chose"),
   },
 
+  /** The people texted when Get help is pressed. */
+  contacts: {
+    title: p("Trusted contacts", "Contacts de confiance"),
+    why: p(
+      "If you press Get help during a ride, we text them which taxi you are in and a link to follow the ride. Up to three people.",
+      "Si vous appuyez sur Demander de l'aide pendant une course, nous leur envoyons par SMS le taxi dans lequel vous êtes et un lien pour suivre la course. Jusqu'à trois personnes.",
+    ),
+    nameLabel: p("Their name", "Son nom"),
+    namePlaceholder: p("Mum", "Maman"),
+    phoneLabel: p("Their number", "Son numéro"),
+    phonePlaceholder: p("6 70 00 00 00", "6 70 00 00 00"),
+    add: p("Add this person", "Ajouter cette personne"),
+    remove: p("Remove", "Retirer"),
+    removeOne: p("Remove {name}", "Retirer {name}"),
+    full: p("You have {n} — the most you can keep.", "Vous en avez {n} — le maximum."),
+    badPhone: p("Enter a Cameroon number, like 6 70 00 00 00.", "Entrez un numéro camerounais, par exemple 6 70 00 00 00."),
+    ownNumber: p("That is your own number.", "C'est votre propre numéro."),
+    already: p("That number is already on your list.", "Ce numéro est déjà dans votre liste."),
+    tooMany: p("You can keep up to three people.", "Vous pouvez garder jusqu'à trois personnes."),
+    texted: p(
+      "We have also texted your trusted contacts a link to follow this ride.",
+      "Nous avons aussi envoyé à vos contacts de confiance un lien pour suivre cette course.",
+    ),
+  },
+
   reports: {
     title: p("What you told us", "Ce que vous nous avez dit"),
     nothing: p(

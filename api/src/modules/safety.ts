@@ -16,6 +16,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { ApiError, asyncHandler, param } from "../lib/http";
 import { requireAuth } from "../middleware/auth";
+import { alertTrustedContacts } from "./contacts";
 import { rateLimit, RULES } from "../middleware/rateLimit";
 import { emitToOps } from "../realtime";
 import { logger } from "../lib/logger";
@@ -50,6 +51,9 @@ export function tripSosRouter(): Router {
       const isDriver = trip.driver?.userId === req.user!.sub;
       if (!isRider && !isDriver) throw new ApiError(403, "not_yours", "That trip is not yours.");
 
+      // Their people are texted on the first alarm of a ride, not on every press.
+      const earlier = await prisma.sosAlert.count({ where: { tripId, raisedByUserId: req.user!.sub } });
+
       const alert = await prisma.sosAlert.create({
         data: {
           tripId,
@@ -81,9 +85,21 @@ export function tripSosRouter(): Router {
         plate: trip.driver?.plate ?? null,
       });
 
+      const contactsTold = await alertTrustedContacts({
+        userId: req.user!.sub,
+        tripId,
+        plate: trip.driver?.plate ?? null,
+        firstAlert: earlier === 0,
+      }).catch((err: unknown) => {
+        logger.error({ alertId: alert.id, err: String(err) }, "contacts: could not prepare the texts");
+        return 0;
+      });
+
       res.status(201).json({
         alertId: alert.id,
         status: alert.status,
+        // How many of their trusted contacts were just texted, so the app can say so.
+        contactsTold,
         // Say what happens now. A screen that only says "sent" is not help.
         next: "We have your location and this trip. Somebody is calling you now.",
       });

@@ -165,6 +165,7 @@ model User {
   ridesTaken Trip[]      @relation("RiderTrips")
   sosAlerts  SosAlert[]
   complaints Complaint[]
+  trustedContacts TrustedContact[]
 
   @@index([role])
 }
@@ -600,4 +601,23 @@ model StoredFile {
   bytes       Bytes
   byteSize    Int
   createdAt   DateTime @default(now())
+}
+
+/// Somebody this account wants told when it presses Get help mid-ride.
+///
+/// Up to three. They get one text per ride with a link to follow it — the same
+/// link a rider can share by hand, carrying the same nothing: no PIN, no phone
+/// numbers, the driver's first name and plate.
+model TrustedContact {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// What the account calls them — "Mum", "Ngwa".
+  name      String
+  /// E.164, Cameroon only: the only numbers the SMS sender reaches.
+  phone     String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, phone])
+  @@index([userId])
 }

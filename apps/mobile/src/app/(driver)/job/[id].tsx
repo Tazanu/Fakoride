@@ -213,7 +213,12 @@ export default function Trip() {
     if (!id) return;
     void trips
       .sos(id, { note: "driver pressed get help" })
-      .then(() => Alert.alert(t(S.trip.helpComing), t(S.trip.helpCominWhy)))
+      .then((raised) =>
+        Alert.alert(
+          t(S.trip.helpComing),
+          raised.contactsTold > 0 ? `${t(S.trip.helpCominWhy)}\n\n${t(S.contacts.texted)}` : t(S.trip.helpCominWhy),
+        ),
+      )
       .catch(() => Alert.alert(t(S.trip.helpFailed), t(S.trip.callPolice)));
   }
 
