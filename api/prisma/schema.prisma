@@ -317,6 +317,10 @@ model Trip {
   /// starts the trip — it is both the safety check and the anti-fraud check.
   pin         String
   pinVerified Boolean @default(false)
+  /// The rider's stars for this ride, once. Null until she rates it, and it
+  /// cannot be rated twice: the old endpoint counted every call as a new rating.
+  riderStars  Int?
+  ratedAt     DateTime?
 
   /// Drivers already offered this trip, so we never re-offer to the same one.
   offeredDriverIds String[] @default([])

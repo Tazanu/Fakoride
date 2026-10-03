@@ -346,6 +346,9 @@ export const S = {
    */
   job: {
     goGetHer: p("Go and get her", "Allez la chercher"),
+    pickingUp: p("Picking up {name}", "Vous prenez {name}"),
+    pickingUpRider: p("Picking up your rider", "Vous prenez votre passager"),
+    lookFor: p("Look for this face at the pickup.", "Cherchez ce visage au point de départ."),
     youAreThere: p("You are there", "Vous y êtes"),
     carryingHer: p("Carrying her now", "Course en cours"),
     finished: p("Ride finished", "Course terminée"),
@@ -517,6 +520,10 @@ export const S = {
     ),
 
     yourDriver: p("Your driver", "Votre chauffeur"),
+    newDriver: p("New driver", "Nouveau chauffeur"),
+    rateTitle: p("How was your ride?", "Comment s'est passée votre course ?"),
+    rateThanks: p("Thank you. It helps the next rider.", "Merci. Cela aide le prochain passager."),
+    rateStars: p("{n} out of 5", "{n} sur 5"),
     oneRide: p("{n} ride", "{n} course"),
     manyRides: p("{n} rides", "{n} courses"),
     callDriver: p("Call your driver", "Appeler votre chauffeur"),

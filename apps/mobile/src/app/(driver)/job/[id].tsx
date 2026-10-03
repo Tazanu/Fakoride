@@ -38,6 +38,7 @@ import { useDriverRealtime } from "@/realtime/DriverRealtime";
 import { pushPosition } from "@/realtime/socket";
 import { cardShadow, palette, primaryButton, radius, space, touch, type, xaf } from "@/theme";
 import { S } from "@/content/strings";
+import { Face, useTripFace } from "@/ui/trip-face";
 import { useT, type Phrase } from "@/ui/i18n";
 import { keyboardBehavior, useScrollPastKeyboard } from "@/ui/keyboard";
 
@@ -97,6 +98,12 @@ export default function Trip() {
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<Phrase | null>(null);
+  // Her face, while he is on his way and while he waits — the moment he is
+  // looking for one person in a crowd at a junction.
+  const riderFace = useTripFace(
+    trip?.id,
+    Boolean(trip?.rider?.hasPhoto) && (trip?.status === "ACCEPTED" || trip?.status === "ARRIVED"),
+  );
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -253,6 +260,20 @@ export default function Trip() {
           <Text style={styles.payment}>{t(PAYMENT_LABEL[trip.paymentMethod])}</Text>
         </View>
 
+        {trip.rider && (trip.status === "ACCEPTED" || trip.status === "ARRIVED") ? (
+          <View style={styles.rider}>
+            <Face uri={riderFace} name={trip.rider.firstName} size={52} />
+            <View style={styles.riderWords}>
+              <Text style={styles.riderName}>
+                {trip.rider.firstName
+                  ? t(S.job.pickingUp, { name: trip.rider.firstName })
+                  : t(S.job.pickingUpRider)}
+              </Text>
+              {riderFace ? <Text style={styles.riderHint}>{t(S.job.lookFor)}</Text> : null}
+            </View>
+          </View>
+        ) : null}
+
         <View style={styles.legs}>
           <Leg label={t(S.job.pickUp)} place={trip.pickupLabel} zone={trip.from.name} />
           <Leg label={t(S.job.drop)} place={trip.dropLabel} zone={trip.to.name} />
@@ -391,6 +412,10 @@ const styles = StyleSheet.create({
   payment: { ...type.body, color: c.inkSoft, marginTop: space.xs },
 
   legs: { gap: space.md },
+  rider: { flexDirection: "row", alignItems: "center", gap: space.md },
+  riderWords: { flexShrink: 1, gap: 2 },
+  riderName: { ...type.bodyStrong, color: c.ink },
+  riderHint: { ...type.secondary, color: c.muted },
   leg: { gap: 2 },
   legLabel: { ...type.label, color: c.muted },
   legPlace: { ...type.body, color: c.ink },

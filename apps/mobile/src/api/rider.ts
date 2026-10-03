@@ -187,6 +187,8 @@ export type TripDriver = {
   phone: string;
   plate: string;
   rating: number;
+  /** Zero means nobody has rated him yet: the 5.0 he starts on is not a rating. */
+  ratingCount: number;
   tripCount: number;
   verified: boolean;
   hasSpareHelmet: boolean;
@@ -213,6 +215,8 @@ export type TripDetail = {
    */
   pin?: string;
   driver: TripDriver | null;
+  /** Her stars for this ride, or null until she rates it. */
+  riderStars?: number | null;
   needsHelmet: boolean;
   womanDriverOnly: boolean;
   requestedAt: string;
@@ -278,7 +282,7 @@ export const trips = {
     api.post<{ status: string }>(`/trips/${id}/cancel`, { reason }),
 
   rate: (id: string, stars: number, comment?: string) =>
-    api.post<{ ok: true }>(`/trips/${id}/rate`, { stars, ...(comment ? { comment } : {}) }),
+    api.post<{ rated: true }>(`/trips/${id}/rate`, { stars, ...(comment ? { comment } : {}) }),
 
   /** Panic. Sends position with it, because "where" is the whole question. */
   sos: (id: string, body: { lat?: number; lng?: number; note?: string }) =>

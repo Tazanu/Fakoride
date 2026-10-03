@@ -228,7 +228,14 @@ export function tripPhotoRouter(): Router {
           status: true,
           riderId: true,
           rider: { select: { photoKey: true } },
-          driver: { select: { userId: true, user: { select: { photoKey: true } } } },
+          driver: {
+            select: {
+              userId: true,
+              user: { select: { photoKey: true } },
+              // The face ops checked against his ID card when they approved him.
+              documents: { where: { kind: "DRIVER_PHOTO" }, select: { key: true } },
+            },
+          },
         },
       });
       if (!trip) throw new ApiError(404, "no_trip", "That trip does not exist.");
@@ -245,7 +252,10 @@ export function tripPhotoRouter(): Router {
 
       // You get the other one, never your own — this route exists so the two
       // of you can recognise each other at the kerb.
-      const key = isRider ? trip.driver?.user.photoKey : trip.rider.photoKey;
+      // For the driver, the face ops checked against his ID — the one the
+      // application screen promised riders would see — before any photo he set
+      // for himself afterwards, which nobody checked.
+      const key = isRider ? (trip.driver?.documents[0]?.key ?? trip.driver?.user.photoKey) : trip.rider.photoKey;
       if (!key) throw new ApiError(404, "no_photo", "They have not sent a photograph.");
 
       const stored = await documents.get(key);

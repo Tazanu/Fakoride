@@ -52,6 +52,8 @@ import {
 import { useRiderRealtime } from "@/realtime/RiderRealtime";
 import { findMe } from "@/ui/position";
 import { MapPanel, MapPill, Sheet } from "@/ui/map";
+import { Face, useTripFace } from "@/ui/trip-face";
+import { RateRide } from "@/ui/rate-ride";
 import { S } from "@/content/strings";
 import { plural, useT, type Phrase } from "@/ui/i18n";
 import { palette, radius, space, touch, type, xaf } from "@/theme";
@@ -101,13 +103,6 @@ function stageLine(status: TripDetail["status"]): Phrase {
     default:
       return S.trip.over;
   }
-}
-
-/** Two letters for the avatar. "Epie Ndive" becomes EN. */
-function initials(name: string | null): string {
-  if (!name) return "?";
-  const parts = name.trim().split(/\s+/).slice(0, 2);
-  return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || "?";
 }
 
 export default function Trip() {
@@ -161,6 +156,10 @@ export default function Trip() {
    * she is standing at a junction deciding whether to give up on us.
    */
   const searching = trip?.status === "REQUESTED" || trip?.status === "OFFERED";
+  const driverFace = useTripFace(
+    trip?.id,
+    trip?.status === "ACCEPTED" || trip?.status === "ARRIVED" || trip?.status === "IN_PROGRESS",
+  );
   const poll = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
     if (!searching) return;
@@ -297,9 +296,7 @@ export default function Trip() {
 
         {driver ? (
           <View style={styles.driverRow}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{initials(driver.name)}</Text>
-            </View>
+            <Face uri={driverFace} name={driver.name} />
             <View style={styles.grow}>
               <View style={styles.nameRow}>
                 <Text style={styles.driverName} numberOfLines={1}>
@@ -309,7 +306,10 @@ export default function Trip() {
               </View>
               <View style={styles.ratingRow}>
                 <StarIcon size={15} color={c.amber} weight="fill" />
-                <Text style={styles.rating}>{driver.rating.toFixed(1)}</Text>
+                {/* The 5.0 a driver starts on is not a rating, so a new one says so. */}
+                <Text style={styles.rating}>
+                  {driver.ratingCount > 0 ? driver.rating.toFixed(1) : t(S.trip.newDriver)}
+                </Text>
                 <Text style={styles.rides}>
                   {"· "}
                   {t(plural(driver.tripCount, S.trip.oneRide, S.trip.manyRides), {
@@ -354,6 +354,10 @@ export default function Trip() {
 
         {over ? (
           <>
+            {trip.status === "COMPLETED" && driver ? (
+              <RateRide tripId={trip.id} rated={trip.riderStars} />
+            ) : null}
+
             <Pressable
               onPress={() => router.replace("/(rider)")}
               accessibilityRole="button"
@@ -602,15 +606,6 @@ const styles = StyleSheet.create({
   waiting: { ...type.bodyPlain, color: c.inkSoft },
 
   driverRow: { flexDirection: "row", alignItems: "center", gap: space.md },
-  avatar: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: c.action,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: { ...type.heading, color: c.onAction },
   nameRow: { flexDirection: "row", alignItems: "center", gap: space.sm },
   driverName: { ...type.heading, color: c.ink, flexShrink: 1 },
   ratingRow: { flexDirection: "row", alignItems: "center", gap: space.xs, marginTop: 2 },

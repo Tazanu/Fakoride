@@ -111,6 +111,8 @@ export type TripDetail = {
   to: { code: string; name: string };
   /** Never present for a driver. He types what the rider reads out. */
   pin?: undefined;
+  /** Who he is picking up — first name only, and only while the ride is live. */
+  rider?: { firstName: string | null; hasPhoto: boolean };
   needsHelmet: boolean;
   womanDriverOnly: boolean;
   requestedAt: string;

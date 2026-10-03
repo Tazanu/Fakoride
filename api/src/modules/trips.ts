@@ -319,6 +319,7 @@ export function tripsRouter(): Router {
           driver: { include: { user: { select: { name: true, phone: true } } } },
           fromZone: { select: { code: true, name: true } },
           toZone: { select: { code: true, name: true } },
+          rider: { select: { name: true, photoKey: true } },
         },
       });
       if (!trip) throw new ApiError(404, "no_trip", "That trip does not exist.");
@@ -349,12 +350,22 @@ export function tripsRouter(): Router {
         drop: { lat: trip.dropLat, lng: trip.dropLng },
         // Only the rider reads the PIN out; the driver types what he is told.
         pin: isRider ? trip.pin : undefined,
+        // So the app asks once and then stops asking.
+        ...(isRider ? { riderStars: trip.riderStars } : {}),
+        // Who he is picking up, while he is picking her up. The sign-in screen
+        // has always told riders "drivers see this when they accept your ride";
+        // until now nothing sent it. First name only, and only while it is live.
+        ...(isDriver && ["ACCEPTED", "ARRIVED", "IN_PROGRESS"].includes(trip.status)
+          ? { rider: { firstName: trip.rider.name?.split(" ")[0] ?? null, hasPhoto: trip.rider.photoKey !== null } }
+          : {}),
         driver: trip.driver
           ? {
               name: trip.driver.user.name,
               phone: trip.driver.user.phone,
               plate: trip.driver.plate,
               rating: trip.driver.rating,
+              // Zero means "new" — the 5.0 every driver starts on is not a rating.
+              ratingCount: trip.driver.ratingCount,
               tripCount: trip.driver.tripCount,
               verified: trip.driver.status === "ACTIVE",
               // "ID checked · helmet on board" — both halves of that line.
@@ -596,16 +607,28 @@ export function tripsRouter(): Router {
         throw new ApiError(409, "not_completed", "You can only rate a finished trip.");
       }
 
-      const driver = await prisma.driver.findUniqueOrThrow({ where: { id: trip.driverId } });
-      const count = driver.ratingCount + 1;
-      const rating = (driver.rating * driver.ratingCount + stars) / count;
+      const driverId = trip.driverId;
+      await prisma.$transaction(async (tx) => {
+        // Once per ride. Every call used to count as a new rating, so one
+        // rider tapping one star a hundred times could sink a driver. Marking
+        // the trip rated is the same statement that checks it was not.
+        const marked = await tx.trip.updateMany({
+          where: { id: trip.id, ratedAt: null },
+          data: { riderStars: stars, ratedAt: new Date() },
+        });
+        if (marked.count === 0) throw new ApiError(409, "already_rated", "You have already rated this ride.");
 
-      await prisma.$transaction([
-        prisma.driver.update({ where: { id: driver.id }, data: { rating, ratingCount: count } }),
-        prisma.tripEvent.create({
+        // The average in one statement, from the row as it is now, so ratings
+        // that arrive together cannot overwrite each other's arithmetic.
+        await tx.$executeRaw`
+          UPDATE "Driver"
+          SET "rating" = ("rating" * "ratingCount" + ${stars}) / ("ratingCount" + 1),
+              "ratingCount" = "ratingCount" + 1
+          WHERE "id" = ${driverId}`;
+        await tx.tripEvent.create({
           data: { tripId: trip.id, status: "COMPLETED", actor: req.user!.sub, meta: { stars, comment: comment ?? null } },
-        }),
-      ]);
+        });
+      });
 
       res.json({ rated: true });
     }),

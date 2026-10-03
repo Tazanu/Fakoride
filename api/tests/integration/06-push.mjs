@@ -325,6 +325,74 @@ check("pressing it again raises the alarm again", again2.status === 201);
 check("but does not text the same people twice", again2.body.contactsTold === 0 && textsTo(MUM).length === 1, JSON.stringify({ told: again2.body.contactsTold, mum: textsTo(MUM).length }));
 
 await call("POST", `/trips/${scared.body.id}/complete`, { token: driverToken });
+console.log("\n=== finding each other at the kerb ===");
+/*
+ * The driver is told who he is picking up, and each of them sees the other's
+ * face — the rider sees the face ops checked against his ID, not a picture he
+ * chose — but only while the ride is live.
+ */
+const putPhoto = async (path, token, bytes, type) => {
+  const res = await fetch(`${API}${path}`, { method: "PUT", headers: { "content-type": type, authorization: `Bearer ${token}` }, body: bytes });
+  await res.arrayBuffer();
+  return res.status;
+};
+const getPhoto = async (path, token) => {
+  const res = await fetch(`${API}${path}`, { headers: { authorization: `Bearer ${token}` } });
+  return { status: res.status, bytes: Buffer.from(await res.arrayBuffer()) };
+};
+const jpeg = (tag) => Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.from(`${tag}-${nonce}-`.repeat(20)), Buffer.from([0xff, 0xd9])]);
+const checkedFace = jpeg("driver-checked");
+const selfieFace = jpeg("driver-selfie");
+const riderFace = jpeg("rider");
+await putPhoto("/drivers/me/documents/DRIVER_PHOTO", driverToken, checkedFace, "image/jpeg");
+await putPhoto("/me/photo", driverToken, selfieFace, "image/jpeg");
+await putPhoto("/me/photo", riderToken, riderFace, "image/jpeg");
+
+await call("POST", "/drivers/online", { token: driverToken, body: BOKWAONGO });
+const kerb = await call("POST", "/trips", {
+  token: riderToken,
+  body: { pickupLat: BOKWAONGO.lat, pickupLng: BOKWAONGO.lng, toZone: "MOLYKO", paymentMethod: "CASH" },
+});
+await call("POST", `/trips/${kerb.body.id}/accept`, { token: driverToken });
+
+const asDriver = await call("GET", `/trips/${kerb.body.id}`, { token: driverToken });
+check("the driver is told who he is picking up — first name only", asDriver.body.rider?.firstName === "Enanga" && asDriver.body.rider?.hasPhoto === true, JSON.stringify(asDriver.body.rider));
+check("and never her phone number", !JSON.stringify(asDriver.body).includes(RIDER_PHONE));
+
+const herFace = await getPhoto(`/trips/${kerb.body.id}/photo`, driverToken);
+check("he sees her face while he is coming for her", herFace.status === 200 && herFace.bytes.equals(riderFace), String(herFace.status));
+const hisFace = await getPhoto(`/trips/${kerb.body.id}/photo`, riderToken);
+check("she sees the face ops checked against his ID, not the one he chose", hisFace.status === 200 && hisFace.bytes.equals(checkedFace) && !hisFace.bytes.equals(selfieFace), String(hisFace.status));
+
+await call("POST", `/trips/${kerb.body.id}/start`, { token: driverToken, body: { pin: kerb.body.pin } });
+
+console.log("\n=== rating the ride ===");
+const tooSoon = await call("POST", `/trips/${kerb.body.id}/rate`, { token: riderToken, body: { stars: 4 } });
+check("a ride still under way cannot be rated", tooSoon.status === 409 && tooSoon.body.error?.code === "not_completed", JSON.stringify(tooSoon.body));
+
+await call("POST", `/trips/${kerb.body.id}/complete`, { token: driverToken });
+const afterwards = await call("GET", `/trips/${kerb.body.id}`, { token: driverToken });
+check("once it is over the driver no longer has her name", afterwards.body.rider === undefined, JSON.stringify(afterwards.body.rider));
+check("nor her face", (await getPhoto(`/trips/${kerb.body.id}/photo`, driverToken)).status === 409);
+
+const ratingRow = sql(`SELECT "ratingCount" || '|' || "rating" FROM "Driver" WHERE id='${driver.id}'`);
+const unrated = await call("GET", `/trips/${kerb.body.id}`, { token: riderToken });
+check("a new driver is shown as new, not as a 5.0 nobody gave him", unrated.body.driver?.ratingCount === Number(ratingRow.split("|")[0]), JSON.stringify(unrated.body.driver));
+check("and the finished ride is not yet rated", unrated.body.riderStars === null, JSON.stringify(unrated.body.riderStars));
+
+// Five taps on the stars at once. Each used to count as a separate rating.
+const taps = await Promise.all(Array.from({ length: 5 }, () => call("POST", `/trips/${kerb.body.id}/rate`, { token: riderToken, body: { stars: 4 } })));
+check("five taps rate the ride once", taps.filter((r) => r.status === 200).length === 1, JSON.stringify(taps.map((r) => r.status)));
+check("the rest are told it is already rated", taps.filter((r) => r.status === 409 && r.body.error?.code === "already_rated").length === 4, JSON.stringify(taps.map((r) => r.body.error?.code ?? r.status)));
+const [countBefore, ratingBefore] = ratingRow.split("|").map(Number);
+const [countAfter, ratingAfter] = sql(`SELECT "ratingCount" || '|' || "rating" FROM "Driver" WHERE id='${driver.id}'`).split("|").map(Number);
+check("his count goes up by exactly one", countAfter === countBefore + 1, `${countBefore} -> ${countAfter}`);
+check("and his average moves by exactly one rating of four", Math.abs(ratingAfter - (ratingBefore * countBefore + 4) / (countBefore + 1)) < 1e-9, `${ratingBefore} -> ${ratingAfter}`);
+const remembered = await call("GET", `/trips/${kerb.body.id}`, { token: riderToken });
+check("and the app is told, so it stops asking", remembered.body.riderStars === 4, JSON.stringify(remembered.body.riderStars));
+const later = await call("POST", `/trips/${kerb.body.id}/rate`, { token: riderToken, body: { stars: 1 } });
+check("a later change of heart is refused too", later.status === 409, String(later.status));
+
 await call("POST", "/drivers/offline", { token: driverToken });
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
