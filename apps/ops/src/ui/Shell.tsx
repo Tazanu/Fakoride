@@ -21,6 +21,7 @@ export type Section =
   | "complaints"
   | "fares"
   | "drivers"
+  | "money"
   | "notices";
 
 const ITEMS: { id: Section; label: string }[] = [
@@ -32,6 +33,7 @@ const ITEMS: { id: Section; label: string }[] = [
   { id: "complaints", label: "Complaints" },
   { id: "fares", label: "Fare rules" },
   { id: "drivers", label: "All drivers" },
+  { id: "money", label: "Money" },
   // Last: it is the only one that speaks to everybody at once, and the only
   // one you open knowing what you came to say.
   { id: "notices", label: "Service notice" },

@@ -241,6 +241,10 @@ export function adminPaymentsRouter(): Router {
           providerTransId: p.providerTransId,
           financialTransId: p.financialTransId,
           failureReason: p.failureReason,
+          // What it was for, so the console can act on the thing itself:
+          // charge the day again, or open the trip.
+          accessFeeChargeId: p.accessFeeChargeId,
+          tripId: p.tripId,
           createdAt: p.createdAt,
           confirmedAt: p.confirmedAt,
         })),

@@ -224,6 +224,38 @@ export type Notice = {
 
 export type Zone = { code: string; name: string; town: string };
 
+export type PaymentStatus = "CREATED" | "PENDING" | "SUCCESSFUL" | "FAILED" | "EXPIRED";
+export type PaymentPurpose = "TRIP_FARE" | "ACCESS_FEE" | "DRIVER_PAYOUT";
+
+export type PaymentRow = {
+  id: string;
+  purpose: PaymentPurpose;
+  status: PaymentStatus;
+  amountXaf: number;
+  phone: string;
+  driver: string | null;
+  plate: string | null;
+  providerTransId: string | null;
+  financialTransId: string | null;
+  failureReason: string | null;
+  accessFeeChargeId: string | null;
+  tripId: string | null;
+  createdAt: string;
+  confirmedAt: string | null;
+};
+
+/** What one run of the daily-fee collection did. Every charge lands in exactly one. */
+export type FeeSweep = {
+  attempted: number;
+  inFlight: number;
+  deferred: number;
+  exhausted: number;
+  alreadyPaid: number;
+  belowFloor: number;
+  missing: number;
+  due: number;
+};
+
 export const ops = {
   signIn: {
     requestCode: (phone: string) =>
@@ -319,6 +351,25 @@ export const ops = {
       priceXaf,
       ...(note ? { note } : {}),
     }),
+
+  /** The money that moved, or did not. `provider` is "fake" until real keys are set. */
+  payments: (status?: PaymentStatus) =>
+    api.get<{ provider: string; failed: number; stillMoving: number; payments: PaymentRow[] }>(
+      `/admin/payments${status ? `?status=${status}` : ""}`,
+    ),
+
+  /** Ask the provider what happened, now, instead of waiting for the reconciler. */
+  refreshPayment: (id: string) =>
+    api.post<{ id: string; status: PaymentStatus; providerSaid: PaymentStatus }>(`/admin/payments/${id}/refresh`),
+
+  /** Run the daily-fee collection now. Puts a MoMo prompt on every phone that owes one. */
+  collectFees: () => api.post<FeeSweep>("/admin/access-fees/collect"),
+
+  /** Charge one driver's day again, past the backoff — he is usually on the phone saying he has topped up. */
+  collectFee: (chargeId: string) =>
+    api.post<{ paymentId: string; status: PaymentStatus; amountXaf: number; failureReason: string | null }>(
+      `/admin/access-fees/${chargeId}/collect`,
+    ),
 
   suspend: (driverId: string, reason: string) =>
     api.post<{ id: string; status: DriverStatus }>(`/admin/drivers/${driverId}/suspend`, { reason }),

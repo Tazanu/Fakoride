@@ -433,7 +433,14 @@ check("and the reason is on the charge for ops to read", recordedFailure === "t"
 
 // Ops overriding is the escape hatch — a person decided, usually with the
 // driver on the phone saying he has topped up.
-const forced = await call("POST", `/admin/access-fees/${brokeChargeId}/collect`, { token: adminToken });
+// What the console's Money screen reads: the failure, its reason, and which day
+// it was for — the one thing "Charge again" needs.
+const moneyScreen = await call("GET", "/admin/payments?status=FAILED", { token: adminToken });
+const failedFeeRow = moneyScreen.body.payments?.find((p) => p.accessFeeChargeId === brokeChargeId);
+check("the money screen lists the failed fee, naming the day it was for", failedFeeRow?.purpose === "ACCESS_FEE" && Boolean(failedFeeRow?.failureReason), JSON.stringify(failedFeeRow));
+check("and counts the failures", moneyScreen.body.failed >= 1 && moneyScreen.body.provider === "fake", JSON.stringify({ failed: moneyScreen.body.failed, provider: moneyScreen.body.provider }));
+
+const forced = await call("POST", `/admin/access-fees/${failedFeeRow?.accessFeeChargeId ?? brokeChargeId}/collect`, { token: adminToken });
 check("ops can still force a retry past the backoff", forced.status === 200, JSON.stringify(forced.body));
 
 await sleep(1500);

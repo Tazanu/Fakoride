@@ -17,6 +17,7 @@ import { Complaints } from "@/screens/Complaints";
 import { Drivers } from "@/screens/Drivers";
 import { Fares } from "@/screens/Fares";
 import { Notices } from "@/screens/Notices";
+import { Money } from "@/screens/Money";
 import { Safety } from "@/screens/Safety";
 import { SignIn } from "@/screens/SignIn";
 import { Trips } from "@/screens/Trips";
@@ -93,6 +94,7 @@ export function App() {
       {section === "complaints" ? <Complaints onCount={onOpen} /> : null}
       {section === "fares" ? <Fares /> : null}
       {section === "drivers" ? <Drivers /> : null}
+      {section === "money" ? <Money /> : null}
       {section === "notices" ? <Notices /> : null}
     </Shell>
   );
