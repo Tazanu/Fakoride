@@ -26,6 +26,13 @@ config.watchFolders = [designRoot];
 // There is nothing to protect against here anyway: this app has the only
 // node_modules on the path up to the drive root.
 
+// .pmtiles is a map, not a module.
+//
+// The whole of Fako Division, down to zoom 15, is a single 2.8 MB file cut
+// out of the OpenStreetMap planet. Metro has to treat it as an asset to be
+// copied into the build rather than JavaScript to be parsed.
+config.resolver.assetExts = [...config.resolver.assetExts, "pmtiles"];
+
 config.resolver.extraNodeModules = {
   ...config.resolver.extraNodeModules,
   "@design": designRoot,

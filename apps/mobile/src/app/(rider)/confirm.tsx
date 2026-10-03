@@ -125,7 +125,13 @@ export default function Confirm() {
       contentContainerStyle={{ paddingBottom: insets.bottom + space.xl }}
       keyboardShouldPersistTaps="handled"
     >
-      <MapPanel height={MAP_HEIGHT} here={{ x: 0.2, y: 0.25 }} driver={{ x: 0.76, y: 0.76 }}>
+      <MapPanel
+        height={MAP_HEIGHT}
+        // Where she is being picked up: the home screen already resolved it
+        // and passed it through, so there is no second trip to the GPS here.
+        here={lat && lng ? { lat: Number(lat), lng: Number(lng) } : null}
+        sketch={{ here: { x: 0.2, y: 0.25 }, driver: { x: 0.76, y: 0.76 } }}
+      >
         <Pressable
           onPress={() => router.back()}
           accessibilityRole="button"

@@ -157,8 +157,12 @@ MTN number and check that one arrives too.
 
 ## Known limitations, on purpose
 
-- **The map is a drawing.** A real map is on the `real-map` branch; it needs a
-  native build, which EAS (step 8) can now do. A next piece of work.
+- **The real map only shows in the installed app.** The build from step 8 draws
+  OpenStreetMap from a 2.8 MB file of Fako bundled inside the app — no map bill,
+  works without signal — with her dot, the taxi and where she is going. Expo Go
+  cannot load the map library, so there it shows the old drawing instead. The map
+  has compiled and bundled here but has never run on a phone: step 8's build is its
+  first real test, so look at the map closely then.
 - **One API server.** Render's starter plan runs one. A second would need a Redis
   adapter for the live connections — not needed until there is real load.
 - **A driver has 12 seconds to accept.** Opening the app from a locked phone may

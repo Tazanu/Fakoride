@@ -50,7 +50,7 @@ import {
   type TripDetail,
 } from "@/api/rider";
 import { useRiderRealtime } from "@/realtime/RiderRealtime";
-import { findMe } from "@/ui/position";
+import { findMe, useWhereIAm } from "@/ui/position";
 import { MapPanel, MapPill, Sheet } from "@/ui/map";
 import { Face, useTripFace } from "@/ui/trip-face";
 import { RateRide } from "@/ui/rate-ride";
@@ -110,7 +110,9 @@ export default function Trip() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const t = useT();
-  const { version, last, watch } = useRiderRealtime();
+  const { version, last, watch, driverPosition } = useRiderRealtime();
+  // Her own position; his comes down the socket while the trip is watched.
+  const where = useWhereIAm();
 
   const [trip, setTrip] = useState<TripDetail | null>(null);
   const [error, setError] = useState<Phrase | null>(null);
@@ -255,8 +257,10 @@ export default function Trip() {
     >
       <MapPanel
         height={MAP_HEIGHT}
-        here={{ x: 0.5, y: 0.44 }}
-        driver={driver && !over ? { x: 0.3, y: 0.74 } : undefined}
+        here={where}
+        driver={driver && !over ? driverPosition : null}
+        destination={over ? null : trip.drop}
+        sketch={{ here: { x: 0.5, y: 0.44 }, ...(driver && !over ? { driver: { x: 0.3, y: 0.74 } } : {}) }}
       >
         <View style={[styles.pillWrap, { top: insets.top + space.sm }]}>
           <MapPill style={styles.pill}>

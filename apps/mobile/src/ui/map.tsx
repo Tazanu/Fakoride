@@ -7,22 +7,34 @@
  * than following it down the page — so it lives here once instead of being
  * re-derived with a different negative margin on each screen.
  *
- * **This is a drawing, not a map.** There is no tile source, no OSM, no
- * MapLibre. The design canvas itself draws a stylised street grid, and until
- * real tiles are wired this reproduces that: the same block colours, the same
- * white roads, a position marker and route drawn from real coordinates where
- * they exist. It is honest scaffolding — it never claims to show a street a
- * rider could navigate by, and it costs no tiles, no API key and no data.
+ * **Two maps, one component.** In an installed build this is OpenStreetMap,
+ * drawn by MapLibre out of a single 2.8 MB PMTiles archive holding the whole of
+ * Fako Division down to zoom 15. The archive ships inside the app, so the map
+ * costs nothing to load, bills nobody per view, and works with no signal on the
+ * Soppo climb. Her position, the taxi coming for her and where she is going are
+ * real coordinates on it.
  *
- * When MapLibre lands, `MapPanel` is the one component that changes.
+ * Expo Go cannot load MapLibre — it is native code Expo Go was not built with —
+ * and Expo Go is where the app is tried out day to day. So there the panel
+ * falls back to the drawing it used before: the canvas's stylised street grid,
+ * in the same palette, honest that it is a sketch. Each screen passes both the
+ * real positions and where the sketch should put things, and the panel uses
+ * whichever it can draw.
+ *
+ * MapLibre is required only when it can actually load, so Expo Go never so
+ * much as evaluates it.
  */
 
-import type { ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { StyleSheet, View, type ViewStyle } from "react-native";
 import Svg, { Circle, Path, Rect } from "react-native-svg";
+import { Asset } from "expo-asset";
+import { isRunningInExpoGo } from "expo";
+import type { CameraRef, StyleSpecification } from "@maplibre/maplibre-react-native";
 import { S } from "@/content/strings";
 import { useT } from "@/ui/i18n";
 import { mapPalette, palette, radius, space } from "@/theme";
+import { fakoStyle } from "./map-style";
 import { Rise } from "./motion";
 
 const c = palette("light");
@@ -31,27 +43,185 @@ const map = mapPalette;
 /** How far the sheet is pulled up over the map. Straight from the canvas. */
 const OVERLAP = 26;
 
-type Marker = { x: number; y: number };
+export type LatLng = { lat: number; lng: number };
+/** A place in the sketch, as a fraction of its width and height. */
+type SketchPoint = { x: number; y: number };
 
-export function MapPanel({
-  height,
-  /** Where she is, in panel coordinates 0–1. Centre by default. */
-  here = { x: 0.5, y: 0.55 },
-  /** Other taxis, as dots. Positions are illustrative, never real ones. */
-  pins = [],
-  /** A dotted line from a driver to her, when one is coming. */
-  driver,
-  children,
-}: {
+type MapLibreModule = typeof import("@maplibre/maplibre-react-native");
+
+/** The real map's library, or null where it cannot run. Resolved once. */
+const MapLibre: MapLibreModule | null = (() => {
+  if (isRunningInExpoGo()) return null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require("@maplibre/maplibre-react-native") as MapLibreModule;
+  } catch {
+    // A build made without the native module. The sketch is still a map of sorts.
+    return null;
+  }
+})();
+
+/** Whether this build draws the real map. */
+export const hasRealMap = MapLibre !== null;
+
+/**
+ * Buea, when we have nothing better.
+ *
+ * Never a silent fallback for a missing fix — the screens say "finding you"
+ * in their own words. This is only so the map has somewhere to open.
+ */
+const BUEA: LatLng = { lat: 4.1527, lng: 9.2415 };
+
+/** Close enough to read a junction, wide enough to see where you are going. */
+const CLOSE_ZOOM = 14.5;
+
+type PanelProps = {
   height: number;
-  here?: Marker;
-  pins?: Marker[];
-  driver?: Marker;
+  /** Where she is. The teal dot. */
+  here?: LatLng | null;
+  /** The taxi, once one is coming. */
+  driver?: LatLng | null;
+  /** Where she is going. The amber pin. */
+  destination?: LatLng | null;
+  /**
+   * Where the sketch puts things, for builds without the real map. Fractions
+   * of the panel, chosen per screen so each composition reads as before.
+   */
+  sketch?: { here?: SketchPoint; driver?: SketchPoint };
   children?: ReactNode;
-}) {
+};
+
+export function MapPanel(props: PanelProps) {
+  return MapLibre ? <RealMap {...props} lib={MapLibre} /> : <SketchMap {...props} />;
+}
+
+function RealMap({ height, here, driver, destination, children, lib }: PanelProps & { lib: MapLibreModule }) {
+  // MapView, not Map: the library's name would shadow JavaScript's own Map.
+  const { Camera, Map: MapView, Marker } = lib;
+  const t = useT();
+
+  /**
+   * The archive, resolved to a path on this device.
+   *
+   * Bundled rather than downloaded, so this is a copy already inside the app;
+   * `downloadAsync` only unpacks it and hands back where it landed.
+   */
+  const [uri, setUri] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const asset = Asset.fromModule(require("../../assets/map/fako.pmtiles"));
+    void asset
+      .downloadAsync()
+      .then(() => {
+        if (alive) setUri(asset.localUri ?? asset.uri);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const style = useMemo(() => (uri ? (fakoStyle(uri) as StyleSpecification) : null), [uri]);
+
+  /**
+   * Frame whatever we actually know about: the midpoint of every point we
+   * have, and a zoom wide enough to hold the two furthest apart. Buea is about
+   * 6 km across, so this never has to zoom far out.
+   */
+  const points = [here, driver, destination].filter(Boolean) as LatLng[];
+  const key = JSON.stringify(points);
+  const view = useMemo(() => {
+    if (points.length === 0) return { centre: BUEA, zoom: CLOSE_ZOOM };
+    const lats = points.map((p) => p.lat);
+    const lngs = points.map((p) => p.lng);
+    const centre = {
+      lat: (Math.min(...lats) + Math.max(...lats)) / 2,
+      lng: (Math.min(...lngs) + Math.max(...lngs)) / 2,
+    };
+    const span = Math.max(Math.max(...lats) - Math.min(...lats), Math.max(...lngs) - Math.min(...lngs));
+    if (span < 0.004) return { centre, zoom: CLOSE_ZOOM };
+    // Each zoom level halves what fits: 0.008 degrees is about a kilometre
+    // here, which wants roughly zoom 14.
+    return { centre, zoom: Math.max(11.5, Math.min(CLOSE_ZOOM, Math.log2(0.36 / span))) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  /**
+   * Keep up with what we learn. The first render usually has no fix yet, and
+   * the taxi moves every few seconds after that — eased, because a map that
+   * snaps each time a position arrives reads as a glitch.
+   */
+  const camera = useRef<CameraRef>(null);
+  useEffect(() => {
+    camera.current?.easeTo({ center: [view.centre.lng, view.centre.lat], zoom: view.zoom, duration: 450 });
+  }, [view]);
+
+  return (
+    <View style={[styles.map, { height }]} accessible accessibilityLabel={t(S.signIn.mapOfArea)}>
+      {style ? (
+        <MapView
+          style={StyleSheet.absoluteFill}
+          mapStyle={style}
+          // Nothing to tap. The map is orientation, not a thing to explore —
+          // every action on these screens lives in the sheet below it.
+          dragPan={false}
+          touchZoom={false}
+          touchRotate={false}
+          touchPitch={false}
+          doubleTapZoom={false}
+          logo={false}
+          attribution={false}
+          compass={false}
+          scaleBar={false}
+        >
+          <Camera ref={camera} initialViewState={{ center: [view.centre.lng, view.centre.lat], zoom: view.zoom }} />
+
+          {destination ? (
+            <Marker lngLat={[destination.lng, destination.lat]}>
+              <View style={styles.destination} />
+            </Marker>
+          ) : null}
+
+          {driver ? (
+            <Marker lngLat={[driver.lng, driver.lat]}>
+              <View style={styles.driver} />
+            </Marker>
+          ) : null}
+
+          {here ? (
+            <Marker lngLat={[here.lng, here.lat]}>
+              <View style={styles.hereRing}>
+                <View style={styles.here} />
+              </View>
+            </Marker>
+          ) : null}
+        </MapView>
+      ) : (
+        // The ground colour while the archive unpacks. A white flash under an
+        // ivory sheet is worse than half a second of the map's own background.
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: map.ground }]} />
+      )}
+
+      {children}
+    </View>
+  );
+}
+
+/**
+ * The drawing, for builds that cannot run the real map.
+ *
+ * The design canvas's stylised street grid: the same block colours, the same
+ * white roads, her marker and a driver's dotted run. It never claims to show
+ * a street anybody could navigate by.
+ */
+function SketchMap({ height, sketch, driver, children }: PanelProps) {
   const w = 390;
   const t = useT();
   const h = height;
+  const here = sketch?.here ?? { x: 0.5, y: 0.55 };
+  // The sketch shows a driver when the screen has one to show, wherever the
+  // screen asked for him to be drawn.
+  const coming = sketch?.driver ?? (driver ? { x: 0.3, y: 0.74 } : undefined);
   const hx = here.x * w;
   const hy = here.y * h;
 
@@ -73,24 +243,19 @@ export function MapPanel({
         <Path d={`M330 ${h * 0.2} L302 ${h + 10}`} stroke={map.lane} strokeWidth={8} fill="none" />
 
         {/* A driver on the way: a dotted run to her, and the car at its end. */}
-        {driver ? (
+        {coming ? (
           <>
             <Path
-              d={`M${driver.x * w} ${driver.y * h} C${(driver.x * w + hx) / 2} ${driver.y * h} ${hx} ${(driver.y * h + hy) / 2} ${hx} ${hy}`}
+              d={`M${coming.x * w} ${coming.y * h} C${(coming.x * w + hx) / 2} ${coming.y * h} ${hx} ${(coming.y * h + hy) / 2} ${hx} ${hy}`}
               stroke={map.route}
               strokeWidth={5}
               strokeLinecap="round"
               strokeDasharray="1 11"
               fill="none"
             />
-            <Circle cx={driver.x * w} cy={driver.y * h} r={17} fill={map.pin} />
+            <Circle cx={coming.x * w} cy={coming.y * h} r={17} fill={map.pin} />
           </>
         ) : null}
-
-        {/* Other taxis nearby. A count, never a real position. */}
-        {pins.map((p, i) => (
-          <Circle key={i} cx={p.x * w} cy={p.y * h} r={6} fill={map.pin} />
-        ))}
 
         {/* Her. A soft halo, then a hard dot with a white ring. */}
         <Circle cx={hx} cy={hy} r={26} fill={map.here} opacity={0.16} />
@@ -141,6 +306,43 @@ export function MapPill({ children, style }: { children: ReactNode; style?: View
 
 const styles = StyleSheet.create({
   map: { backgroundColor: map.ground, overflow: "hidden" },
+
+  /* Her own position: a dot inside a soft ring, as on the canvas. */
+  hereRing: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: map.here,
+    opacity: 0.9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  here: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: map.route,
+    borderWidth: 2.5,
+    borderColor: c.card,
+  },
+  /* The taxi coming for her. Solid, and bigger than her dot's centre. */
+  driver: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: map.route,
+    borderWidth: 3,
+    borderColor: c.card,
+  },
+  /* Where she is going. Amber, the one warm mark on the map. */
+  destination: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: map.pin,
+    borderWidth: 3,
+    borderColor: c.card,
+  },
 
   sheet: {
     flexGrow: 1,

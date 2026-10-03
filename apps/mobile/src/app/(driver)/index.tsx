@@ -37,7 +37,7 @@ import { ApiError } from "@/api/client";
 import { shift, trips, type TodaySummary } from "@/api/driver";
 import { useSession } from "@/session/SessionProvider";
 import { useDriverRealtime } from "@/realtime/DriverRealtime";
-import { findMe } from "@/ui/position";
+import { findMe, useWhereIAm } from "@/ui/position";
 import { MapPanel, Sheet } from "@/ui/map";
 import { ServiceNotice } from "@/ui/notice";
 import { S } from "@/content/strings";
@@ -53,6 +53,8 @@ export default function Home() {
   const { me } = useSession();
   const insets = useSafeAreaInsets();
   const { offer, clearOffer } = useDriverRealtime();
+  // The map opens where he is, not where Buea is.
+  const where = useWhereIAm();
   const t = useT();
 
   const [today, setToday] = useState<TodaySummary | null>(null);
@@ -164,7 +166,7 @@ export default function Home() {
         />
       }
     >
-      <MapPanel height={MAP_HEIGHT} here={{ x: 0.5, y: 0.47 }}>
+      <MapPanel height={MAP_HEIGHT} here={where} sketch={{ here: { x: 0.5, y: 0.47 } }}>
         {/* The online switch is the whole top of the map, not a button in a bar. */}
         <View style={[styles.statusBar, { top: insets.top + space.sm }]}>
           <View style={styles.statusLeft}>

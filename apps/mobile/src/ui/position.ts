@@ -14,6 +14,7 @@
  */
 
 import * as Location from "expo-location";
+import { useEffect, useState } from "react";
 
 export type Fix = { lat: number; lng: number };
 
@@ -64,4 +65,39 @@ export async function findMe(): Promise<Fix | null> {
   }
 
   return null;
+}
+
+/**
+ * Where I am, as state.
+ *
+ * `findMe` is a promise; a map needs a value it can re-render on. Three screens
+ * wanted the same six lines around it, so they live here once.
+ *
+ * Cheap to call: `findMe` asks for the last known fix before it asks the GPS,
+ * so a second screen opening a moment later gets the answer immediately rather
+ * than waking the radio again.
+ *
+ * **It does not ask for permission**, deliberately. A prompt should follow
+ * something the person did, with a reason attached — the rider's home screen
+ * asks before finding her a taxi, and the driver's asks before he goes online.
+ * A map quietly wanting to draw a dot is not a reason. Without permission this
+ * returns null and the map opens on the town instead, which is a fair answer
+ * to a question nobody agreed to.
+ */
+export function useWhereIAm(): Fix | null {
+  const [fix, setFix] = useState<Fix | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void findMe()
+      .then((next) => {
+        if (alive && next) setFix(next);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  return fix;
 }

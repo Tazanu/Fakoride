@@ -232,7 +232,7 @@ export default function Book() {
         count, never positions — so they were decoration standing in for a
         fact. The pill above says the honest thing, and says it in words.
       */}
-      <MapPanel height={MAP_HEIGHT}>
+      <MapPanel height={MAP_HEIGHT} here={fix}>
         <View style={[styles.mapTop, { top: insets.top + space.sm }]}>
           {/*
             This used to sign her out in one tap, from a button that looked

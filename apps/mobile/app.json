@@ -28,6 +28,7 @@
       "expo-status-bar",
       "expo-secure-store",
       "expo-font",
+      "@maplibre/maplibre-react-native",
       [
         "expo-notifications",
         {
