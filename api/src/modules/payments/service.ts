@@ -21,6 +21,7 @@
 
 import { Prisma, type Payment, type PaymentStatus } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
+import { takeTick } from "../../lib/redis";
 import { oneAtATime } from "../../lib/locks";
 import { env } from "../../env";
 import { logger } from "../../lib/logger";
@@ -664,7 +665,13 @@ async function retryInitiation(payment: Payment): Promise<void> {
  */
 export function startPaymentJobs(intervalMs = env.PAYMENT_JOB_INTERVAL_SECONDS * 1000): NodeJS.Timeout {
   return setInterval(() => {
-    void reconcilePendingPayments().catch((err) => logger.error({ err }, "payment reconciliation failed"));
-    void runAccessFeeCollection().catch((err) => logger.error({ err }, "access fee collection failed"));
+    // One instance per tick. The money paths are already safe to run twice —
+    // locked and idempotent — but there is no reason to ask the provider about
+    // the same payment from two places.
+    void takeTick("payment-jobs", intervalMs - 200).then((mine) => {
+      if (!mine) return;
+      void reconcilePendingPayments().catch((err) => logger.error({ err }, "payment reconciliation failed"));
+      void runAccessFeeCollection().catch((err) => logger.error({ err }, "access fee collection failed"));
+    });
   }, intervalMs);
 }

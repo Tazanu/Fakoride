@@ -41,6 +41,7 @@ const SUITES = [
   "04-money.mjs",
   "05-remaining-surface.mjs",
   "06-push.mjs",
+  "07-two-servers.mjs",
 ];
 
 /** Each run's own database. The prefix is what the drop below checks for. */

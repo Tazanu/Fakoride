@@ -8,6 +8,7 @@
 
 import type { Server as HttpServer } from "node:http";
 import { Server as SocketServer, type Socket } from "socket.io";
+import { createAdapter } from "@socket.io/redis-adapter";
 import { env } from "./env";
 import { prisma } from "./lib/prisma";
 import { assertLive, verifyToken } from "./middleware/auth";
@@ -16,6 +17,17 @@ import { redis, driverActiveTripKey } from "./lib/redis";
 import { logger } from "./lib/logger";
 
 let io: SocketServer | null = null;
+
+/**
+ * The two Redis connections the adapter needs: one to publish, one to listen.
+ *
+ * Without them every instance knows only its own sockets, so an offer
+ * dispatched by one instance never reaches a driver connected to another, and
+ * "sign out everywhere" only closes the connections that happen to be local.
+ * With them, every emit and every disconnect goes to whichever instance holds
+ * the socket. With a single instance it costs one publish per emit.
+ */
+let adapterClients: { pub: typeof redis; sub: typeof redis } | null = null;
 
 const riderRoom = (userId: string) => `rider:${userId}`;
 const driverRoom = (driverId: string) => `driver:${driverId}`;
@@ -36,6 +48,10 @@ export function initRealtime(server: HttpServer): SocketServer {
     pingInterval: 25_000,
     pingTimeout: 20_000,
   });
+  const pub = redis.duplicate();
+  const sub = redis.duplicate();
+  adapterClients = { pub, sub };
+  io.adapter(createAdapter(pub, sub));
 
   io.use(async (socket, next) => {
     try {
@@ -153,4 +169,6 @@ export function emitToOps(event: string, payload: unknown): void {
 export async function closeRealtime(): Promise<void> {
   await io?.close();
   io = null;
+  await Promise.all([adapterClients?.pub.quit(), adapterClients?.sub.quit()]).catch(() => undefined);
+  adapterClients = null;
 }

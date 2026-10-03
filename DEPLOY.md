@@ -163,8 +163,10 @@ MTN number and check that one arrives too.
   cannot load the map library, so there it shows the old drawing instead. The map
   has compiled and bundled here but has never run on a phone: step 8's build is its
   first real test, so look at the map closely then.
-- **One API server.** Render's starter plan runs one. A second would need a Redis
-  adapter for the live connections — not needed until there is real load.
+- **Ready for a second API server, not using one.** Render's starter plan runs one.
+  If load ever needs two, raise the instance count in Render: live connections
+  are shared through Redis and each background job runs on one server at a time,
+  both tested with two servers running together.
 - **A driver has 12 seconds to accept.** Opening the app from a locked phone may
   need longer; change `OFFER_TTL_SECONDS` in Render after watching real drivers.
 - **Library advisories left open:** in the API, one inside Prisma's command-line

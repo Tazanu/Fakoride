@@ -9,7 +9,7 @@
  * a driver having to move once for us to see him again.
  */
 
-import { redis, driverOfferKey, offerKey } from "../lib/redis";
+import { redis, driverOfferKey, offerKey, takeTick } from "../lib/redis";
 import { prisma } from "../lib/prisma";
 import { env } from "../env";
 import { logger } from "../lib/logger";
@@ -193,7 +193,11 @@ export async function offerToNextDriver(tripId: string): Promise<boolean> {
  */
 export function startDispatchSweeper(intervalMs = 2000): NodeJS.Timeout {
   return setInterval(() => {
-    void sweepExpiredOffers().catch((err) => logger.error({ err }, "dispatch sweep failed"));
+    // One instance per tick: two sweeping at once would both move the same
+    // expired offer on to the next driver.
+    void takeTick("dispatch-sweep", intervalMs - 100)
+      .then((mine) => (mine ? sweepExpiredOffers() : undefined))
+      .catch((err) => logger.error({ err }, "dispatch sweep failed"));
   }, intervalMs);
 }
 
