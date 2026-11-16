@@ -181,6 +181,28 @@ export const S = {
       "Vos signalements, et les réponses reçues",
     ),
     signOut: p("Sign out", "Se déconnecter"),
+    callUs: p("Call Fako Ride", "Appeler Fako Ride"),
+
+    deleteAccount: p("Delete my account", "Supprimer mon compte"),
+    deleteAsk: p("Delete your account?", "Supprimer votre compte ?"),
+    deleteWhy: p(
+      "Your number, name, photo and trusted contacts are erased, and you are signed out everywhere. Records of your rides and payments are kept, as the law requires, without your name. This cannot be undone.",
+      "Votre numéro, votre nom, votre photo et vos contacts de confiance sont effacés, et vous êtes déconnecté partout. L'historique de vos courses et paiements est conservé, comme la loi l'exige, sans votre nom. Cette action est définitive.",
+    ),
+    deleteDo: p("Delete it", "Le supprimer"),
+    deleteAfterRide: p(
+      "You have a ride under way. Finish or cancel it, then delete your account.",
+      "Vous avez une course en cours. Terminez-la ou annulez-la, puis supprimez votre compte.",
+    ),
+    deleteAfterCashOut: p(
+      "We are holding money for you. Send it to your mobile money from My money, then delete your account.",
+      "Nous détenons de l'argent pour vous. Envoyez-le sur votre mobile money depuis Mon argent, puis supprimez votre compte.",
+    ),
+    deleteAfterPayment: p(
+      "A payment is still going through. Try again in a few minutes.",
+      "Un paiement est encore en cours. Réessayez dans quelques minutes.",
+    ),
+
     signOutElsewhere: p("Sign out on every other phone", "Se déconnecter sur tous les autres téléphones"),
     signOutElsewhereAsk: p("Sign out everywhere else?", "Se déconnecter partout ailleurs ?"),
     signOutElsewhereWhy: p(
@@ -336,6 +358,33 @@ export const S = {
     noNetwork: p("No network.", "Pas de réseau."),
     didNotWork: p("That did not work.", "Cela n'a pas fonctionné."),
     didNotWorkTryAgain: p("That did not work. Try again.", "Cela n'a pas fonctionné. Réessayez."),
+
+    // The permanent notification Android shows while his position is being sent.
+    onlineNoticeTitle: p("Fako Ride — you are online", "Fako Ride — vous êtes en ligne"),
+    onlineNoticeBody: p(
+      "Sharing your position so riders nearby can find you. Go offline to stop.",
+      "Votre position est partagée pour que les passagers proches vous trouvent. Passez hors ligne pour arrêter.",
+    ),
+    takenOffline: p(
+      "We lost your position for a while, so you were taken offline. Go online again when you are ready.",
+      "Nous avons perdu votre position un moment : vous avez été mis hors ligne. Remettez-vous en ligne quand vous êtes prêt.",
+    ),
+
+    feesOverdue: p(
+      "You have unpaid access fees. Pay them to go online.",
+      "Vous avez des frais d'accès impayés. Réglez-les pour vous mettre en ligne.",
+    ),
+    feesOwed: p("Unpaid access fees — {amount} FCFA", "Frais d'accès impayés — {amount} FCFA"),
+    payNow: p("Pay now", "Payer maintenant"),
+    feesPrompted: p(
+      "Check your phone and approve the payment. Then go online.",
+      "Regardez votre téléphone et validez le paiement. Puis mettez-vous en ligne.",
+    ),
+    feesRefused: p(
+      "Your mobile money refused the payment. Top up and try again.",
+      "Votre mobile money a refusé le paiement. Rechargez et réessayez.",
+    ),
+    feesSettled: p("Your fees are paid. You can go online.", "Vos frais sont réglés. Vous pouvez vous mettre en ligne."),
   },
 
   /**
@@ -382,7 +431,6 @@ export const S = {
       "Payé par téléphone. Cela arrive dans votre solde.",
     ),
 
-    callHer: p("Call her", "L'appeler"),
     dropRide: p("Drop this ride", "Abandonner cette course"),
     getHelp: p("GET HELP", "DEMANDER DE L'AIDE"),
     getHelpLabel: p("Get help", "Demander de l'aide"),
@@ -508,6 +556,11 @@ export const S = {
     arrived: p("You have arrived", "Vous êtes arrivé"),
     nobodyTook: p("Nobody took this one", "Personne n'a pris cette course"),
     heDropped: p("He dropped the ride", "Le chauffeur a abandonné la course"),
+    weEndedIt: p("We ended this ride", "Nous avons mis fin à cette course"),
+    weEndedItWhy: p(
+      "Fako Ride ended this ride because it could not go ahead. Nothing has been charged. You can book again.",
+      "Fako Ride a mis fin à cette course car elle ne pouvait pas avoir lieu. Rien ne vous a été facturé. Vous pouvez réserver à nouveau.",
+    ),
     over: p("This ride is over", "Cette course est terminée"),
 
     usuallyQuick: p(

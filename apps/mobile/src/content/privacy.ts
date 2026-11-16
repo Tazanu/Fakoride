@@ -14,7 +14,7 @@ import type { LegalDoc } from "./terms";
 
 const en: LegalDoc = {
   title: "Privacy",
-  updated: "21 September 2026",
+  updated: "16 November 2026",
   intro:
     "What we keep about you, who can see it, and what you can make us do about it. It is written plainly on purpose — a policy nobody can read is not consent, it is paperwork.",
   footer:
@@ -40,7 +40,7 @@ const en: LegalDoc = {
         "Drivers, because the law and the work require it:",
         "• Your vehicle registration plate, your national identity card number, and your S10 licence number. A paid trip cannot legally be dispatched to a driver without an S10, so we have to hold it.",
         "• Photographs of your national identity card, your vehicle registration and yourself. These are checked by a person before you are approved.",
-        "• Where you are, continuously, while you are online and available for work. When you go offline we stop, and your last position is deleted rather than kept.",
+        "• Where you are, continuously, while you are online and available for work — with the screen off too, which is why your phone shows a notification for as long as you are online. When you go offline we stop, and your last position is deleted rather than kept.",
         "• What you earned, what you were paid, and the daily access fee for each day you worked.",
         "Everybody, when something goes wrong:",
         "• Complaints you send us, and what we answered.",
@@ -64,7 +64,9 @@ const en: LegalDoc = {
       body: [
         "We do not sell your information to anybody, and we do not use it to advertise to you.",
         "We share only what is needed, with:",
-        "• Your driver or your rider, during a trip: a name, a photograph if you added one, a phone number so you can call each other, and the plate.",
+        "• Your driver, during a trip: your first name, and your photograph if you added one. He is not shown your phone number.",
+        "• Your rider, during a trip: your name, your photograph if you added one, your plate, and your phone number so that she can call you.",
+        "• The people you saved as trusted contacts, if you press Get help: a text saying so, with a link to follow that trip.",
         "• Anyone you send a trip link to. That is your choice, the link expires, and you can revoke it.",
         "• The mobile money provider, so a payment can be made.",
         "• The police or a court, if we are lawfully required to — and we will tell you when we are allowed to tell you.",
@@ -74,6 +76,7 @@ const en: LegalDoc = {
       heading: "How long we keep it",
       body: [
         "Trip records, complaints and emergency alerts are kept while the account exists, because a dispute about a fare or an incident can arrive weeks later and we would be no use without them.",
+        "If you delete your account, those records and the record of payments are kept, no longer attached to your name, for the same reason and because financial records have to be held. Everything else goes at once — see Your rights, below.",
         "Driver documents are kept while you drive with us and for as long afterwards as we are required to hold them.",
         "Your photograph is kept until you remove it. When you remove it, the file itself is deleted, not just hidden.",
         "A driver's live position is not history. It is overwritten as you move and deleted when you go offline.",
@@ -85,7 +88,7 @@ const en: LegalDoc = {
         "Under Cameroonian law — Law No. 2024/017 of 23 December 2024 on the protection of personal data — you can ask us to:",
         "• Show you what we hold about you.",
         "• Correct anything that is wrong. Your name is yours to change in the app at any time.",
-        "• Delete your account and what we hold, except where we are required to keep it.",
+        "• Delete your account. You do not have to ask: open Account and press Delete my account. Your phone number, name, photograph, trusted contacts and, for drivers, your identity documents and their numbers are erased at once. If you no longer have the app, write to us and we will do it.",
         "• Give you a copy you can take elsewhere.",
         "• Stop processing that relies on your agreement, by withdrawing it.",
         "Ask us and we will answer. If you are not satisfied, you may complain to the national data protection authority.",
@@ -116,7 +119,7 @@ const en: LegalDoc = {
       heading: "Changes, and reaching us",
       body: [
         "If we change this, we will say so in the app rather than quietly updating a page nobody visits.",
-        "Write to us at privacy@fakoride.cm, or call the number on the support screen.",
+        "Write to us at privacy@fakoride.cm, or call the number shown on your Account screen.",
       ],
     },
   ],
@@ -124,7 +127,7 @@ const en: LegalDoc = {
 
 const fr: LegalDoc = {
   title: "Confidentialité",
-  updated: "21 septembre 2026",
+  updated: "16 novembre 2026",
   intro:
     "Ce que nous conservons sur vous, qui peut le voir, et ce que vous pouvez nous obliger à en faire. Écrit simplement, volontairement : une politique que personne ne peut lire n'est pas un consentement, c'est de la paperasse.",
   footer:
@@ -150,7 +153,7 @@ const fr: LegalDoc = {
         "Pour les chauffeurs, parce que la loi et le métier l'exigent :",
         "• Votre plaque d'immatriculation, le numéro de votre carte nationale d'identité et celui de votre licence S10. Une course payante ne peut légalement être confiée à un chauffeur sans S10 ; nous devons donc le conserver.",
         "• Les photographies de votre carte nationale d'identité, de votre carte grise et de vous-même. Elles sont vérifiées par une personne avant votre validation.",
-        "• Votre position, en continu, tant que vous êtes en ligne et disponible. Dès que vous vous mettez hors ligne nous arrêtons, et votre dernière position est supprimée plutôt que conservée.",
+        "• Votre position, en continu, tant que vous êtes en ligne et disponible — écran éteint compris, raison pour laquelle votre téléphone affiche une notification tant que vous êtes en ligne. Dès que vous vous mettez hors ligne nous arrêtons, et votre dernière position est supprimée plutôt que conservée.",
         "• Ce que vous avez gagné, ce qui vous a été versé, et les frais d'accès journaliers de chaque jour travaillé.",
         "Pour tout le monde, quand quelque chose se passe mal :",
         "• Les réclamations que vous nous envoyez, et ce que nous avons répondu.",
@@ -174,7 +177,9 @@ const fr: LegalDoc = {
       body: [
         "Nous ne vendons vos informations à personne, et nous ne les utilisons pas pour vous adresser de la publicité.",
         "Nous ne partageons que le nécessaire, avec :",
-        "• Votre chauffeur ou votre passager, pendant une course : un nom, une photographie si vous en avez ajouté une, un numéro de téléphone pour vous appeler, et la plaque.",
+        "• Votre chauffeur, pendant une course : votre prénom, et votre photographie si vous en avez ajouté une. Votre numéro de téléphone ne lui est pas communiqué.",
+        "• Votre passager, pendant une course : votre nom, votre photographie si vous en avez ajouté une, votre plaque, et votre numéro de téléphone pour qu'il puisse vous appeler.",
+        "• Les personnes que vous avez enregistrées comme contacts de confiance, si vous appuyez sur Demander de l'aide : un SMS les prévenant, avec un lien pour suivre cette course.",
         "• Toute personne à qui vous envoyez un lien de suivi. C'est votre choix, le lien expire, et vous pouvez le révoquer.",
         "• L'opérateur de mobile money, pour qu'un paiement puisse être effectué.",
         "• La police ou un tribunal, si la loi nous y oblige — et nous vous le dirons lorsque nous avons le droit de vous le dire.",
@@ -184,6 +189,7 @@ const fr: LegalDoc = {
       heading: "Combien de temps nous les gardons",
       body: [
         "Les courses, les réclamations et les alertes d'urgence sont conservées tant que le compte existe, car un litige sur un tarif ou un incident peut survenir des semaines plus tard et nous ne vous serions alors d'aucune utilité.",
+        "Si vous supprimez votre compte, ces éléments et l'historique des paiements sont conservés, sans être rattachés à votre nom, pour la même raison et parce que les documents financiers doivent être conservés. Tout le reste disparaît aussitôt — voir Vos droits, ci-dessous.",
         "Les documents d'un chauffeur sont conservés tant qu'il roule avec nous, et ensuite aussi longtemps que nous sommes tenus de les garder.",
         "Votre photographie est conservée jusqu'à ce que vous la retiriez. Quand vous la retirez, le fichier lui-même est supprimé, pas seulement masqué.",
         "La position d'un chauffeur en ligne n'est pas un historique. Elle est écrasée à mesure qu'il se déplace et supprimée dès qu'il se met hors ligne.",
@@ -195,7 +201,7 @@ const fr: LegalDoc = {
         "En vertu du droit camerounais — la loi n° 2024/017 du 23 décembre 2024 relative à la protection des données à caractère personnel — vous pouvez nous demander de :",
         "• Vous montrer ce que nous détenons à votre sujet.",
         "• Corriger ce qui est inexact. Votre nom vous appartient et se modifie dans l'application à tout moment.",
-        "• Supprimer votre compte et ce que nous détenons, sauf ce que nous sommes tenus de conserver.",
+        "• Supprimer votre compte. Inutile de nous le demander : ouvrez Compte et appuyez sur Supprimer mon compte. Votre numéro de téléphone, votre nom, votre photographie, vos contacts de confiance et, pour les chauffeurs, vos pièces d'identité et leurs numéros sont effacés aussitôt. Si vous n'avez plus l'application, écrivez-nous et nous le ferons.",
         "• Vous remettre une copie que vous pouvez emporter ailleurs.",
         "• Cesser un traitement qui repose sur votre accord, en le retirant.",
         "Demandez-nous et nous répondrons. Si la réponse ne vous satisfait pas, vous pouvez saisir l'autorité nationale de protection des données.",
@@ -226,7 +232,7 @@ const fr: LegalDoc = {
       heading: "Modifications, et nous joindre",
       body: [
         "Si nous modifions ce texte, nous le dirons dans l'application plutôt que de mettre à jour discrètement une page que personne ne consulte.",
-        "Écrivez-nous à privacy@fakoride.cm, ou appelez le numéro indiqué sur l'écran d'assistance.",
+        "Écrivez-nous à privacy@fakoride.cm, ou appelez le numéro affiché sur l'écran Compte.",
       ],
     },
   ],

@@ -35,6 +35,7 @@ import { geo, onboarding } from "@/api/driver";
 import { useSession } from "@/session/SessionProvider";
 import { keyboardBehavior, useScrollPastKeyboard } from "@/ui/keyboard";
 import { Steps } from "@/ui/steps";
+import { CallUs } from "@/ui/call-us";
 import { S } from "@/content/strings";
 import { useT, type Phrase } from "@/ui/i18n";
 import { palette, radius, space, touch, type } from "@/theme";
@@ -309,6 +310,7 @@ function Rejected({ onSignOut }: { onSignOut: () => void }) {
       <View style={styles.waitingWords}>
         <Text style={styles.h1Centre}>{t(S.apply.refused)}</Text>
         <Text style={styles.subCentre}>{t(S.apply.refusedWhy)}</Text>
+        <CallUs />
       </View>
       <View style={styles.spacer} />
       <Pressable onPress={onSignOut} accessibilityRole="button" style={styles.signOut}>

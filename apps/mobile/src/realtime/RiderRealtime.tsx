@@ -39,7 +39,8 @@ export type TripEvent =
   | "arrived"
   | "started"
   | "completed"
-  | "driver_cancelled";
+  | "driver_cancelled"
+  | "cancelled_by_ops";
 
 type RealtimeState = {
   /** The last thing that happened, and which trip it happened to. */
@@ -106,6 +107,8 @@ export function RiderRealtime({ children }: { children: ReactNode }) {
         ["trip:started", bump("started")],
         ["trip:completed", bump("completed")],
         ["trip:driver_cancelled", bump("driver_cancelled")],
+        // Fako Ride ended it: an operator, or a ride its driver never started.
+        ["trip:cancelled_by_ops", bump("cancelled_by_ops")],
       ];
       for (const [name, fn] of handlers) socket.on(name, fn);
 

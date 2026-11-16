@@ -100,6 +100,8 @@ function stageLine(status: TripDetail["status"]): Phrase {
       return S.trip.nobodyTook;
     case "CANCELLED_BY_DRIVER":
       return S.trip.heDropped;
+    case "CANCELLED_BY_OPS":
+      return S.trip.weEndedIt;
     default:
       return S.trip.over;
   }
@@ -247,7 +249,8 @@ export default function Trip() {
     trip.status === "COMPLETED" ||
     trip.status === "NO_DRIVER_FOUND" ||
     trip.status === "CANCELLED_BY_RIDER" ||
-    trip.status === "CANCELLED_BY_DRIVER";
+    trip.status === "CANCELLED_BY_DRIVER" ||
+    trip.status === "CANCELLED_BY_OPS";
   const driver = trip.driver;
 
   return (
@@ -298,6 +301,10 @@ export default function Trip() {
           <Text style={styles.waiting}>{t(S.trip.noTaxiTook)}</Text>
         ) : null}
 
+        {trip.status === "CANCELLED_BY_OPS" ? (
+          <Text style={styles.waiting}>{t(S.trip.weEndedItWhy)}</Text>
+        ) : null}
+
         {driver ? (
           <View style={styles.driverRow}>
             <Face uri={driverFace} name={driver.name} />
@@ -322,14 +329,16 @@ export default function Trip() {
                 </Text>
               </View>
             </View>
-            <Pressable
-              onPress={() => void Linking.openURL(`tel:${driver.phone}`)}
-              accessibilityRole="button"
-              accessibilityLabel={t(S.trip.callDriver)}
-              style={({ pressed }) => [styles.callButton, pressed && styles.pressed]}
-            >
-              <PhoneCallIcon size={22} color={c.onAction} />
-            </Pressable>
+            {driver.phone && !over ? (
+              <Pressable
+                onPress={() => void Linking.openURL(`tel:${driver.phone}`)}
+                accessibilityRole="button"
+                accessibilityLabel={t(S.trip.callDriver)}
+                style={({ pressed }) => [styles.callButton, pressed && styles.pressed]}
+              >
+                <PhoneCallIcon size={22} color={c.onAction} />
+              </Pressable>
+            ) : null}
           </View>
         ) : null}
 

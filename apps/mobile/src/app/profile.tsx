@@ -18,13 +18,13 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { CameraIcon, CaretLeftIcon, UserIcon } from "@/ui/icons";
 import { ApiError, fetchPhotoDataUri } from "@/api/client";
-import { profile } from "@/api/session";
+import { profile, support } from "@/api/session";
 import { S } from "@/content/strings";
 import { useT, type Phrase } from "@/ui/i18n";
 import { TrustedContacts } from "@/ui/trusted-contacts";
@@ -45,6 +45,14 @@ function errorFor(err: unknown): Phrase {
       return S.account.notAnImage;
     case "too_large":
       return S.account.tooLarge;
+    // The three things that stop an account being deleted. Each is something
+    // to finish first, so each says what.
+    case "trip_in_progress":
+      return S.account.deleteAfterRide;
+    case "balance_held":
+      return S.account.deleteAfterCashOut;
+    case "payment_in_flight":
+      return S.account.deleteAfterPayment;
     default:
       return S.account.didNotWork;
   }
@@ -54,7 +62,7 @@ export default function Profile() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const scroll = useScrollPastKeyboard();
-  const { me, refresh, signOut, signOutEverywhere } = useSession();
+  const { me, refresh, signOut, signOutEverywhere, deleteAccount } = useSession();
   const t = useT();
 
   const [photo, setPhoto] = useState<string | null>(null);
@@ -62,6 +70,51 @@ export default function Profile() {
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<Phrase | null>(null);
+  // The office number, when the server has one. The row is simply absent until
+  // then — "Call us" with nothing to call is what this replaces.
+  const [supportPhone, setSupportPhone] = useState<string | null>(null);
+  // Its own line, beside the button at the foot of the page — the general
+  // error sits a screen and a half above, where he would never see it.
+  const [deleteError, setDeleteError] = useState<Phrase | null>(null);
+
+  useEffect(() => {
+    let gone = false;
+    void support
+      .get()
+      .then((s) => {
+        if (!gone) setSupportPhone(s.phone);
+      })
+      .catch(() => undefined);
+    return () => {
+      gone = true;
+    };
+  }, []);
+
+  /**
+   * Delete the account.
+   *
+   * Asked twice in one dialog's worth of words: what goes, what is kept, and
+   * that it cannot be undone. When the server refuses it is because something
+   * has to finish first, and the message under the form says what.
+   */
+  function confirmDelete() {
+    Alert.alert(t(S.account.deleteAsk), t(S.account.deleteWhy), [
+      { text: t(S.account.cancel), style: "cancel" },
+      {
+        text: t(S.account.deleteDo),
+        style: "destructive",
+        onPress: () => {
+          setBusy(true);
+          setDeleteError(null);
+          // On success the session is gone and the app returns to the welcome
+          // screen by itself; there is nothing left here to update.
+          void deleteAccount()
+            .catch((err: unknown) => setDeleteError(errorFor(err)))
+            .finally(() => setBusy(false));
+        },
+      },
+    ]);
+  }
 
   const loadPhoto = useCallback(async () => {
     if (!me?.hasPhoto) {
@@ -323,6 +376,17 @@ export default function Profile() {
         <Text style={styles.rowLinkHint}>{t(S.account.reportsWhy)}</Text>
       </Pressable>
 
+      {supportPhone ? (
+        <Pressable
+          onPress={() => void Linking.openURL(`tel:${supportPhone}`)}
+          accessibilityRole="button"
+          style={styles.rowLink}
+        >
+          <Text style={styles.rowLinkText}>{t(S.account.callUs)}</Text>
+          <Text style={styles.rowLinkHint}>{supportPhone}</Text>
+        </Pressable>
+      ) : null}
+
       {/*
         Reachable after you have signed in, not only on the welcome screen you
         saw once and will never see again.
@@ -371,6 +435,21 @@ export default function Profile() {
       >
         <Text style={styles.elsewhereLabel}>{t(S.account.signOutElsewhere)}</Text>
       </Pressable>
+
+      {/*
+        Last, and quiet, but here: the privacy page has always said an account
+        can be deleted, and until now there was no way to do it.
+      */}
+      <Pressable
+        onPress={confirmDelete}
+        disabled={busy}
+        accessibilityRole="button"
+        hitSlop={8}
+        style={styles.elsewhere}
+      >
+        <Text style={styles.deleteLabel}>{t(S.account.deleteAccount)}</Text>
+      </Pressable>
+      {deleteError ? <Text style={styles.error}>{t(deleteError)}</Text> : null}
     </ScrollView>
   );
 }
@@ -504,4 +583,5 @@ const styles = StyleSheet.create({
   signOutLabel: { ...type.bodyStrong, color: c.danger },
   elsewhere: { minHeight: touch.min, alignItems: "center", justifyContent: "center" },
   elsewhereLabel: { ...type.secondary, color: c.muted, textDecorationLine: "underline" },
+  deleteLabel: { ...type.secondary, color: c.danger, textDecorationLine: "underline" },
 });

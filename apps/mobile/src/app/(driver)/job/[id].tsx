@@ -21,7 +21,6 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
-  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -90,7 +89,7 @@ export default function Trip() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const t = useT();
-  const { cancelledTripId, acknowledgeCancellation } = useDriverRealtime();
+  const { cancelledTripId, acknowledgeCancellation, completedTripId } = useDriverRealtime();
   // The PIN gate puts a keypad over the bottom half of this screen.
   const scroll = useScrollPastKeyboard();
 
@@ -132,6 +131,16 @@ export default function Trip() {
       { text: t(S.job.ok), onPress: () => router.replace("/(driver)") },
     ]);
   }, [cancelledTripId, id, acknowledgeCancellation, router]);
+
+  /**
+   * Somebody else finished this ride — ops from the console, after he rang to
+   * say his screen had frozen, or the server because it ran for hours. Show it
+   * as finished, with the money line, rather than a FINISH button that will be
+   * refused.
+   */
+  useEffect(() => {
+    if (id && completedTripId === id) void load();
+  }, [completedTripId, id, load]);
 
   /**
    * His position, while it matters.
@@ -320,10 +329,13 @@ export default function Trip() {
 
         {!done ? (
           <>
+            {/*
+              There was a "Call her" here. It opened the dialler with no number
+              in it, because a driver is never sent a rider's number — the API
+              withholds it on purpose and a test holds it to that. She has his,
+              and can ring him; a button that cannot work is worse than none.
+            */}
             <View style={styles.minorActions}>
-              <Pressable onPress={() => void Linking.openURL("tel:")} accessibilityRole="button" style={styles.minor}>
-                <Text style={styles.minorLabel}>{t(S.job.callHer)}</Text>
-              </Pressable>
               <Pressable onPress={confirmCancel} accessibilityRole="button" style={styles.minor}>
                 <Text style={[styles.minorLabel, styles.minorDanger]}>{t(S.job.dropRide)}</Text>
               </Pressable>

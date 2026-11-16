@@ -81,6 +81,20 @@ export const profile = {
     api.patch<{ id: string; name: string | null; language: string }>("/me", body),
 
   removePhoto: () => api.delete<{ removed: true }>("/me/photo"),
+
+  /**
+   * Delete this account, for good. Refused with `trip_in_progress`,
+   * `balance_held` or `payment_in_flight` when something has to finish first.
+   */
+  deleteAccount: () => api.delete<null>("/me"),
+};
+
+/**
+ * The number to call. Asked of the server rather than built into the app, so
+ * changing the office phone does not need a new release. Null until one is set.
+ */
+export const support = {
+  get: () => api.get<{ phone: string | null; email: string }>("/support"),
 };
 
 export type TrustedContact = { id: string; name: string; phone: string };

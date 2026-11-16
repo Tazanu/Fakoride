@@ -23,6 +23,9 @@ import {
   Manrope_700Bold,
 } from "@expo-google-fonts/manrope";
 import { SessionProvider, useSession } from "@/session/SessionProvider";
+// For its side effect: defines the task Android delivers a driver's position
+// to. It must exist before any screen does — see the file.
+import "@/driver/presence";
 import { palette } from "@/theme";
 
 void SplashScreen.preventAutoHideAsync();

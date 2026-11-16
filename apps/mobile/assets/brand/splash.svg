@@ -1,0 +1,12 @@
+<!-- The welcome screen's badge (src/app/welcome.tsx), laid out as an app icon. Edit the badge there first, then here. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><g transform="translate(71.68 71.68) scale(3.38708)">
+  <circle cx="130" cy="130" r="122" fill="none" stroke="#5EC4B6" stroke-width="3"/>
+  <circle cx="130" cy="130" r="110" fill="none" stroke="#5EC4B6" stroke-width="1.2"/>
+  <polygon points="42,152 90,96 112,118 138,44 164,118 186,96 218,152" fill="#5EC4B6"/>
+  <rect x="120" y="156" width="26" height="10" rx="3" fill="#F0A93B"/>
+  <path d="M 74 210 L 77 195 C 78 189, 83 186, 89 186 L 104 186 L 117 171 C 119 168, 123 166, 127 166 L 151 166 C 156 166, 161 169, 163 174 L 168 186 L 179 189 C 186 191, 190 196, 190 203 L 190 210 Z" fill="#F0A93B"/>
+  <path d="M 112 184 L 122 173 C 123 171, 125 170, 128 170 L 140 170 L 140 184 Z" fill="#0F5F58"/>
+  <path d="M 146 170 L 150 170 C 153 170, 155 171, 156 174 L 160 184 L 146 184 Z" fill="#0F5F58"/>
+  <circle cx="101" cy="210" r="13" fill="#0F5F58" stroke="#F0A93B" stroke-width="4"/>
+  <circle cx="166" cy="210" r="13" fill="#0F5F58" stroke="#F0A93B" stroke-width="4"/>
+</g></svg>

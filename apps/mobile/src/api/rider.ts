@@ -21,7 +21,9 @@ export type TripStatus =
   | "COMPLETED"
   | "CANCELLED_BY_RIDER"
   | "CANCELLED_BY_DRIVER"
-  | "NO_DRIVER_FOUND";
+  | "NO_DRIVER_FOUND"
+  /** Ended by Fako Ride itself — an operator, or the watchdog. Nothing charged. */
+  | "CANCELLED_BY_OPS";
 
 // Who is signed in lives in one place now that one app serves both sides.
 // Re-exported so a screen can keep importing it from the module it already uses.
@@ -184,7 +186,8 @@ export const demand = {
 
 export type TripDriver = {
   name: string | null;
-  phone: string;
+  /** Null once he has deleted his account: there is then nobody to ring. */
+  phone: string | null;
   plate: string;
   rating: number;
   /** Zero means nobody has rated him yet: the 5.0 he starts on is not a rating. */
