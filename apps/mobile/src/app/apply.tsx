@@ -64,7 +64,11 @@ export default function Apply() {
   const status = me.driver?.status;
 
   if (status === "PENDING_REVIEW") return <Pending onRefresh={refresh} onSignOut={signOut} />;
-  if (status === "REJECTED") return <Rejected onSignOut={signOut} />;
+  // A suspended driver used to fall through to the application form, as if he
+  // had never applied — never told he was off the road, let alone why.
+  if (status === "REJECTED" || status === "SUSPENDED") {
+    return <OffTheRoad suspended={status === "SUSPENDED"} reason={me.driver?.statusReason ?? null} onSignOut={signOut} />;
+  }
   return <Details />;
 }
 
@@ -295,8 +299,16 @@ function Pending({ onRefresh, onSignOut }: { onRefresh: () => Promise<void>; onS
   );
 }
 
-function Rejected({ onSignOut }: { onSignOut: () => void }) {
+/**
+ * Turned down, or taken off the road — and told why.
+ *
+ * Ops must write a reason for both, and the terms promise "we will tell you
+ * why". The reason is shown here in ops' own words, with the way to reach a
+ * person directly under it.
+ */
+function OffTheRoad({ suspended, reason, onSignOut }: { suspended: boolean; reason: string | null; onSignOut: () => void }) {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const t = useT();
   return (
     <ScrollView
@@ -307,10 +319,25 @@ function Rejected({ onSignOut }: { onSignOut: () => void }) {
       ]}
     >
       <View style={styles.waitingWords}>
-        <Text style={styles.h1Centre}>{t(S.apply.refused)}</Text>
-        <Text style={styles.subCentre}>{t(S.apply.refusedWhy)}</Text>
+        <Text style={styles.h1Centre}>{t(suspended ? S.apply.suspended : S.apply.refused)}</Text>
+        <Text style={styles.subCentre}>{t(suspended ? S.apply.suspendedWhy : S.apply.refusedWhy)}</Text>
       </View>
+
+      {reason ? (
+        <View style={styles.reasonBox}>
+          <Text style={styles.reasonLabel}>{t(S.apply.theReason)}</Text>
+          <Text style={styles.reasonText}>{reason}</Text>
+        </View>
+      ) : null}
+
       <View style={styles.spacer} />
+      <Pressable
+        onPress={() => router.push("/help")}
+        accessibilityRole="button"
+        style={({ pressed }) => [styles.ghost, pressed && styles.pressed]}
+      >
+        <Text style={styles.ghostLabel}>{t(S.apply.talkToUs)}</Text>
+      </Pressable>
       <Pressable onPress={onSignOut} accessibilityRole="button" style={styles.signOut}>
         <Text style={styles.signOutLabel}>{t(S.apply.signOut)}</Text>
       </Pressable>
@@ -460,4 +487,15 @@ const styles = StyleSheet.create({
 
   signOut: { minHeight: touch.min, alignItems: "center", justifyContent: "center", marginTop: space.md },
   signOutLabel: { ...type.body, color: c.muted },
+  reasonBox: {
+    gap: space.xs,
+    marginTop: space.xl,
+    padding: space.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: c.edge,
+    backgroundColor: c.card,
+  },
+  reasonLabel: { ...type.secondary, color: c.muted },
+  reasonText: { ...type.body, color: c.ink },
 });

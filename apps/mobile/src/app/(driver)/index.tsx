@@ -40,6 +40,7 @@ import { useDriverRealtime } from "@/realtime/DriverRealtime";
 import { findMe, useWhereIAm } from "@/ui/position";
 import { MapPanel, Sheet } from "@/ui/map";
 import { ServiceNotice } from "@/ui/notice";
+import { BackToRide } from "@/ui/back-to-ride";
 import { S } from "@/content/strings";
 import { useT, type Phrase } from "@/ui/i18n";
 import { palette, radius, space, touch, type, xaf } from "@/theme";
@@ -129,7 +130,9 @@ export default function Home() {
     } catch (err) {
       // Somebody else took it, or it expired while he was deciding. Neither is
       // his fault and neither is worth a dialog — the offer just goes.
-      if (err instanceof ApiError && (err.code === "already_taken" || err.code === "offer_expired")) {
+      // The API calls this "offer_gone"; the app was listening for two words it
+      // never sends, so a ride another driver took showed him an error.
+      if (err instanceof ApiError && (err.code === "offer_gone" || err.code === "wrong_state")) {
         clearOffer();
         return;
       }
@@ -192,6 +195,7 @@ export default function Home() {
 
       <Sheet handle={false} style={styles.sheet}>
         <ServiceNotice />
+        <BackToRide side="driver" />
 
         <View style={styles.stats}>
           <Stat label={t(S.driver.today)} value={`${xaf(today?.earnedXaf ?? 0)} F`} />

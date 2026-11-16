@@ -33,7 +33,7 @@ export const EXPO_TOKEN = /^Expo(nent)?PushToken\[[^\]]+\]$/;
 /** A hung push must not hold a dispatch loop open. */
 const PUSH_TIMEOUT_MS = 8_000;
 
-export type PushKind = "offer" | "accepted" | "arrived" | "no_driver" | "driver_cancelled";
+export type PushKind = "offer" | "accepted" | "arrived" | "no_driver" | "driver_cancelled" | "payment_failed";
 
 type Words = { title: string; body: string };
 
@@ -61,6 +61,12 @@ const TEXT: Record<PushKind, { en: Words; fr: Words }> = {
     en: { title: "Your driver dropped the ride", body: "We are finding you another taxi. Nothing has been charged." },
     fr: { title: "Le chauffeur a abandonné la course", body: "Nous vous cherchons un autre taxi. Rien n'a été facturé." },
   },
+  // Said plainly that nothing left her account, because that is the first
+  // thing anybody wonders about a payment that failed.
+  payment_failed: {
+    en: { title: "Your payment did not go through", body: "Nothing was taken. Pay the {price} FCFA in cash, or open the app to try again." },
+    fr: { title: "Votre paiement n'a pas abouti", body: "Rien n'a été prélevé. Payez les {price} FCFA en espèces, ou ouvrez l'application pour réessayer." },
+  },
 };
 
 /**
@@ -73,6 +79,7 @@ const CHANNEL: Record<PushKind, string> = {
   arrived: "trips",
   no_driver: "trips",
   driver_cancelled: "trips",
+  payment_failed: "trips",
 };
 
 /** 1500 → "1 500", the way a price is written on a kiosk here. */

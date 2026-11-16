@@ -323,6 +323,16 @@ export default function Profile() {
         <Text style={styles.rowLinkHint}>{t(S.account.reportsWhy)}</Text>
       </Pressable>
 
+      <Pressable onPress={() => router.push("/rides")} accessibilityRole="button" style={styles.rowLink}>
+        <Text style={styles.rowLinkText}>{t(S.rides.link)}</Text>
+        <Text style={styles.rowLinkHint}>{t(S.rides.linkWhy)}</Text>
+      </Pressable>
+
+      <Pressable onPress={() => router.push("/help")} accessibilityRole="button" style={styles.rowLink}>
+        <Text style={styles.rowLinkText}>{t(S.help.link)}</Text>
+        <Text style={styles.rowLinkHint}>{t(S.help.why)}</Text>
+      </Pressable>
+
       {/*
         Reachable after you have signed in, not only on the welcome screen you
         saw once and will never see again.

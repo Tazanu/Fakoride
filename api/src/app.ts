@@ -10,6 +10,7 @@ import { authRouter } from "./modules/auth";
 import { geoRouter } from "./modules/geo";
 import { profileRouter } from "./modules/profile";
 import { trustedContactsRouter } from "./modules/contacts";
+import { accountRouter } from "./modules/account";
 import { faresRouter } from "./modules/fares";
 import { driversRouter } from "./modules/drivers";
 import { tripsRouter } from "./modules/trips";
@@ -42,7 +43,16 @@ export function createApp(): express.Express {
 
   app.use("/auth", authRouter());
   app.use("/geo", geoRouter());
+  // Who to call. Public: somebody who cannot sign in needs it most.
+  app.get("/support", (_req, res) => {
+    const digits = (v?: string) => (v ? v.replace(/[^\d+]/g, "") : null);
+    const phone = digits(env.SUPPORT_PHONE);
+    res.json({ phone, whatsapp: digits(env.SUPPORT_WHATSAPP) ?? phone, email: env.SUPPORT_EMAIL });
+  });
+
   app.use("/me/contacts", trustedContactsRouter());
+  // A copy of your data, and deleting your account.
+  app.use("/me", accountRouter());
   app.use("/me", profileRouter());
   app.use("/fares", faresRouter({ mobileDiscountXaf: env.MOBILE_PAYMENT_DISCOUNT_XAF }));
   app.use("/drivers", driversRouter());

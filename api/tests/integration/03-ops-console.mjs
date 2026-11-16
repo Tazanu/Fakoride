@@ -205,8 +205,14 @@ const noBike = await call("POST", "/trips", {
 });
 check("a suspended fleet is offered nothing", noBike.body.status === "NO_DRIVER_FOUND", JSON.stringify(noBike.body.status));
 
+// She used to be shown the application form, as if she had never applied.
+const offRoad = await call("GET", "/auth/me", { token: applicantToken });
+check("a suspended driver is told she is suspended, and why", offRoad.body.driver?.status === "SUSPENDED" && offRoad.body.driver?.statusReason === "Testing suspension.", JSON.stringify(offRoad.body.driver));
+
 const reinstated = await call("POST", `/admin/drivers/${grace.id}/reinstate`, { token: adminToken, body: { note: "Test over." } });
 check("reinstating returns her to ACTIVE", reinstated.body.status === "ACTIVE", JSON.stringify(reinstated.body));
+const backOnRoad = await call("GET", "/auth/me", { token: applicantToken });
+check("and the old reason is no longer shown to her", backOnRoad.body.driver?.statusReason === null, JSON.stringify(backOnRoad.body.driver));
 await call("POST", "/drivers/online", { token: applicantToken, body: CHECKPOINT });
 
 const backOn = await call("POST", "/trips", {

@@ -8,7 +8,7 @@
  *   ACCEPTED     I AM HERE       he has reached her
  *   ARRIVED      the PIN gate    she reads four digits, he types them
  *   IN_PROGRESS  FINISH RIDE     he has dropped her
- *   COMPLETED    the fare, and how it is being paid
+ *   COMPLETED    the fare, and whether it has actually been paid
  *
  * The PIN is the whole safety design and it only works in this direction: the
  * rider holds it, the driver asks for it. He never sees it, which is why
@@ -64,8 +64,26 @@ function errorFor(err: unknown): Phrase {
     // "bad_state" for a long time, so the message never once appeared.
     case "wrong_state":
       return S.job.movedOn;
+    case "already_paid":
+      return S.job.alreadyPaid;
     default:
       return S.driver.didNotWorkTryAgain;
+  }
+}
+
+/** What he is told once the ride is over, by where the money stands. */
+function doneLine(trip: TripDetail): Phrase {
+  switch (trip.fare.state) {
+    case "CASH":
+      return S.job.takeCash;
+    case "WAITING":
+      return S.job.payWaiting;
+    case "FAILED":
+      return S.job.payFailed;
+    case "PAID_IN_CASH":
+      return S.job.paidInCash;
+    default:
+      return S.job.paidByPhone;
   }
 }
 
@@ -90,7 +108,7 @@ export default function Trip() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const t = useT();
-  const { cancelledTripId, acknowledgeCancellation } = useDriverRealtime();
+  const { cancelledTripId, acknowledgeCancellation, fareNews } = useDriverRealtime();
   // The PIN gate puts a keypad over the bottom half of this screen.
   const scroll = useScrollPastKeyboard();
 
@@ -118,6 +136,24 @@ export default function Trip() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Her phone paid, or did not: read the trip again.
+  useEffect(() => {
+    if (id && fareNews?.tripId === id) void load();
+  }, [fareNews, id, load]);
+
+  /**
+   * While her prompt is out, look every few seconds.
+   *
+   * He is standing at the kerb deciding whether to let her walk away. The
+   * socket usually says first; this is for when it does not.
+   */
+  const fareWaiting = trip?.status === "COMPLETED" && trip.fare.state === "WAITING";
+  useEffect(() => {
+    if (!fareWaiting) return;
+    const every = setInterval(() => void load(), 5_000);
+    return () => clearInterval(every);
+  }, [fareWaiting, load]);
 
   /**
    * She cancelled.
@@ -198,6 +234,31 @@ export default function Trip() {
     } finally {
       setBusy(false);
     }
+  }
+
+  /** She paid him at the kerb instead. Recorded, so it counts in his earnings. */
+  async function tookCash() {
+    if (!id) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { fare } = await trips.paidCash(id);
+      setTrip((current) => (current ? { ...current, fare } : current));
+    } catch (err) {
+      setError(errorFor(err));
+      if (err instanceof ApiError && err.code === "already_paid") await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function callHer() {
+    const phone = trip?.rider?.phone;
+    if (!phone) {
+      setError(S.job.noNumber);
+      return;
+    }
+    void Linking.openURL(`tel:${phone}`);
   }
 
   function confirmCancel() {
@@ -311,17 +372,28 @@ export default function Trip() {
 
         {done ? (
           <View style={styles.doneBlock}>
-            <Text style={styles.doneText}>
-              {t(trip.paymentMethod === "CASH" ? S.job.takeCash : S.job.paidByPhone)}
-            </Text>
-            <Primary label={t(S.job.done)} busy={false} onPress={() => router.replace("/(driver)")} />
+            <Text style={styles.doneText}>{t(doneLine(trip))}</Text>
+            {trip.fare.state === "WAITING" ? <Text style={styles.doneWhy}>{t(S.job.payWaitingWhy)}</Text> : null}
+            {trip.fare.state === "FAILED" ? (
+              <>
+                <Text style={styles.doneWhy}>{t(S.job.payFailedWhy, { amount: xaf(trip.priceXaf) })}</Text>
+                <Primary label={t(S.job.tookCash)} busy={busy} onPress={() => void tookCash()} />
+                {/* She walked off without paying: he is not kept on this screen. */}
+                <Pressable onPress={() => router.replace("/(driver)")} accessibilityRole="button" style={styles.minor}>
+                  <Text style={styles.minorLabel}>{t(S.job.notPaidLeave)}</Text>
+                </Pressable>
+              </>
+            ) : (
+              <Primary label={t(S.job.done)} busy={false} onPress={() => router.replace("/(driver)")} />
+            )}
           </View>
         ) : null}
 
         {!done ? (
           <>
             <View style={styles.minorActions}>
-              <Pressable onPress={() => void Linking.openURL("tel:")} accessibilityRole="button" style={styles.minor}>
+              {/* This dialled an empty number: the API never sent hers. */}
+              <Pressable onPress={callHer} accessibilityRole="button" style={styles.minor}>
                 <Text style={styles.minorLabel}>{t(S.job.callHer)}</Text>
               </Pressable>
               <Pressable onPress={confirmCancel} accessibilityRole="button" style={styles.minor}>
@@ -448,6 +520,7 @@ const styles = StyleSheet.create({
 
   doneBlock: { gap: space.md },
   doneText: { ...type.bodyPlain, color: c.inkSoft },
+  doneWhy: { ...type.secondary, color: c.muted },
 
   minorActions: { flexDirection: "row", gap: space.md, marginTop: space.sm },
   minor: { flex: 1, minHeight: touch.min, alignItems: "center", justifyContent: "center" },

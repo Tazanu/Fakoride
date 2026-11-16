@@ -87,6 +87,16 @@ const schema = z.object({
    * text messages — a trusted contact's "follow the ride" — start with this.
    */
   PUBLIC_API_URL: z.string().url().default("http://localhost:4000"),
+  /**
+   * How a person reaches a person. Shown on the app's Help screen, and the
+   * privacy page tells people to call it, so it lives here rather than in the
+   * app — it can change without anybody installing an update. Unset, the Help
+   * screen offers email only.
+   */
+  SUPPORT_PHONE: z.string().optional(),
+  /** If WhatsApp is on a different number. Defaults to SUPPORT_PHONE. */
+  SUPPORT_WHATSAPP: z.string().optional(),
+  SUPPORT_EMAIL: z.string().email().default("hello@fakoride.cm"),
   /** Scales every rate limit at once — 3 for a launch day on campus Wi-Fi. */
   RATE_LIMIT_MULTIPLIER: z.coerce.number().positive().default(1),
 

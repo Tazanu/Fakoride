@@ -23,6 +23,8 @@ export type Driver = {
   online: boolean;
   rating: number;
   tripCount: number;
+  /** What ops wrote when they suspended or turned him down. Null otherwise. */
+  statusReason?: string | null;
 };
 
 export type Me = {
@@ -81,6 +83,42 @@ export const profile = {
     api.patch<{ id: string; name: string | null; language: string }>("/me", body),
 
   removePhoto: () => api.delete<{ removed: true }>("/me/photo"),
+};
+
+/** Where a finished ride's money stands. See fareState on the server. */
+export type FareState = "NOT_DUE" | "CASH" | "WAITING" | "PAID" | "FAILED" | "PAID_IN_CASH";
+export type Fare = { state: FareState; reason: string | null };
+
+export type CurrentRide = { id: string; status: string; pickupLabel: string; dropLabel: string };
+
+/** One line of "Your rides". */
+export type RideSummary = {
+  id: string;
+  status: string;
+  priceXaf: number;
+  paymentMethod: "CASH" | "MOMO" | "ORANGE_MONEY";
+  pickupLabel: string;
+  dropLabel: string;
+  requestedAt: string;
+  completedAt: string | null;
+  fare: Fare;
+};
+
+export const rides = {
+  /** The ride this account is in the middle of — so closing the app does not lose it. */
+  current: () => api.get<{ trip: CurrentRide | null }>("/trips/current"),
+  /** Newest first. `before` is the cursor the last page handed back. */
+  list: (before?: string) =>
+    api.get<{ trips: RideSummary[]; nextBefore: string | null }>(
+      `/trips?limit=20${before ? `&before=${encodeURIComponent(before)}` : ""}`,
+    ),
+};
+
+export type SupportContacts = { phone: string | null; whatsapp: string | null; email: string };
+
+/** How to reach a person. Public, and set on the server so it can change without an update. */
+export const support = {
+  get: () => api.get<SupportContacts>("/support", { anonymous: true }),
 };
 
 export type TrustedContact = { id: string; name: string; phone: string };

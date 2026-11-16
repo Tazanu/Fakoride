@@ -257,9 +257,22 @@ export function authRouter(): Router {
     asyncHandler(async (req, res) => {
       const user = await prisma.user.findUnique({
         where: { id: req.user!.sub },
-        include: { driver: true },
+        include: {
+          driver: {
+            include: {
+              // The last decision ops wrote down, for a driver who is off the road.
+              reviews: {
+                where: { action: { in: ["SUSPENDED", "REJECTED"] } },
+                orderBy: { at: "desc" },
+                take: 1,
+                select: { note: true },
+              },
+            },
+          },
+        },
       });
       if (!user) throw new ApiError(404, "no_account", "This account no longer exists.");
+      const offTheRoad = user.driver?.status === "SUSPENDED" || user.driver?.status === "REJECTED";
       res.json({
         id: user.id,
         phone: user.phone,
@@ -276,6 +289,9 @@ export function authRouter(): Router {
               online: user.driver.online,
               rating: user.driver.rating,
               tripCount: user.driver.tripCount,
+              // Ops is required to write a reason, and the terms promise he is
+              // told it. Until now it was kept and never shown to him.
+              statusReason: offTheRoad ? (user.driver.reviews[0]?.note ?? null) : null,
             }
           : null,
       });

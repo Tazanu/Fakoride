@@ -24,7 +24,7 @@ import { resolveZoneForPoint, nearestLandmark, placeLabel } from "./geo";
 import { quoteZonePair } from "./fares";
 import { offerToNextDriver } from "./dispatch";
 import { recordFare } from "./ledger";
-import { chargeTripFare } from "./payments/service";
+import { chargeTripFare, fareState, fareStates, takeCashInstead } from "./payments/service";
 import { tripShareRouter } from "./share";
 import { tripSosRouter } from "./safety";
 import { tripPhotoRouter } from "./profile";
@@ -51,6 +51,11 @@ const createSchema = z.object({
   needsHelmet: z.boolean().default(false),
   womanDriverOnly: z.boolean().default(false),
 });
+
+/** A ride that is still happening, from the rider's side. */
+const LIVE_FOR_RIDER: TripStatus[] = ["REQUESTED", "OFFERED", "ACCEPTED", "ARRIVED", "IN_PROGRESS"];
+/** And from the driver's: once he has taken it, until he finishes it. */
+const LIVE_FOR_DRIVER: TripStatus[] = ["ACCEPTED", "ARRIVED", "IN_PROGRESS"];
 
 function generatePin(): string {
   return String(crypto.randomInt(0, 10_000)).padStart(4, "0");
@@ -140,7 +145,7 @@ export function tripsRouter(): Router {
       // a lock per rider, so taps that arrive together cannot both pass.
       const trip = await oneAtATime(`book:${req.user!.sub}`, async (tx) => {
         const running = await tx.trip.findFirst({
-          where: { riderId: req.user!.sub, status: { in: ["REQUESTED", "OFFERED", "ACCEPTED", "ARRIVED", "IN_PROGRESS"] } },
+          where: { riderId: req.user!.sub, status: { in: LIVE_FOR_RIDER } },
           select: { id: true },
         });
         if (running) {
@@ -226,9 +231,11 @@ export function tripsRouter(): Router {
           toZone: { select: { code: true, name: true } },
         },
       });
+      // So the list can say which rides were never paid for.
+      const fares = await fareStates(trips);
 
       res.json({
-        trips,
+        trips: trips.map((t) => ({ ...t, fare: fares.get(t.id) })),
         // A cursor rather than a page number: trips arrive while you scroll.
         nextBefore: trips.length === limit ? trips[trips.length - 1]!.requestedAt : null,
       });
@@ -309,6 +316,34 @@ export function tripsRouter(): Router {
     }),
   );
 
+  /**
+   * The ride this account is in the middle of, if any.
+   *
+   * The app only knew which ride was running while the screen for it was
+   * open. Close the app on the way to Molyko — or let Android close it — and
+   * opening it again landed on the home screen with no way back: the taxi
+   * still coming, the PIN unreachable, Get help gone. Booking again only said
+   * "you already have a ride running". This is how the app finds it again.
+   */
+  router.get(
+    "/current",
+    requireAuth(),
+    asyncHandler(async (req, res) => {
+      const driver =
+        req.user!.role === "DRIVER"
+          ? await prisma.driver.findUnique({ where: { userId: req.user!.sub }, select: { id: true } })
+          : null;
+      const trip = await prisma.trip.findFirst({
+        where: driver
+          ? { driverId: driver.id, status: { in: LIVE_FOR_DRIVER } }
+          : { riderId: req.user!.sub, status: { in: LIVE_FOR_RIDER } },
+        orderBy: { requestedAt: "desc" },
+        select: { id: true, status: true, pickupLabel: true, dropLabel: true },
+      });
+      res.json({ trip });
+    }),
+  );
+
   router.get(
     "/:id",
     requireAuth(),
@@ -319,7 +354,7 @@ export function tripsRouter(): Router {
           driver: { include: { user: { select: { name: true, phone: true } } } },
           fromZone: { select: { code: true, name: true } },
           toZone: { select: { code: true, name: true } },
-          rider: { select: { name: true, photoKey: true } },
+          rider: { select: { name: true, photoKey: true, phone: true } },
         },
       });
       if (!trip) throw new ApiError(404, "no_trip", "That trip does not exist.");
@@ -329,6 +364,7 @@ export function tripsRouter(): Router {
       if (!isRider && !isDriver && req.user!.role !== "ADMIN") {
         throw new ApiError(403, "not_yours", "That trip is not yours.");
       }
+      const liveForDriver = isDriver && LIVE_FOR_DRIVER.includes(trip.status);
 
       res.json({
         id: trip.id,
@@ -355,9 +391,22 @@ export function tripsRouter(): Router {
         // Who he is picking up, while he is picking her up. The sign-in screen
         // has always told riders "drivers see this when they accept your ride";
         // until now nothing sent it. First name only, and only while it is live.
-        ...(isDriver && ["ACCEPTED", "ARRIVED", "IN_PROGRESS"].includes(trip.status)
-          ? { rider: { firstName: trip.rider.name?.split(" ")[0] ?? null, hasPhoto: trip.rider.photoKey !== null } }
+        //
+        // Her number too, for the same window and no longer. His "Call her"
+        // button dialled nothing — the number was never sent — while the
+        // privacy page tells both sides they can call each other during a ride.
+        ...(liveForDriver
+          ? {
+              rider: {
+                firstName: trip.rider.name?.split(" ")[0] ?? null,
+                hasPhoto: trip.rider.photoKey !== null,
+                phone: trip.rider.phone,
+              },
+            }
           : {}),
+        // Where the money stands. Both phones used to say "paid" the moment the
+        // ride ended, whatever the provider went on to say.
+        fare: isRider || isDriver || req.user!.role === "ADMIN" ? await fareState(trip) : undefined,
         driver: trip.driver
           ? {
               name: trip.driver.user.name,
@@ -590,6 +639,48 @@ export function tripsRouter(): Router {
 
       const offered = await offerToNextDriver(trip.id);
       res.json({ declined: true, passedOn: offered });
+    }),
+  );
+
+  /**
+   * "Try again" on a phone payment that did not go through.
+   *
+   * Only for the rider, only for a finished ride she chose to pay by phone,
+   * and never a second prompt while one is already on her phone: the charge
+   * hands back the one in flight rather than sending another.
+   */
+  router.post(
+    "/:id/pay-again",
+    requireAuth("RIDER"),
+    asyncHandler(async (req, res) => {
+      const trip = await prisma.trip.findUnique({ where: { id: param(req, "id") } });
+      if (!trip || trip.riderId !== req.user!.sub) throw new ApiError(404, "no_trip", "That trip does not exist.");
+      if (trip.status !== "COMPLETED") throw new ApiError(409, "not_completed", "This ride is not finished yet.");
+      if (trip.paymentMethod === "CASH") throw new ApiError(409, "pays_cash", "This ride is paid in cash.");
+
+      const before = await fareState(trip);
+      if (before.state === "PAID" || before.state === "PAID_IN_CASH") {
+        throw new ApiError(409, "already_paid", "This ride is already paid.");
+      }
+      await chargeTripFare(trip.id);
+      res.json({ fare: await fareState(trip) });
+    }),
+  );
+
+  /** The driver took cash for a fare her phone did not pay. See takeCashInstead. */
+  router.post(
+    "/:id/paid-cash",
+    requireAuth("DRIVER"),
+    asyncHandler(async (req, res) => {
+      const { trip, driver } = await loadTripForDriver(param(req, "id"), req.user!.sub);
+      if (trip.driverId !== driver.id) throw new ApiError(403, "not_yours", "That trip is not yours.");
+      if (trip.status !== "COMPLETED") throw new ApiError(409, "not_completed", "Finish the ride first.");
+      if (trip.paymentMethod === "CASH") {
+        // Already recorded when he finished it; nothing to change.
+        res.json({ fare: await fareState(trip) });
+        return;
+      }
+      res.json({ fare: await takeCashInstead(trip.id, driver.id) });
     }),
   );
 

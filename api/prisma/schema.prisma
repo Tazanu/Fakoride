@@ -158,6 +158,9 @@ model User {
   /// go on receiving the first owner's rides. Registering it moves it.
   pushToken   String?   @unique
   pushTokenAt DateTime?
+  /// Set when the person deleted their account. Name, number and photo are
+  /// gone by then; the row stays only because trips and money point at it.
+  deletedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

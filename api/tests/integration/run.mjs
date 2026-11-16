@@ -42,6 +42,7 @@ const SUITES = [
   "05-remaining-surface.mjs",
   "06-push.mjs",
   "07-two-servers.mjs",
+  "08-fares-and-the-way-back.mjs",
 ];
 
 /** Each run's own database. The prefix is what the drop below checks for. */
@@ -268,6 +269,9 @@ const server = spawn(process.execPath, [TSX, "src/server.ts"], {
     TRUST_PROXY: "1",
     // Never Expo itself: a test run must not wake a real phone.
     EXPO_PUSH_URL: `${PUSH_STANDIN}/--/api/v2/push/send`,
+    // Written the way a person types it into Render, spaces and all.
+    SUPPORT_PHONE: "+237 6 77 00 00 07",
+    SUPPORT_WHATSAPP: "",
   },
 });
 server.stdout.pipe(logFile);

@@ -5,6 +5,8 @@
  *
  *   trip:offer      a ride, with twelve seconds to answer it
  *   trip:cancelled  the rider walked away, wherever in the app he happens to be
+ *   trip:payment_failed / trip:fare
+ *                   the money on a finished ride moved, or did not
  *
  * An offer is deliberately NOT a screen. A driver who is looking at his earnings
  * when a ride comes in must see it there, without losing what he was doing, so
@@ -37,6 +39,8 @@ type RealtimeState = {
   /** The trip the rider just cancelled, so the trip screen can say so and leave. */
   cancelledTripId: string | null;
   acknowledgeCancellation: () => void;
+  /** Which trip's money just moved, and a counter so the same trip can move twice. */
+  fareNews: { tripId: string; n: number } | null;
   connected: boolean;
 };
 
@@ -46,6 +50,7 @@ export function DriverRealtime({ children }: { children: ReactNode }) {
   const { me } = useSession();
   const [offer, setOffer] = useState<TripOffer | null>(null);
   const [cancelledTripId, setCancelledTripId] = useState<string | null>(null);
+  const [fareNews, setFareNews] = useState<{ tripId: string; n: number } | null>(null);
   const [connected, setConnected] = useState(false);
 
   /**
@@ -142,10 +147,17 @@ export function DriverRealtime({ children }: { children: ReactNode }) {
         setOffer((current) => (current?.tripId === payload.tripId ? null : current));
       };
 
+      // He is standing at the kerb waiting to hear whether her phone paid.
+      // The server has always said; until now nothing here listened.
+      const onFare = (payload: { tripId: string }) =>
+        setFareNews((prev) => ({ tripId: payload.tripId, n: (prev?.n ?? 0) + 1 }));
+
       socket.on("connect", onConnect);
       socket.on("disconnect", onDisconnect);
       socket.on("trip:offer", onOffer);
       socket.on("trip:cancelled", onCancelled);
+      socket.on("trip:payment_failed", onFare);
+      socket.on("trip:fare", onFare);
       if (socket.connected) setConnected(true);
 
       cleanup.current = () => {
@@ -153,6 +165,8 @@ export function DriverRealtime({ children }: { children: ReactNode }) {
         socket.off("disconnect", onDisconnect);
         socket.off("trip:offer", onOffer);
         socket.off("trip:cancelled", onCancelled);
+        socket.off("trip:payment_failed", onFare);
+        socket.off("trip:fare", onFare);
       };
     })();
 
@@ -184,8 +198,8 @@ export function DriverRealtime({ children }: { children: ReactNode }) {
   }, [recoverOffer]);
 
   const value = useMemo(
-    () => ({ offer, clearOffer, cancelledTripId, acknowledgeCancellation, connected }),
-    [offer, clearOffer, cancelledTripId, acknowledgeCancellation, connected],
+    () => ({ offer, clearOffer, cancelledTripId, acknowledgeCancellation, fareNews, connected }),
+    [offer, clearOffer, cancelledTripId, acknowledgeCancellation, fareNews, connected],
   );
 
   return <RealtimeContext.Provider value={value}>{children}</RealtimeContext.Provider>;

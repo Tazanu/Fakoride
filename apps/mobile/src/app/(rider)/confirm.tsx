@@ -31,6 +31,7 @@ import {
 } from "@/ui/icons";
 import { ApiError } from "@/api/client";
 import { fares, trips, type PaymentMethod, type Quote } from "@/api/rider";
+import { rides } from "@/api/session";
 import { MapButton, MapPanel, Sheet } from "@/ui/map";
 import { S } from "@/content/strings";
 import { useT, type Phrase } from "@/ui/i18n";
@@ -111,6 +112,15 @@ export default function Confirm() {
       });
       router.replace({ pathname: "/(rider)/trip/[id]", params: { id: trip.id } });
     } catch (err) {
+      // She has a ride running already — take her to it, rather than telling
+      // her so and leaving her with no way to reach it.
+      if (err instanceof ApiError && err.code === "trip_in_progress") {
+        const running = await rides.current().catch(() => null);
+        if (running?.trip) {
+          router.replace({ pathname: "/(rider)/trip/[id]", params: { id: running.trip.id } });
+          return;
+        }
+      }
       setError(errorFor(err));
       setBusy(false);
     }
