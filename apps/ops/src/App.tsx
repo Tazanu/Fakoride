@@ -10,7 +10,8 @@
  * table is the case the whole thing exists for.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { armAlarm, soundAlarm } from "@/alarm";
 import { clearToken, getToken, ops } from "@/api";
 import { Approvals } from "@/screens/Approvals";
 import { Complaints } from "@/screens/Complaints";
@@ -23,8 +24,12 @@ import { SignIn } from "@/screens/SignIn";
 import { Trips } from "@/screens/Trips";
 import { Shell, type Section } from "@/ui/Shell";
 
-/** How often the rail's counts are refreshed while you are on another screen. */
-const WATCH_MS = 20_000;
+/**
+ * How often the rail's counts are refreshed while you are on another screen.
+ * Ten seconds, not twenty: one of those counts is the alarm, and it also drives
+ * the sound.
+ */
+const WATCH_MS = 10_000;
 
 export function App() {
   const [signedIn, setSignedIn] = useState(() => Boolean(getToken()));
@@ -37,6 +42,8 @@ export function App() {
   const onWaiting = useCallback((n: number) => setWaiting(n), []);
   const onAlarms = useCallback((n: number) => setAlarms(n), []);
   const onOpen = useCallback((n: number) => setOpen(n), []);
+  /** How many alarms were un-acknowledged at the last poll, to spot a new one. */
+  const unanswered = useRef(0);
 
   /**
    * The counts, polled for the whole console rather than by each screen.
@@ -52,7 +59,19 @@ export function App() {
     const tick = () => {
       void ops
         .sos()
-        .then((r) => alive && setAlarms(r.open))
+        .then((r) => {
+          if (!alive) return;
+          setAlarms(r.open);
+          // Ring for the ones nobody has acknowledged — see alarm.ts.
+          const waiting = r.alerts.filter((a) => a.status === "RAISED");
+          const newest = waiting[0];
+          soundAlarm(
+            waiting.length,
+            waiting.length > unanswered.current,
+            newest ? `${newest.raisedByName ?? newest.raisedByPhone} · ${newest.route}` : undefined,
+          );
+          unanswered.current = waiting.length;
+        })
         .catch(() => undefined);
       void ops
         .drivers("PENDING_REVIEW")
@@ -69,7 +88,15 @@ export function App() {
     return () => {
       alive = false;
       clearInterval(timer);
+      soundAlarm(0, false);
     };
+  }, [signedIn]);
+
+  // Sound and notifications need one click first; any click in the console will do.
+  useEffect(() => {
+    if (!signedIn) return;
+    window.addEventListener("pointerdown", armAlarm, { once: true });
+    return () => window.removeEventListener("pointerdown", armAlarm);
   }, [signedIn]);
 
   if (!signedIn) return <SignIn onSignedIn={() => setSignedIn(true)} />;

@@ -69,3 +69,17 @@ export function serviceDateRange(from: Date, to: Date): string[] {
 export function isMonday(dateKey: string): boolean {
   return new Date(`${dateKey}T00:00:00.000Z`).getUTCDay() === 1;
 }
+
+/**
+ * The newest service date whose unpaid fee stops a driver going online, or
+ * null when nothing does.
+ *
+ * `blockAfterDays` is how long a fee may age. With three, a fee for Monday is
+ * asked for on Tuesday, retried through Tuesday, and stops him from Thursday:
+ * on Thursday this returns Monday. A fee for a later day than the one returned
+ * is still inside its grace and stops nobody. Zero means the rule is off.
+ */
+export function overdueFeeCutoff(now: Date, blockAfterDays: number): Date | null {
+  if (blockAfterDays <= 0) return null;
+  return new Date(serviceDate(now).getTime() - blockAfterDays * MS_PER_DAY);
+}

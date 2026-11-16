@@ -387,7 +387,16 @@ const firstSweep = sweeps[0];
  */
 check("the sweep picks up a fee due from yesterday", firstSweep.body.due >= 1, JSON.stringify(firstSweep.body));
 
-await sleep(1500);
+// Wait for the refusal to land rather than for a fixed second and a half: the
+// provider answers in 150 ms, but our reconciler only asks it after a second,
+// on a one-second tick — so "settled" is anywhere from one to two and a bit,
+// and a flat sleep failed whenever the tick fell late.
+for (const until = Date.now() + 8000; Date.now() < until; ) {
+  const moving = sql(`SELECT count(*) FROM "Payment" WHERE "accessFeeChargeId"='${brokeChargeId}' AND status IN ('CREATED', 'PENDING')`);
+  const any = sql(`SELECT count(*) FROM "Payment" WHERE "accessFeeChargeId"='${brokeChargeId}'`);
+  if (any !== "0" && moving === "0") break;
+  await sleep(200);
+}
 const attemptsAfterFirst = Number(sql(`SELECT count(*) FROM "Payment" WHERE "accessFeeChargeId"='${brokeChargeId}'`));
 check("one attempt was made", attemptsAfterFirst === 1, `${attemptsAfterFirst}`);
 

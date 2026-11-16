@@ -117,6 +117,8 @@ export function Money() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  /** The failed fee whose "waive" box is open. */
+  const [waiving, setWaiving] = useState<string | null>(null);
 
   const load = useCallback(async (which: Tab) => {
     setRows(null);
@@ -209,8 +211,10 @@ export function Money() {
         ) : (
           rows.map((p) => {
             const stuck = p.status === "CREATED" || p.status === "PENDING" || p.status === "FAILED";
+            const waiveOpen = waiving === p.id;
             return (
-              <div key={p.id} className="ops-table-row" style={COLUMNS}>
+              <div key={p.id}>
+              <div className="ops-table-row" style={COLUMNS}>
                 <span style={styles.what}>{PURPOSE[p.purpose] ?? p.purpose}</span>
                 <span data-label="Who" style={styles.who}>
                   {p.driver ?? p.phone}
@@ -248,13 +252,93 @@ export function Money() {
                       disabled={busy !== null}
                     />
                   ) : null}
+                  {p.status === "FAILED" && p.purpose === "ACCESS_FEE" && p.accessFeeChargeId ? (
+                    <button
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={() => setWaiving(waiveOpen ? null : p.id)}
+                      className="ops-btn ops-btn-sm ops-btn-ghost"
+                    >
+                      {waiveOpen ? "Close" : "Waive"}
+                    </button>
+                  ) : null}
                 </span>
+              </div>
+              {waiveOpen ? (
+                <Waive
+                  payment={p}
+                  onDone={(line) => {
+                    setWaiving(null);
+                    setNotice(line);
+                    void load(tab);
+                  }}
+                />
+              ) : null}
               </div>
             );
           })
         )}
       </Panel>
     </Section>
+  );
+}
+
+/**
+ * Letting one day's fee go.
+ *
+ * An unpaid fee more than a few days old now stops a driver going online, so
+ * there has to be a way to say "this one was our mistake": the app was down
+ * that morning, or he went online by accident and straight off again. The
+ * reason is written to his ledger beside the fee it cancels.
+ */
+function Waive({ payment, onDone }: { payment: PaymentRow; onDone: (line: string) => void }) {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function go() {
+    if (text.trim().length < 5) {
+      setError("Say why. It is written to his ledger.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await ops.waiveFee(payment.accessFeeChargeId!, text.trim());
+      onDone(`Waived. ${payment.driver ?? payment.phone} no longer owes that day's fee.`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "That did not work.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={styles.act}>
+      <div style={styles.actHead}>
+        Waive {payment.amountXaf.toLocaleString("fr-FR")} FCFA for {payment.driver ?? payment.phone}
+      </div>
+      <p style={styles.actNote}>
+        The day is settled at nothing and he is not asked for it again. If it was the only fee stopping him, he can go
+        online straight away.
+      </p>
+      <label style={styles.field}>
+        <span style={styles.label}>Why — written to his ledger</span>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="The app was down that morning; he never carried anybody."
+          rows={2}
+          disabled={busy}
+          className="ops-textarea"
+          autoFocus
+        />
+      </label>
+      {error ? <p style={styles.error}>{error}</p> : null}
+      <button type="button" onClick={() => void go()} disabled={busy} style={styles.confirm}>
+        {busy ? "Working…" : "Waive this fee"}
+      </button>
+    </div>
   );
 }
 
@@ -288,4 +372,29 @@ const styles: Record<string, React.CSSProperties> = {
   reason: { fontSize: 12, color: "var(--c-ink-soft)" },
   muted: { fontSize: 13, color: "var(--c-ink-soft)" },
   actions: { display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 6 },
+
+  act: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+    padding: "16px 18px",
+    background: "var(--c-amber-tint)",
+    borderBottom: "1px solid var(--c-line)",
+  },
+  actHead: { fontSize: 15, fontWeight: 700, color: "var(--c-ink)" },
+  actNote: { margin: 0, fontSize: 13, lineHeight: 1.5, color: "var(--c-ink-soft)" },
+  field: { display: "flex", flexDirection: "column", gap: 6 },
+  label: { fontSize: 13, fontWeight: 600, color: "var(--c-ink-soft)" },
+  error: { margin: 0, fontSize: 13, color: "var(--c-danger)" },
+  confirm: {
+    alignSelf: "flex-start",
+    minHeight: 46,
+    padding: "0 20px",
+    borderRadius: 12,
+    border: 0,
+    background: "var(--c-action)",
+    fontSize: 15,
+    fontWeight: 700,
+    color: "var(--c-on-action)",
+  },
 };

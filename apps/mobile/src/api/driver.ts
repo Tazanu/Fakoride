@@ -6,7 +6,7 @@
  * rendering `undefined` in front of a driver on the roadside.
  */
 
-import { api } from "./client";
+import { api, setToken } from "./client";
 import type { DriverStatus } from "./session";
 
 // --- shared shapes ----------------------------------------------------------
@@ -21,7 +21,9 @@ export type TripStatus =
   | "COMPLETED"
   | "CANCELLED_BY_RIDER"
   | "CANCELLED_BY_DRIVER"
-  | "NO_DRIVER_FOUND";
+  | "NO_DRIVER_FOUND"
+  /** Ended by Fako Ride itself — an operator, or the watchdog. Nothing charged. */
+  | "CANCELLED_BY_OPS";
 
 // As in rider.ts: one session module, re-exported where screens expect it.
 export { auth } from "./session";
@@ -37,7 +39,15 @@ export const onboarding = {
     homeZone?: string;
     gender?: "UNSPECIFIED" | "WOMAN" | "MAN";
     hasSpareHelmet?: boolean;
-  }) => api.post<{ id: string; status: DriverStatus; next: string }>("/drivers/apply", body),
+  }) =>
+    api
+      .post<{ id: string; status: DriverStatus; next: string; token?: string }>("/drivers/apply", body)
+      .then(async (res) => {
+        // He signed in as a rider; this is the token that says he is a driver.
+        // Kept before anything else is asked, or the next request is refused.
+        if (res.token) await setToken(res.token);
+        return res;
+      }),
 
   updateProfile: (body: { gender?: "UNSPECIFIED" | "WOMAN" | "MAN"; hasSpareHelmet?: boolean; homeZone?: string }) =>
     api.patch<{ gender: string; hasSpareHelmet: boolean; homeZoneId: string | null }>("/drivers/me", body),
@@ -79,7 +89,13 @@ export const shift = {
   goOffline: () => api.post<{ online: false }>("/drivers/offline"),
 
   /** The fallback. In normal operation position rides the socket instead. */
-  pushPosition: (lat: number, lng: number) => api.post<{ ok: true }>("/drivers/position", { lat, lng }),
+  /**
+   * Where he is now. Sent every half minute while he is online (see
+   * driver/presence). `online: false` means the server no longer has him
+   * online, and the sender should stop.
+   */
+  pushPosition: (lat: number, lng: number) =>
+    api.post<{ ok: true; online?: boolean }>("/drivers/position", { lat, lng }),
 
   today: () => api.get<TodaySummary>("/drivers/me/today"),
 
@@ -105,6 +121,12 @@ export type TripDetail = {
   status: TripStatus;
   priceXaf: number;
   paymentMethod: PaymentMethod;
+  /**
+   * A fare paid by phone, once the ride is over: PENDING while the prompt is
+   * unanswered, PAID when it lands, FAILED when it will not — then it is cash.
+   * Null for cash, and until the ride is finished.
+   */
+  mobileFare?: "PENDING" | "PAID" | "FAILED" | null;
   pickupLabel: string;
   dropLabel: string;
   from: { code: string; name: string };
@@ -209,6 +231,15 @@ export type Balance = {
   note: string;
   unpaidFees: { date: string; amountXaf: number; lastFailure: string | null }[];
   unpaidFeesXaf: number;
+  /** The part of that old enough to stop him going online. Zero: he may. */
+  overdueFeesXaf: number;
+};
+
+/** What pressing "Pay now" did. PENDING: the prompt is on his phone. */
+export type FeePayment = {
+  status: "PENDING" | "SUCCESSFUL" | "FAILED" | "EXPIRED" | "CREATED" | "NOTHING_DUE";
+  amountXaf?: number;
+  remainingXaf: number;
 };
 
 export const money = {
@@ -218,6 +249,9 @@ export const money = {
 
   /** Only ever mobile fares. Cash was handed to him and was never ours. */
   balance: () => api.get<Balance>("/drivers/me/balance"),
+
+  /** Put the MoMo prompt for his oldest unpaid day on his phone, now. */
+  payFees: () => api.post<FeePayment>("/drivers/me/fees/pay"),
 
   cashOut: (amountXaf?: number) =>
     api.post<{ id: string; amountXaf: number; status: string; next: string; failureReason: string | null }>(

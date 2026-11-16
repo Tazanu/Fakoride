@@ -261,6 +261,18 @@ export function authRouter(): Router {
       });
       if (!user) throw new ApiError(404, "no_account", "This account no longer exists.");
       res.json({
+        /**
+         * Only when the token is out of date about what this account is.
+         *
+         * A role changes while a token is still alive: somebody applies to
+         * drive on another phone, or ops grants or revokes admin. The token
+         * goes on saying the old thing until it expires, and every route that
+         * checks it refuses. The app asks this question each time it opens, so
+         * this is where a stale token is quietly replaced.
+         */
+        ...(req.user!.role !== user.role
+          ? { token: signToken({ sub: user.id, role: user.role, phone: user.phone }) }
+          : {}),
         id: user.id,
         phone: user.phone,
         name: user.name,

@@ -37,6 +37,7 @@ import { findMe, type Fix } from "@/ui/position";
 import { Appear } from "@/ui/motion";
 import { MapButton, MapPanel, MapPill, Sheet } from "@/ui/map";
 import { ServiceNotice } from "@/ui/notice";
+import { LiveRide } from "@/ui/live-ride";
 import { S } from "@/content/strings";
 import { plural, useT, type Phrase } from "@/ui/i18n";
 import { palette, radius, space, touch, type, xaf } from "@/theme";
@@ -276,6 +277,7 @@ export default function Book() {
 
       <Sheet>
         <ServiceNotice />
+        <LiveRide side="rider" />
         <Text style={styles.question}>{t(S.home.where)}</Text>
 
         {/*

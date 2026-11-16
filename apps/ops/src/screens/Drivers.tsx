@@ -35,6 +35,8 @@ export function Drivers() {
   const [drivers, setDrivers] = useState<QueueDriver[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [acting, setActing] = useState<string | null>(null);
+  /** The driver whose "adjust money" box is open. */
+  const [adjusting, setAdjusting] = useState<string | null>(null);
 
   const load = useCallback(async (status: DriverStatus) => {
     setDrivers(null);
@@ -75,6 +77,7 @@ export function Drivers() {
         ) : (
           drivers.map((d) => {
             const open = acting === d.id;
+            const adjustOpen = adjusting === d.id;
             return (
               <div key={d.id}>
                 <div className="ops-table-row" style={COLUMNS}>
@@ -97,7 +100,22 @@ export function Drivers() {
                     {tab === "ACTIVE" || tab === "SUSPENDED" ? (
                       <button
                         type="button"
-                        onClick={() => setActing(open ? null : d.id)}
+                        onClick={() => {
+                          setActing(null);
+                          setAdjusting(adjustOpen ? null : d.id);
+                        }}
+                        style={styles.reinstateButton}
+                      >
+                        {adjustOpen ? "Close" : "Adjust money"}
+                      </button>
+                    ) : null}
+                    {tab === "ACTIVE" || tab === "SUSPENDED" ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAdjusting(null);
+                          setActing(open ? null : d.id);
+                        }}
                         style={tab === "ACTIVE" ? styles.suspendButton : styles.reinstateButton}
                       >
                         {open ? "Cancel" : tab === "ACTIVE" ? "Suspend" : "Put back on"}
@@ -113,12 +131,100 @@ export function Drivers() {
                     onDone={() => void load(tab)}
                   />
                 ) : null}
+                {adjustOpen ? <Adjust driver={d} onDone={() => setAdjusting(null)} /> : null}
               </div>
             );
           })
         )}
       </Panel>
     </Section>
+  );
+}
+
+/**
+ * Correcting what we hold for a driver.
+ *
+ * The one money movement Fapshi cannot make for us. When a rider is charged
+ * twice, a person refunds her from the Fapshi dashboard — and the fare the
+ * driver was credited for it then has to come off what we are holding for him,
+ * or he cashes out money that has already gone back. This writes that entry,
+ * in either direction, with the reason. It moves no money by itself.
+ */
+function Adjust({ driver, onDone }: { driver: QueueDriver; onDone: () => void }) {
+  const [amount, setAmount] = useState("");
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+
+  async function go() {
+    const amountXaf = Number(amount.replace(/\s/g, ""));
+    if (!Number.isInteger(amountXaf) || amountXaf === 0) {
+      setError("A whole number of francs. Put a minus sign in front to take money off.");
+      return;
+    }
+    if (text.trim().length < 5) {
+      setError("Say why. It is written to his ledger with your account.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await ops.adjust(driver.id, amountXaf, text.trim());
+      setDone(`Done. We are now holding ${r.payableXaf.toLocaleString("fr-FR")} FCFA for him.`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "That did not work.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (done) {
+    return (
+      <div style={styles.act}>
+        <div style={styles.actHead}>{done}</div>
+        <button type="button" onClick={onDone} style={styles.confirm}>
+          Close
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ ...styles.act, ...styles.actWarn }}>
+      <div style={styles.actHead}>Adjust what we hold for {driver.name ?? driver.plate}</div>
+      <p style={styles.actNote}>
+        This changes what he can cash out. It does not send or take any money itself — refund the rider from the Fapshi
+        dashboard first, then record it here.
+      </p>
+      <label style={styles.field}>
+        <span style={styles.label}>Amount in FCFA — a minus sign takes it off</span>
+        <input
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="-700"
+          inputMode="numeric"
+          disabled={busy}
+          className="ops-textarea"
+          autoFocus
+        />
+      </label>
+      <label style={styles.field}>
+        <span style={styles.label}>Why — written to his ledger</span>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Rider charged twice for the Molyko trip on the 14th; second charge refunded in Fapshi."
+          rows={2}
+          disabled={busy}
+          className="ops-textarea"
+        />
+      </label>
+      {error ? <p style={styles.error}>{error}</p> : null}
+      <button type="button" onClick={() => void go()} disabled={busy} style={styles.confirmWarn}>
+        {busy ? "Working…" : "Record this adjustment"}
+      </button>
+    </div>
   );
 }
 
@@ -202,7 +308,7 @@ function Act({
   );
 }
 
-const COLUMNS = { "--ops-cols": "1.8fr 1.1fr 1.2fr 0.9fr 1.1fr" } as React.CSSProperties;
+const COLUMNS = { "--ops-cols": "1.8fr 1.1fr 1.2fr 0.9fr 1.8fr" } as React.CSSProperties;
 
 const styles: Record<string, React.CSSProperties> = {
   th: { fontSize: 12, fontWeight: 700, letterSpacing: "0.4px", color: "var(--c-muted)" },
@@ -215,7 +321,7 @@ const styles: Record<string, React.CSSProperties> = {
   papersOk: { fontSize: 13, fontWeight: 600, color: "var(--c-action-text)" },
   papersShort: { fontSize: 13, fontWeight: 600, color: "var(--c-hill)" },
 
-  rowAction: { display: "flex", justifyContent: "flex-end" },
+  rowAction: { display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 6 },
   suspendButton: {
     minHeight: 36,
     padding: "0 12px",

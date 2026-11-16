@@ -249,7 +249,15 @@ check("he keeps the fare less the day's fee", today2.body.keptXaf === 250 - 500,
 const week = await call("GET", "/drivers/me/week", { token: driverToken });
 check("the week has seven days, Monday first", week.body.days?.length === 7 && week.body.days?.[0]?.weekday === "Mon", JSON.stringify(week.body.days?.map((d) => d.weekday)));
 const monday = week.body.days?.[0];
-check("an unworked Monday is named a ghost town", monday?.ghostTown === true && monday?.feeXaf === 0, JSON.stringify(monday));
+// On a Monday this driver has just worked the Monday in question, so it is not
+// a ghost town and carries today's fee. The check used to assume otherwise and
+// failed one run in seven — every Monday, in Buea time.
+const itIsMonday = new Date(Date.now() + 60 * 60_000).getUTCDay() === 1;
+if (itIsMonday) {
+  check("a Monday he worked is not called a ghost town", monday?.ghostTown === false && monday?.worked === true && monday?.feeXaf === 500, JSON.stringify(monday));
+} else {
+  check("an unworked Monday is named a ghost town", monday?.ghostTown === true && monday?.feeXaf === 0, JSON.stringify(monday));
+}
 check("the week totals the day he did work", week.body.earnedXaf === 250 && week.body.daysWorked === 1, JSON.stringify({ e: week.body.earnedXaf, d: week.body.daysWorked }));
 
 console.log("\n=== after the trip ===");

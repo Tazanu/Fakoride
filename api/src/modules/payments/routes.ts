@@ -13,11 +13,15 @@ import { env } from "../../env";
 import { ApiError, asyncHandler, param } from "../../lib/http";
 import { requireAuth } from "../../middleware/auth";
 import { logger } from "../../lib/logger";
+import { oneAtATime } from "../../lib/locks";
 import { payments } from "./index";
 import { PaymentProviderError } from "./provider";
+import { serviceDate, serviceDateKey } from "../../lib/time";
+import { overdueAccessFees } from "../ledger";
 import {
   applyProviderStatus,
   collectAccessFee,
+  collectAccessFeeOutcome,
   driverPayable,
   requestPayout,
   runAccessFeeCollection,
@@ -122,8 +126,9 @@ export function driverPaymentsRouter(): Router {
     requireAuth("DRIVER"),
     asyncHandler(async (req, res) => {
       const driverId = await currentDriverId(req.user!.sub);
-      const [payable, unpaidFees] = await Promise.all([
+      const [payable, overdue, unpaidFees] = await Promise.all([
         driverPayable(driverId),
+        overdueAccessFees(driverId),
         prisma.accessFeeCharge.findMany({
           where: { driverId, paid: false },
           orderBy: { serviceDate: "asc" },
@@ -141,7 +146,63 @@ export function driverPaymentsRouter(): Router {
           lastFailure: f.failureCode,
         })),
         unpaidFeesXaf: unpaidFees.reduce((sum, f) => sum + f.amountXaf, 0),
+        // The part of that old enough to stop him going online. Zero: he may.
+        overdueFeesXaf: overdue.owedXaf,
       });
+    }),
+  );
+
+  /**
+   * "Pay it now."
+   *
+   * The sweep asks his MoMo on its own schedule and gives up after a few
+   * refusals. A driver who has topped up and wants to work should not have to
+   * ring anybody: this puts the prompt for his oldest unpaid day on his phone
+   * straight away. One day per press — two prompts at once on one handset is
+   * how the second gets dismissed unread.
+   *
+   * Only days that are over. Today's fee is taken tomorrow morning, as the app
+   * has always told him.
+   */
+  router.post(
+    "/me/fees/pay",
+    requireAuth("DRIVER"),
+    asyncHandler(async (req, res) => {
+      const driverId = await currentDriverId(req.user!.sub);
+      const today = serviceDate();
+      const due = await prisma.accessFeeCharge.findMany({
+        where: { driverId, paid: false, serviceDate: { lt: today } },
+        orderBy: { serviceDate: "asc" },
+        select: { id: true, serviceDate: true, amountXaf: true },
+      });
+      const oldest = due[0];
+      if (!oldest) {
+        res.json({ status: "NOTHING_DUE", remainingXaf: 0 });
+        return;
+      }
+
+      // force: he asked. The backoff exists to stop us pestering him.
+      const outcome = await collectAccessFeeOutcome(oldest.id, { force: true });
+      const remainingXaf = due.reduce((sum, c) => sum + c.amountXaf, 0);
+      const day = oldest.serviceDate.toISOString().slice(0, 10);
+
+      if (outcome.kind === "charged" || outcome.kind === "in_flight") {
+        res.status(outcome.kind === "charged" ? 201 : 200).json({
+          // PENDING: the prompt is on his phone. FAILED: his MoMo said no.
+          status: outcome.payment.status,
+          paymentId: outcome.payment.id,
+          amountXaf: outcome.payment.amountXaf,
+          day,
+          failureReason: outcome.payment.failureReason,
+          remainingXaf,
+        });
+        return;
+      }
+      if (outcome.kind === "already_paid") {
+        res.json({ status: "SUCCESSFUL", amountXaf: oldest.amountXaf, day, remainingXaf: remainingXaf - oldest.amountXaf });
+        return;
+      }
+      throw new ApiError(409, "not_collectable", "That fee cannot be collected. Call us.");
     }),
   );
 
@@ -302,6 +363,105 @@ export function adminPaymentsRouter(): Router {
         amountXaf: payment.amountXaf,
         failureReason: payment.failureReason,
       });
+    }),
+  );
+
+  /**
+   * Let one day's fee go.
+   *
+   * Now that an old unpaid fee stops a driver going online, there has to be a
+   * way to say "this one was our mistake" — he was charged for a day the app
+   * was down, or went online by accident and off again. Without it the only
+   * tools ops had were "ask his MoMo again" and nothing.
+   *
+   * The charge is settled at zero and the ledger entry that raised it is
+   * written back, with the reason, so his earnings screen stops counting a fee
+   * he was let off. Nothing is deleted: both rows stay, and say what happened.
+   */
+  router.post(
+    "/access-fees/:id/waive",
+    asyncHandler(async (req, res) => {
+      const { reason } = z.object({ reason: z.string().trim().min(5).max(300) }).parse(req.body);
+      const chargeId = param(req, "id");
+
+      const waived = await oneAtATime(`access-fee:${chargeId}`, async (tx) => {
+        const charge = await tx.accessFeeCharge.findUnique({ where: { id: chargeId } });
+        if (!charge) throw new ApiError(404, "no_charge", "No such access fee.");
+        if (charge.paid) throw new ApiError(409, "already_paid", "That day is already settled.");
+
+        const inFlight = await tx.payment.findFirst({
+          where: { accessFeeChargeId: chargeId, status: { in: ["CREATED", "PENDING"] } },
+          select: { id: true },
+        });
+        if (inFlight) {
+          throw new ApiError(409, "payment_in_flight", "A payment for that day is still on his phone. Wait for it to settle.");
+        }
+
+        const day = charge.serviceDate.toISOString().slice(0, 10);
+        await tx.ledgerEntry.create({
+          data: {
+            driverId: charge.driverId,
+            type: "ACCESS_FEE",
+            amountXaf: charge.amountXaf,
+            note: `Access fee for ${day} waived on ${serviceDateKey()}: ${reason}`,
+            // Dated with the fee it cancels, so any window that counts the one
+            // counts the other, and no week ever shows a negative fee.
+            createdAt: charge.createdAt,
+          },
+        });
+        return tx.accessFeeCharge.update({
+          where: { id: chargeId },
+          data: { amountXaf: 0, paid: true, paidAt: new Date(), providerRef: "WAIVED", failureCode: null },
+        });
+      });
+
+      logger.info({ chargeId, by: req.user!.sub, reason }, "access fee waived");
+      res.json({ id: waived.id, waived: true });
+    }),
+  );
+
+  /**
+   * Correct what we are holding for a driver.
+   *
+   * The one money movement the provider cannot make for us. A rider charged
+   * twice is refunded from the Fapshi dashboard by a person; the fare the
+   * driver was credited for it then has to come back off what we hold for him,
+   * and until now nothing could write that. Positive adds to what we hold,
+   * negative takes from it, and it can never take more than is there.
+   */
+  router.post(
+    "/drivers/:id/adjustments",
+    asyncHandler(async (req, res) => {
+      const body = z
+        .object({
+          amountXaf: z.number().int().refine((n) => n !== 0, "An adjustment of nothing is not an adjustment."),
+          reason: z.string().trim().min(5).max(300),
+        })
+        .parse(req.body);
+      const driverId = param(req, "id");
+
+      // The same lock a cash-out takes, so the two cannot both spend one balance.
+      const result = await oneAtATime(`payout:${driverId}`, async (tx) => {
+        const driver = await tx.driver.findUnique({ where: { id: driverId }, select: { id: true } });
+        if (!driver) throw new ApiError(404, "no_driver", "No such driver.");
+
+        const entries = await tx.ledgerEntry.findMany({
+          where: { driverId, type: { in: ["FARE_MOBILE", "PAYOUT", "ADJUSTMENT"] } },
+          select: { amountXaf: true },
+        });
+        const holding = entries.reduce((sum, e) => sum + e.amountXaf, 0);
+        if (holding + body.amountXaf < 0) {
+          throw new ApiError(409, "more_than_held", `We are only holding ${holding} XAF for this driver.`);
+        }
+
+        const entry = await tx.ledgerEntry.create({
+          data: { driverId, type: "ADJUSTMENT", amountXaf: body.amountXaf, note: `${body.reason} (by ${req.user!.sub})` },
+        });
+        return { id: entry.id, payableXaf: holding + body.amountXaf };
+      });
+
+      logger.info({ driverId, amountXaf: body.amountXaf, by: req.user!.sub }, "ledger adjusted by ops");
+      res.status(201).json(result);
     }),
   );
 

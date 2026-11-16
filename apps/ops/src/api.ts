@@ -143,7 +143,9 @@ export type TripStatus =
   | "COMPLETED"
   | "CANCELLED_BY_RIDER"
   | "CANCELLED_BY_DRIVER"
-  | "NO_DRIVER_FOUND";
+  | "NO_DRIVER_FOUND"
+  /** Ended from this console, or by the server's watchdog. No fare. */
+  | "CANCELLED_BY_OPS";
 
 export type TripRow = {
   id: string;
@@ -157,6 +159,8 @@ export type TripRow = {
   driver: string | null;
   plate: string | null;
   requestedAt: string;
+  acceptedAt: string | null;
+  startedAt: string | null;
   /** Null once a driver has it, or once the trip is over. */
   waitingSeconds: number | null;
 };
@@ -294,6 +298,16 @@ export const ops = {
   trips: (status: TripStatus) => api.get<{ trips: TripRow[] }>(`/admin/trips?status=${status}`),
 
   /**
+   * End a ride that will not end by itself.
+   *
+   * `complete` writes the fare exactly as if the driver had pressed Finish, and
+   * charges a mobile fare; the API only allows it once the ride has started.
+   * `cancel` writes and charges nothing. Both need a reason, kept on the ride.
+   */
+  endTrip: (id: string, how: "complete" | "cancel", reason: string) =>
+    api.post<{ status: string }>(`/admin/trips/${id}/${how}`, { reason }),
+
+  /**
    * The banner both apps show at the top of the home screen.
    *
    * `messageFr` is not optional — the API refuses a notice without it. Both
@@ -370,6 +384,17 @@ export const ops = {
     api.post<{ paymentId: string; status: PaymentStatus; amountXaf: number; failureReason: string | null }>(
       `/admin/access-fees/${chargeId}/collect`,
     ),
+
+  /** Let one day's access fee go. Settled at zero, with the reason on his ledger. */
+  waiveFee: (chargeId: string, reason: string) =>
+    api.post<{ id: string; waived: true }>(`/admin/access-fees/${chargeId}/waive`, { reason }),
+
+  /**
+   * Correct what we are holding for a driver. Positive adds, negative takes;
+   * the API refuses to take more than is there.
+   */
+  adjust: (driverId: string, amountXaf: number, reason: string) =>
+    api.post<{ id: string; payableXaf: number }>(`/admin/drivers/${driverId}/adjustments`, { amountXaf, reason }),
 
   suspend: (driverId: string, reason: string) =>
     api.post<{ id: string; status: DriverStatus }>(`/admin/drivers/${driverId}/suspend`, { reason }),

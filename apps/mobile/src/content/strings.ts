@@ -58,13 +58,13 @@ export const S = {
     codeLabel: p("6-digit code", "Code à 6 chiffres"),
     sixDigitCode: p("Six digit code", "Code à six chiffres"),
     yourName: p("Your name", "Votre nom"),
-    namePlaceholder: p("Tazanu Stanley", "Tazanu Stanley"),
+    namePlaceholder: p("Enanga Mofor", "Enanga Mofor"),
     nameHint: p(
       "A first name is enough. Drivers see this when they accept your ride.",
       "Un prénom suffit. Les chauffeurs le voient quand ils acceptent votre course.",
     ),
     verify: p("Verify and continue", "Vérifier et continuer"),
-    phonePlaceholder: p("6 72 48 84 17", "6 72 48 84 17"),
+    phonePlaceholder: p("6 70 00 00 00", "6 70 00 00 00"),
 
     /* Chosen from the API's `code`, never from its English message. */
     badPhone: p(
@@ -97,6 +97,14 @@ export const S = {
       "Pas de réseau. Vérifiez votre connexion et réessayez.",
     ),
     wentWrong: p("Something went wrong. Try again.", "Une erreur s'est produite. Réessayez."),
+  },
+
+  /** The card on a home screen that leads back to a ride still going on. */
+  live: {
+    riding: p("You have a ride in progress", "Vous avez une course en cours"),
+    driving: p("You are on a ride", "Vous êtes en course"),
+    tapToOpen: p("Tap to go back to it.", "Touchez pour y revenir."),
+    open: p("Open", "Ouvrir"),
   },
 
   home: {
@@ -181,6 +189,28 @@ export const S = {
       "Vos signalements, et les réponses reçues",
     ),
     signOut: p("Sign out", "Se déconnecter"),
+    callUs: p("Call Fako Ride", "Appeler Fako Ride"),
+
+    deleteAccount: p("Delete my account", "Supprimer mon compte"),
+    deleteAsk: p("Delete your account?", "Supprimer votre compte ?"),
+    deleteWhy: p(
+      "Your number, name, photo and trusted contacts are erased, and you are signed out everywhere. Records of your rides and payments are kept, as the law requires, without your name. This cannot be undone.",
+      "Votre numéro, votre nom, votre photo et vos contacts de confiance sont effacés, et vous êtes déconnecté partout. L'historique de vos courses et paiements est conservé, comme la loi l'exige, sans votre nom. Cette action est définitive.",
+    ),
+    deleteDo: p("Delete it", "Le supprimer"),
+    deleteAfterRide: p(
+      "You have a ride under way. Finish or cancel it, then delete your account.",
+      "Vous avez une course en cours. Terminez-la ou annulez-la, puis supprimez votre compte.",
+    ),
+    deleteAfterCashOut: p(
+      "We are holding money for you. Send it to your mobile money from My money, then delete your account.",
+      "Nous détenons de l'argent pour vous. Envoyez-le sur votre mobile money depuis Mon argent, puis supprimez votre compte.",
+    ),
+    deleteAfterPayment: p(
+      "A payment is still going through. Try again in a few minutes.",
+      "Un paiement est encore en cours. Réessayez dans quelques minutes.",
+    ),
+
     signOutElsewhere: p("Sign out on every other phone", "Se déconnecter sur tous les autres téléphones"),
     signOutElsewhereAsk: p("Sign out everywhere else?", "Se déconnecter partout ailleurs ?"),
     signOutElsewhereWhy: p(
@@ -336,6 +366,33 @@ export const S = {
     noNetwork: p("No network.", "Pas de réseau."),
     didNotWork: p("That did not work.", "Cela n'a pas fonctionné."),
     didNotWorkTryAgain: p("That did not work. Try again.", "Cela n'a pas fonctionné. Réessayez."),
+
+    // The permanent notification Android shows while his position is being sent.
+    onlineNoticeTitle: p("Fako Ride — you are online", "Fako Ride — vous êtes en ligne"),
+    onlineNoticeBody: p(
+      "Sharing your position so riders nearby can find you. Go offline to stop.",
+      "Votre position est partagée pour que les passagers proches vous trouvent. Passez hors ligne pour arrêter.",
+    ),
+    takenOffline: p(
+      "We lost your position for a while, so you were taken offline. Go online again when you are ready.",
+      "Nous avons perdu votre position un moment : vous avez été mis hors ligne. Remettez-vous en ligne quand vous êtes prêt.",
+    ),
+
+    feesOverdue: p(
+      "You have unpaid access fees. Pay them to go online.",
+      "Vous avez des frais d'accès impayés. Réglez-les pour vous mettre en ligne.",
+    ),
+    feesOwed: p("Unpaid access fees — {amount} FCFA", "Frais d'accès impayés — {amount} FCFA"),
+    payNow: p("Pay now", "Payer maintenant"),
+    feesPrompted: p(
+      "Check your phone and approve the payment. Then go online.",
+      "Regardez votre téléphone et validez le paiement. Puis mettez-vous en ligne.",
+    ),
+    feesRefused: p(
+      "Your mobile money refused the payment. Top up and try again.",
+      "Votre mobile money a refusé le paiement. Rechargez et réessayez.",
+    ),
+    feesSettled: p("Your fees are paid. You can go online.", "Vos frais sont réglés. Vous pouvez vous mettre en ligne."),
   },
 
   /**
@@ -381,8 +438,17 @@ export const S = {
       "Paid by phone. It lands in your balance.",
       "Payé par téléphone. Cela arrive dans votre solde.",
     ),
+    phoneWaiting: p("Waiting for the payment", "En attente du paiement"),
+    phoneWaitingWhy: p(
+      "The rider has a prompt on their phone to approve. Do not let them go until this says paid.",
+      "Le passager doit valider le paiement sur son téléphone. Ne le laissez pas partir avant que ceci indique payé.",
+    ),
+    phoneFailed: p("The phone payment did not go through", "Le paiement par téléphone a échoué"),
+    phoneFailedTakeCash: p(
+      "Take {amount} FCFA in cash now, before the rider leaves.",
+      "Prenez {amount} FCFA en espèces maintenant, avant que le passager ne parte.",
+    ),
 
-    callHer: p("Call her", "L'appeler"),
     dropRide: p("Drop this ride", "Abandonner cette course"),
     getHelp: p("GET HELP", "DEMANDER DE L'AIDE"),
     getHelpLabel: p("Get help", "Demander de l'aide"),
@@ -508,6 +574,11 @@ export const S = {
     arrived: p("You have arrived", "Vous êtes arrivé"),
     nobodyTook: p("Nobody took this one", "Personne n'a pris cette course"),
     heDropped: p("He dropped the ride", "Le chauffeur a abandonné la course"),
+    weEndedIt: p("We ended this ride", "Nous avons mis fin à cette course"),
+    weEndedItWhy: p(
+      "Fako Ride ended this ride because it could not go ahead. Nothing has been charged. You can book again.",
+      "Fako Ride a mis fin à cette course car elle ne pouvait pas avoir lieu. Rien ne vous a été facturé. Vous pouvez réserver à nouveau.",
+    ),
     over: p("This ride is over", "Cette course est terminée"),
 
     usuallyQuick: p(
@@ -535,6 +606,8 @@ export const S = {
     ),
 
     youPaid: p("You paid", "Vous avez payé"),
+    approveOnPhone: p("Approve the payment on your phone", "Validez le paiement sur votre téléphone"),
+    payFailed: p("Payment failed — pay your driver in cash", "Paiement échoué — payez votre chauffeur en espèces"),
     payOnArrival: p("You pay on arrival", "Vous payez à l'arrivée"),
     cash: p("Cash", "Espèces"),
     momo: p("MTN MoMo", "MTN MoMo"),
@@ -659,6 +732,12 @@ export const S = {
     checkAgain: p("Check again", "Vérifier à nouveau"),
     signOut: p("Sign out", "Se déconnecter"),
     underReview: p("Under review", "En cours d'examen"),
+
+    suspended: p("Your account is suspended", "Votre compte est suspendu"),
+    suspendedWhy: p(
+      "You cannot take rides for now. We sent you a text saying why. Call us and we will sort it out.",
+      "Vous ne pouvez pas prendre de courses pour le moment. Nous vous avons envoyé un SMS expliquant pourquoi. Appelez-nous pour régler cela.",
+    ),
 
     refused: p("We could not approve this application", "Nous n'avons pas pu approuver cette demande"),
     refusedWhy: p(

@@ -33,7 +33,7 @@ export const EXPO_TOKEN = /^Expo(nent)?PushToken\[[^\]]+\]$/;
 /** A hung push must not hold a dispatch loop open. */
 const PUSH_TIMEOUT_MS = 8_000;
 
-export type PushKind = "offer" | "accepted" | "arrived" | "no_driver" | "driver_cancelled";
+export type PushKind = "offer" | "accepted" | "arrived" | "no_driver" | "driver_cancelled" | "taken_offline";
 
 type Words = { title: string; body: string };
 
@@ -61,6 +61,12 @@ const TEXT: Record<PushKind, { en: Words; fr: Words }> = {
     en: { title: "Your driver dropped the ride", body: "We are finding you another taxi. Nothing has been charged." },
     fr: { title: "Le chauffeur a abandonné la course", body: "Nous vous cherchons un autre taxi. Rien n'a été facturé." },
   },
+  // To a driver whose phone went quiet. Without it he believes he is waiting
+  // for rides all afternoon while none can reach him.
+  taken_offline: {
+    en: { title: "You are offline", body: "We lost your position, so rides stopped coming. Open Fako Ride to go back online." },
+    fr: { title: "Vous êtes hors ligne", body: "Nous avons perdu votre position. Ouvrez Fako Ride pour vous remettre en ligne." },
+  },
 };
 
 /**
@@ -73,6 +79,7 @@ const CHANNEL: Record<PushKind, string> = {
   arrived: "trips",
   no_driver: "trips",
   driver_cancelled: "trips",
+  taken_offline: "trips",
 };
 
 /** 1500 → "1 500", the way a price is written on a kiosk here. */

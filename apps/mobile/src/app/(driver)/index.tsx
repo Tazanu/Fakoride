@@ -22,6 +22,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  AppState,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -34,12 +35,14 @@ import { useFocusEffect, useRouter } from "expo-router";
 import * as Location from "expo-location";
 import { StarIcon } from "@/ui/icons";
 import { ApiError } from "@/api/client";
-import { shift, trips, type TodaySummary } from "@/api/driver";
+import { auth, money, shift, trips, type TodaySummary } from "@/api/driver";
+import { startPresence, stopPresence } from "@/driver/presence";
 import { useSession } from "@/session/SessionProvider";
 import { useDriverRealtime } from "@/realtime/DriverRealtime";
 import { findMe, useWhereIAm } from "@/ui/position";
 import { MapPanel, Sheet } from "@/ui/map";
 import { ServiceNotice } from "@/ui/notice";
+import { LiveRide, rememberOpened } from "@/ui/live-ride";
 import { S } from "@/content/strings";
 import { useT, type Phrase } from "@/ui/i18n";
 import { palette, radius, space, touch, type, xaf } from "@/theme";
@@ -52,7 +55,7 @@ export default function Home() {
   const router = useRouter();
   const { me } = useSession();
   const insets = useSafeAreaInsets();
-  const { offer, clearOffer } = useDriverRealtime();
+  const { offer, clearOffer, takenOffline, acknowledgeTakenOffline } = useDriverRealtime();
   // The map opens where he is, not where Buea is.
   const where = useWhereIAm();
   const t = useT();
@@ -63,6 +66,61 @@ export default function Home() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<Phrase | null>(null);
   const [answering, setAnswering] = useState(false);
+  /** Old access fees standing between him and going online, in francs. Zero: none. */
+  const [owed, setOwed] = useState(0);
+  const [paying, setPaying] = useState(false);
+  const [feeNote, setFeeNote] = useState<Phrase | null>(null);
+
+  /**
+   * His phone reports where it is for exactly as long as he is online.
+   *
+   * Tied to the state rather than to the button, so it is also right when he
+   * opens the app already online from this morning, and when something other
+   * than his own thumb takes him offline.
+   */
+  const noticeTitle = t(S.driver.onlineNoticeTitle);
+  const noticeBody = t(S.driver.onlineNoticeBody);
+  useEffect(() => {
+    if (online) void startPresence({ title: noticeTitle, body: noticeBody });
+    else void stopPresence();
+  }, [online, noticeTitle, noticeBody]);
+
+  /**
+   * The server took him offline: his phone went quiet for too long. Say so —
+   * a switch that flips by itself with no explanation looks like a fault.
+   */
+  useEffect(() => {
+    if (!takenOffline) return;
+    setOnline(false);
+    setError(S.driver.takenOffline);
+    acknowledgeTakenOffline();
+  }, [takenOffline, acknowledgeTakenOffline]);
+
+  /**
+   * Coming back to the app, ask the server rather than trust the switch. He may
+   * have been taken offline while the phone was in his pocket and the socket
+   * that would have told him was asleep.
+   *
+   * Asked directly, not through the session's own refresh: that one signs a
+   * person out on any answer it does not understand, which is right at start-up
+   * and far too much for a glance at one flag every time the screen wakes.
+   */
+  const toggles = useRef(0);
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next !== "active") return;
+      const asked = toggles.current;
+      void auth
+        .me()
+        .then((fresh) => {
+          // He pressed the switch while we were asking; his press is newer.
+          if (asked !== toggles.current || !fresh.driver) return;
+          setOnline(fresh.driver.online);
+        })
+        .catch(() => undefined);
+    });
+    return () => sub.remove();
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -80,6 +138,7 @@ export default function Home() {
   );
 
   async function toggleOnline() {
+    toggles.current += 1;
     setBusy(true);
     setError(null);
     try {
@@ -101,11 +160,21 @@ export default function Home() {
         }
         await shift.goOnline(fix.lat, fix.lng);
         setOnline(true);
+        setOwed(0);
+        setFeeNote(null);
       }
       await load();
     } catch (err) {
       if (err instanceof ApiError && err.code === "not_verified") {
         router.replace("/apply");
+        return;
+      }
+      if (err instanceof ApiError && err.code === "fees_overdue") {
+        // Not an error to apologise for: a bill, with a button that pays it.
+        const balance = await money.balance().catch(() => null);
+        setOwed(balance?.overdueFeesXaf || balance?.unpaidFeesXaf || 0);
+        setFeeNote(null);
+        setError(S.driver.feesOverdue);
         return;
       }
       setError(
@@ -118,18 +187,49 @@ export default function Home() {
     }
   }
 
+  /**
+   * Put the MoMo prompt on his phone. One unpaid day per press — the server
+   * will not stack two prompts on one handset — so the note says what is left.
+   */
+  async function payFees() {
+    setPaying(true);
+    setFeeNote(null);
+    try {
+      const result = await money.payFees();
+      if (result.status === "FAILED" || result.status === "EXPIRED") {
+        setFeeNote(S.driver.feesRefused);
+      } else if (result.status === "NOTHING_DUE") {
+        setOwed(0);
+        setError(null);
+        setFeeNote(S.driver.feesSettled);
+      } else {
+        setFeeNote(S.driver.feesPrompted);
+      }
+    } catch (err) {
+      setFeeNote(err instanceof ApiError && err.offline ? S.driver.offlineMoment : S.driver.didNotWorkTryAgain);
+    } finally {
+      setPaying(false);
+    }
+  }
+
   async function accept() {
     if (!offer) return;
     setAnswering(true);
     try {
       await trips.accept(offer.tripId);
       const id = offer.tripId;
+      // He is going there himself; the home screen need not send him again.
+      rememberOpened(id);
       clearOffer();
       router.push({ pathname: "/(driver)/job/[id]", params: { id } });
     } catch (err) {
       // Somebody else took it, or it expired while he was deciding. Neither is
       // his fault and neither is worth a dialog — the offer just goes.
-      if (err instanceof ApiError && (err.code === "already_taken" || err.code === "offer_expired")) {
+      // `offer_gone` is what the server actually says; the other two are older names for it.
+      if (
+        err instanceof ApiError &&
+        ["offer_gone", "wrong_state", "finish_current_ride", "already_taken", "offer_expired"].includes(err.code)
+      ) {
         clearOffer();
         return;
       }
@@ -192,6 +292,7 @@ export default function Home() {
 
       <Sheet handle={false} style={styles.sheet}>
         <ServiceNotice />
+        <LiveRide side="driver" />
 
         <View style={styles.stats}>
           <Stat label={t(S.driver.today)} value={`${xaf(today?.earnedXaf ?? 0)} F`} />
@@ -208,6 +309,28 @@ export default function Home() {
         ) : null}
 
         {error ? <Text style={styles.error}>{t(error)}</Text> : null}
+
+        {owed > 0 ? (
+          <View style={styles.owed}>
+            <Text style={styles.owedAmount}>{t(S.driver.feesOwed, { amount: xaf(owed) })}</Text>
+            <Pressable
+              onPress={() => void payFees()}
+              disabled={paying}
+              accessibilityRole="button"
+              accessibilityState={{ busy: paying }}
+              style={({ pressed }) => [styles.owedButton, pressed && styles.pressed]}
+            >
+              {paying ? (
+                <ActivityIndicator size="small" color={c.onAction} />
+              ) : (
+                <Text style={styles.owedButtonLabel}>{t(S.driver.payNow)}</Text>
+              )}
+            </Pressable>
+            {feeNote ? <Text style={styles.owedNote}>{t(feeNote)}</Text> : null}
+          </View>
+        ) : feeNote ? (
+          <Text style={styles.owedNote}>{t(feeNote)}</Text>
+        ) : null}
 
         {fee ? (
           <View style={[styles.feeRow, fee.paid ? styles.feePaid : styles.feeDue]}>
@@ -462,6 +585,18 @@ const styles = StyleSheet.create({
   acceptLabel: { ...type.button, fontSize: 16, color: c.action },
 
   error: { ...type.secondary, color: c.danger },
+
+  owed: { borderRadius: radius.md, backgroundColor: c.fill, padding: space.lg, gap: space.md },
+  owedAmount: { ...type.bodyStrong, color: c.ink },
+  owedButton: {
+    minHeight: touch.secondaryButtonMinHeight,
+    borderRadius: radius.md,
+    backgroundColor: c.action,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  owedButtonLabel: { ...type.bodyStrong, color: c.onAction },
+  owedNote: { ...type.secondary, color: c.inkSoft },
 
   feeRow: { borderRadius: radius.md, paddingHorizontal: space.lg, paddingVertical: space.md },
   feePaid: { backgroundColor: c.actionTint },

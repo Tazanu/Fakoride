@@ -16,7 +16,8 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { auth, type Me } from "@/api/session";
+import { auth, profile, type Me } from "@/api/session";
+import { stopPresence } from "@/driver/presence";
 import { ApiError, clearToken, getToken, setToken, setUnauthorisedHandler } from "@/api/client";
 import { forgetPushToken, registerForPush, registeredPushToken } from "@/notifications/push";
 
@@ -30,6 +31,8 @@ type SessionState = {
   signOut: () => Promise<void>;
   /** Every other phone signed out; this one keeps going on a fresh session. */
   signOutEverywhere: () => Promise<void>;
+  /** Delete the account on the server, then forget it here. Throws if the server refuses. */
+  deleteAccount: () => Promise<void>;
   refresh: () => Promise<void>;
 };
 
@@ -99,6 +102,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         // signed out here; the session then simply runs out on its own.
         await auth.signOut(registeredPushToken()).catch(() => undefined);
         forgetPushToken();
+        // A driver who signs out while online stops reporting his position.
+        // The server takes him offline itself once it has not heard from him.
+        await stopPresence();
         await clearToken();
         setMe(null);
       },
@@ -108,6 +114,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         // The server forgot every phone's push registration, this one's too.
         forgetPushToken();
         await registerForPush();
+      },
+      deleteAccount: async () => {
+        // The server first: if it refuses — a ride under way, money still held
+        // — nothing here changes and the screen says why.
+        await profile.deleteAccount();
+        forgetPushToken();
+        await stopPresence();
+        await clearToken();
+        setMe(null);
       },
       refresh: load,
     }),

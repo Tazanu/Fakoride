@@ -19,6 +19,7 @@ import { requireAuth } from "../middleware/auth";
 import { alertTrustedContacts } from "./contacts";
 import { rateLimit, RULES } from "../middleware/rateLimit";
 import { emitToOps } from "../realtime";
+import { alertOps, sosAlertText } from "../lib/ops-alert";
 import { logger } from "../lib/logger";
 
 /** The promise printed on the screen: a human answers within a day. */
@@ -43,7 +44,10 @@ export function tripSosRouter(): Router {
 
       const trip = await prisma.trip.findUnique({
         where: { id: tripId },
-        include: { driver: { select: { id: true, userId: true, plate: true } } },
+        include: {
+          driver: { select: { id: true, userId: true, plate: true, user: { select: { name: true, phone: true } } } },
+          rider: { select: { name: true, phone: true } },
+        },
       });
       if (!trip) throw new ApiError(404, "no_trip", "That trip does not exist.");
 
@@ -84,6 +88,21 @@ export function tripSosRouter(): Router {
         lng: alert.lng,
         plate: trip.driver?.plate ?? null,
       });
+
+      // And to a phone, because a console is only watched while it is open.
+      // Every press, not just the first: an operator who slept through one
+      // text should be woken by the second.
+      const pressedBy = isRider ? trip.rider : trip.driver!.user;
+      alertOps(
+        sosAlertText({
+          raisedByRole: alert.raisedByRole,
+          callBack: pressedBy.phone,
+          name: pressedBy.name,
+          plate: trip.driver?.plate ?? null,
+          from: trip.pickupLabel,
+          to: trip.dropLabel,
+        }),
+      );
 
       const contactsTold = await alertTrustedContacts({
         userId: req.user!.sub,

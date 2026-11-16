@@ -11,7 +11,7 @@
  * makes somebody a driver.
  */
 
-import { api } from "./client";
+import { api, setToken } from "./client";
 
 export type DriverStatus = "PENDING_REVIEW" | "ACTIVE" | "SUSPENDED" | "REJECTED";
 
@@ -65,7 +65,16 @@ export const auth = {
       { anonymous: true },
     ),
 
-  me: () => api.get<Me>("/auth/me"),
+  /**
+   * Who is signed in. When the server finds the token out of date about the
+   * account's role it sends a replacement along, which is kept here so that no
+   * screen has to know it happened.
+   */
+  me: () =>
+    api.get<Me & { token?: string }>("/auth/me").then(async ({ token, ...me }) => {
+      if (token) await setToken(token);
+      return me as Me;
+    }),
 
   /** End this session on the server, and forget this phone for push if it holds it. */
   signOut: (pushToken: string | null) =>
@@ -81,6 +90,30 @@ export const profile = {
     api.patch<{ id: string; name: string | null; language: string }>("/me", body),
 
   removePhoto: () => api.delete<{ removed: true }>("/me/photo"),
+
+  /**
+   * Delete this account, for good. Refused with `trip_in_progress`,
+   * `balance_held` or `payment_in_flight` when something has to finish first.
+   */
+  deleteAccount: () => api.delete<null>("/me"),
+};
+
+/**
+ * The ride this account is in the middle of — as a rider, as a driver, or
+ * neither. Asked whenever a home screen comes into view, so that reopening the
+ * app in the middle of a ride leads back to it. See ui/live-ride.
+ */
+export type LiveTrip = { id: string; status: string };
+export const liveTrips = {
+  current: () => api.get<{ riding: LiveTrip | null; driving: LiveTrip | null }>("/trips/current"),
+};
+
+/**
+ * The number to call. Asked of the server rather than built into the app, so
+ * changing the office phone does not need a new release. Null until one is set.
+ */
+export const support = {
+  get: () => api.get<{ phone: string | null; email: string }>("/support"),
 };
 
 export type TrustedContact = { id: string; name: string; phone: string };

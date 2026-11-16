@@ -21,7 +21,6 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
-  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -90,7 +89,7 @@ export default function Trip() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const t = useT();
-  const { cancelledTripId, acknowledgeCancellation } = useDriverRealtime();
+  const { cancelledTripId, acknowledgeCancellation, completedTripId } = useDriverRealtime();
   // The PIN gate puts a keypad over the bottom half of this screen.
   const scroll = useScrollPastKeyboard();
 
@@ -132,6 +131,28 @@ export default function Trip() {
       { text: t(S.job.ok), onPress: () => router.replace("/(driver)") },
     ]);
   }, [cancelledTripId, id, acknowledgeCancellation, router]);
+
+  /**
+   * Somebody else finished this ride — ops from the console, after he rang to
+   * say his screen had frozen, or the server because it ran for hours. Show it
+   * as finished, with the money line, rather than a FINISH button that will be
+   * refused.
+   */
+  useEffect(() => {
+    if (id && completedTripId === id) void load();
+  }, [completedTripId, id, load]);
+
+  /**
+   * A fare paid by phone is not paid until it lands. Keep asking, every few
+   * seconds, for as long as the prompt is on her phone — the answer decides
+   * whether he may let her go.
+   */
+  const farePending = trip?.status === "COMPLETED" && trip.paymentMethod !== "CASH" && (trip.mobileFare ?? "PENDING") === "PENDING";
+  useEffect(() => {
+    if (!farePending) return;
+    const timer = setInterval(() => void load(), 3000);
+    return () => clearInterval(timer);
+  }, [farePending, load]);
 
   /**
    * His position, while it matters.
@@ -311,22 +332,50 @@ export default function Trip() {
 
         {done ? (
           <View style={styles.doneBlock}>
-            <Text style={styles.doneText}>
-              {t(trip.paymentMethod === "CASH" ? S.job.takeCash : S.job.paidByPhone)}
-            </Text>
+            {/*
+              What he is owed, and whether he has it. This said "Paid by phone"
+              the moment he pressed Finish — before she had answered the prompt,
+              and still after her MoMo had refused it. He let her go and found
+              out from his balance.
+            */}
+            {trip.paymentMethod === "CASH" ? (
+              <Text style={styles.doneText}>{t(S.job.takeCash)}</Text>
+            ) : trip.mobileFare === "PAID" ? (
+              <Text style={styles.doneText}>{t(S.job.paidByPhone)}</Text>
+            ) : trip.mobileFare === "FAILED" ? (
+              <View style={styles.fareFailed}>
+                <Text style={styles.fareFailedTitle}>{t(S.job.phoneFailed)}</Text>
+                <Text style={styles.fareFailedBody}>{t(S.job.phoneFailedTakeCash, { amount: xaf(trip.priceXaf) })}</Text>
+              </View>
+            ) : (
+              <View style={styles.fareWaiting}>
+                <Text style={styles.fareWaitingTitle}>{t(S.job.phoneWaiting)}</Text>
+                <Text style={styles.fareWaitingBody}>{t(S.job.phoneWaitingWhy)}</Text>
+              </View>
+            )}
             <Primary label={t(S.job.done)} busy={false} onPress={() => router.replace("/(driver)")} />
           </View>
         ) : null}
 
         {!done ? (
           <>
+            {/*
+              There was a "Call her" here. It opened the dialler with no number
+              in it, because a driver is never sent a rider's number — the API
+              withholds it on purpose and a test holds it to that. She has his,
+              and can ring him; a button that cannot work is worse than none.
+            */}
+            {/*
+              And no "Drop this ride" once she is in the car. The server has
+              always refused it from that point; the button stayed, and pressing
+              it produced an error halfway up the hill.
+            */}
             <View style={styles.minorActions}>
-              <Pressable onPress={() => void Linking.openURL("tel:")} accessibilityRole="button" style={styles.minor}>
-                <Text style={styles.minorLabel}>{t(S.job.callHer)}</Text>
-              </Pressable>
+              {status === "IN_PROGRESS" ? null : (
               <Pressable onPress={confirmCancel} accessibilityRole="button" style={styles.minor}>
                 <Text style={[styles.minorLabel, styles.minorDanger]}>{t(S.job.dropRide)}</Text>
               </Pressable>
+              )}
             </View>
 
             <Pressable
@@ -448,6 +497,19 @@ const styles = StyleSheet.create({
 
   doneBlock: { gap: space.md },
   doneText: { ...type.bodyPlain, color: c.inkSoft },
+  fareWaiting: { borderRadius: radius.md, backgroundColor: c.amberTint, padding: space.lg, gap: space.xs },
+  fareWaitingTitle: { ...type.bodyStrong, color: c.ink },
+  fareWaitingBody: { ...type.bodyPlain, color: c.inkSoft },
+  fareFailed: {
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: c.dangerEdge,
+    backgroundColor: c.dangerTint,
+    padding: space.lg,
+    gap: space.xs,
+  },
+  fareFailedTitle: { ...type.bodyStrong, color: c.danger },
+  fareFailedBody: { ...type.bodyStrong, color: c.ink },
 
   minorActions: { flexDirection: "row", gap: space.md, marginTop: space.sm },
   minor: { flex: 1, minHeight: touch.min, alignItems: "center", justifyContent: "center" },

@@ -77,16 +77,24 @@ screen asks for, it is probably not needed yet.
 | Driver — earnings | `GET /drivers/me/week`, `GET /drivers/me/earnings` |
 | Ops — verification queue | `GET /admin/drivers`, `POST /admin/drivers/:id/verify` · `/reject` · `/suspend` · `/reinstate` |
 | Ops — fare-table editor | `GET /admin/fares`, `PUT /admin/fares` |
-| Ops — live trip board | `GET /admin/trips` |
+| Ops — live trip board | `GET /admin/trips`, `POST /admin/trips/:id/complete`, `POST /admin/trips/:id/cancel` |
 | Ops — complaints & SOS | `GET /admin/complaints`, `POST /admin/complaints/:id/respond`, `GET /admin/sos`, `POST /admin/sos/:id/resolve` |
 | Ops — service banner | `POST /admin/notices`, `DELETE /admin/notices/:id` |
-| Ops — money | `GET /admin/payments`, `POST /admin/payments/:id/refresh`, `POST /admin/access-fees/collect` |
+| Ops — money | `GET /admin/payments`, `POST /admin/payments/:id/refresh`, `POST /admin/access-fees/collect`, `POST /admin/access-fees/:id/waive`, `POST /admin/drivers/:id/adjustments` |
 | Driver — cash out | `GET /drivers/me/balance`, `POST /drivers/me/cashout`, `GET /drivers/me/payments` |
+| Driver — overdue fees | `POST /drivers/me/fees/pay` |
+| Account — delete | `DELETE /me` |
+| Public pages | `GET /legal/terms`, `GET /legal/privacy`, `GET /legal/delete-account`, `GET /support` |
 | Provider callback | `POST /payments/webhook` |
 
-Still absent: SMS (the `console` sender prints the code to the log, so nobody
-outside your server logs can sign in yet), push notifications, and driver
-document upload. Distances are a haversine estimate until OSRM is wired in.
+SMS, push notifications and driver document upload are all built; in
+development the `console` SMS sender prints the code to the log instead of
+sending it. Distances are a haversine estimate until OSRM is wired in.
+
+Running in the background, with no route of their own: the dispatch sweep that
+moves an unanswered offer to the next driver, the payment reconciler, and the
+watchdog (`src/modules/watchdog.ts`) that takes silent drivers offline and ends
+rides nobody finished.
 
 ## Becoming an admin
 

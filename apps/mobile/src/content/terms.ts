@@ -28,7 +28,7 @@ export type LegalDoc = {
 
 const en: LegalDoc = {
   title: "Terms",
-  updated: "21 September 2026",
+  updated: "16 November 2026",
   intro:
     "What you can expect from us, and what we expect from you. Short sentences on purpose: these are the rules a rider and a driver are actually held to, so they should be readable by both.",
   footer:
@@ -77,6 +77,7 @@ const en: LegalDoc = {
       heading: "What you pay us",
       body: [
         "A flat daily access fee, charged only for a day you actually worked. We do not take a percentage of your fares.",
+        "The fee for a day is taken from your mobile money the next morning. If it cannot be taken, we try again, and you can pay it yourself from the app. A fee still unpaid three days after the day it is for stops you going online until it is paid.",
         "This is deliberate. A cut of a 700 franc trip is the sort of arrangement that drives a man off the app and back to the roadside, and we would rather charge a small fixed amount and have you stay.",
         "The fare is yours. If the rider pays cash, you keep the cash. The fee is settled separately.",
         "There is no charge for a day you did not work. Mondays are quiet in Buea and we know it.",
@@ -133,7 +134,7 @@ const en: LegalDoc = {
 
 const fr: LegalDoc = {
   title: "Conditions",
-  updated: "21 septembre 2026",
+  updated: "16 novembre 2026",
   intro:
     "Ce que vous pouvez attendre de nous, et ce que nous attendons de vous. Des phrases courtes, volontairement : ce sont les règles qui engagent le passager comme le chauffeur, elles doivent donc être lisibles par les deux.",
   footer:
@@ -182,6 +183,7 @@ const fr: LegalDoc = {
       heading: "Ce que vous nous payez",
       body: [
         "Des frais d'accès journaliers fixes, facturés uniquement pour un jour réellement travaillé. Nous ne prenons aucun pourcentage sur vos courses.",
+        "Les frais d'une journée sont prélevés sur votre mobile money le lendemain matin. Si le prélèvement échoue, nous réessayons, et vous pouvez les régler vous-même depuis l'application. Des frais encore impayés trois jours après la journée concernée vous empêchent de vous mettre en ligne jusqu'à leur règlement.",
         "C'est un choix. Prélever une commission sur une course à 700 francs, c'est le genre d'arrangement qui pousse un homme à quitter l'application et à retourner au bord de la route ; nous préférons un petit montant fixe et vous garder.",
         "La course vous revient. Si le passager paie en espèces, vous gardez l'argent. Les frais se règlent séparément.",
         "Rien n'est facturé pour un jour non travaillé. Les lundis sont calmes à Buea, et nous le savons.",

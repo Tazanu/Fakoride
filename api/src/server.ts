@@ -4,6 +4,7 @@ import { createApp } from "./app";
 import { initRealtime, closeRealtime } from "./realtime";
 import { startDispatchSweeper } from "./modules/dispatch";
 import { startPaymentJobs } from "./modules/payments/service";
+import { startWatchdog } from "./modules/watchdog";
 import { disconnectPrisma } from "./lib/prisma";
 import { disconnectRedis } from "./lib/redis";
 import { logger } from "./lib/logger";
@@ -12,6 +13,7 @@ const server = createServer(createApp());
 initRealtime(server);
 const sweeper = startDispatchSweeper();
 const paymentJobs = startPaymentJobs();
+const watchdog = startWatchdog();
 
 server.listen(env.PORT, () => {
   logger.info({ port: env.PORT }, "Fako Ride API listening");
@@ -21,6 +23,7 @@ async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, "shutting down");
   clearInterval(sweeper);
   clearInterval(paymentJobs);
+  clearInterval(watchdog);
   server.close();
   await closeRealtime();
   await disconnectRedis();

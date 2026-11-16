@@ -5,6 +5,8 @@
  *
  *   trip:offer      a ride, with twelve seconds to answer it
  *   trip:cancelled  the rider walked away, wherever in the app he happens to be
+ *   trip:completed  somebody else finished his ride: ops, or the watchdog
+ *   driver:offline  the server took him offline because his phone went quiet
  *
  * An offer is deliberately NOT a screen. A driver who is looking at his earnings
  * when a ride comes in must see it there, without losing what he was doing, so
@@ -37,15 +39,22 @@ type RealtimeState = {
   /** The trip the rider just cancelled, so the trip screen can say so and leave. */
   cancelledTripId: string | null;
   acknowledgeCancellation: () => void;
+  /** The trip that was finished for him, so the trip screen can show it as done. */
+  completedTripId: string | null;
+  /** The server took him offline. The home screen flips its switch and says why. */
+  takenOffline: boolean;
+  acknowledgeTakenOffline: () => void;
   connected: boolean;
 };
 
 const RealtimeContext = createContext<RealtimeState | null>(null);
 
 export function DriverRealtime({ children }: { children: ReactNode }) {
-  const { me } = useSession();
+  const { me, refresh } = useSession();
   const [offer, setOffer] = useState<TripOffer | null>(null);
   const [cancelledTripId, setCancelledTripId] = useState<string | null>(null);
+  const [completedTripId, setCompletedTripId] = useState<string | null>(null);
+  const [takenOffline, setTakenOffline] = useState(false);
   const [connected, setConnected] = useState(false);
 
   /**
@@ -70,6 +79,7 @@ export function DriverRealtime({ children }: { children: ReactNode }) {
   }, []);
 
   const acknowledgeCancellation = useCallback(() => setCancelledTripId(null), []);
+  const acknowledgeTakenOffline = useCallback(() => setTakenOffline(false), []);
 
   /**
    * Ask the server what he is being offered.
@@ -145,7 +155,17 @@ export function DriverRealtime({ children }: { children: ReactNode }) {
       socket.on("connect", onConnect);
       socket.on("disconnect", onDisconnect);
       socket.on("trip:offer", onOffer);
+      const onCompleted = (payload: { tripId: string }) => setCompletedTripId(payload.tripId);
+      const onTakenOffline = (payload?: { reason?: string }) => {
+        // Suspended is not "your phone went quiet": ask who he is now, and the
+        // driver layout takes him to the screen that says so.
+        if (payload?.reason === "suspended") void refresh();
+        else setTakenOffline(true);
+      };
+
       socket.on("trip:cancelled", onCancelled);
+      socket.on("trip:completed", onCompleted);
+      socket.on("driver:offline", onTakenOffline);
       if (socket.connected) setConnected(true);
 
       cleanup.current = () => {
@@ -153,6 +173,8 @@ export function DriverRealtime({ children }: { children: ReactNode }) {
         socket.off("disconnect", onDisconnect);
         socket.off("trip:offer", onOffer);
         socket.off("trip:cancelled", onCancelled);
+        socket.off("trip:completed", onCompleted);
+        socket.off("driver:offline", onTakenOffline);
       };
     })();
 
@@ -184,8 +206,17 @@ export function DriverRealtime({ children }: { children: ReactNode }) {
   }, [recoverOffer]);
 
   const value = useMemo(
-    () => ({ offer, clearOffer, cancelledTripId, acknowledgeCancellation, connected }),
-    [offer, clearOffer, cancelledTripId, acknowledgeCancellation, connected],
+    () => ({
+      offer,
+      clearOffer,
+      cancelledTripId,
+      acknowledgeCancellation,
+      completedTripId,
+      takenOffline,
+      acknowledgeTakenOffline,
+      connected,
+    }),
+    [offer, clearOffer, cancelledTripId, acknowledgeCancellation, completedTripId, takenOffline, acknowledgeTakenOffline, connected],
   );
 
   return <RealtimeContext.Provider value={value}>{children}</RealtimeContext.Provider>;

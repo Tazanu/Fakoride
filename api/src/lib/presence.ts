@@ -9,7 +9,8 @@
  * and the realtime layer depend on it, and neither should depend on the other.
  */
 
-import { redis, driverGeoKey } from "./redis";
+import { env } from "../env";
+import { redis, driverGeoKey, driverSeenKey } from "./redis";
 
 export type NearbyDriver = { driverId: string; distanceM: number };
 
@@ -20,10 +21,40 @@ export async function setDriverPosition(
   lng: number,
 ): Promise<void> {
   await redis.geoadd(driverGeoKey(vehicleType), lng, lat, driverId);
+  await markDriverSeen(driverId);
 }
 
 export async function clearDriverPosition(driverId: string, vehicleType: string): Promise<void> {
   await redis.zrem(driverGeoKey(vehicleType), driverId);
+  await redis.del(driverSeenKey(driverId));
+}
+
+/**
+ * He is still there.
+ *
+ * A position in the geo set says where a driver was, and nothing about when.
+ * A phone that died at Molyko at eight leaves a dot at Molyko all day, and
+ * every rider who books there is offered to it first — twelve seconds of her
+ * wait, each time, for a taxi that is not coming. So every ping also renews a
+ * key that expires on its own, and "has he been heard from lately" is whether
+ * the key still exists.
+ */
+export async function markDriverSeen(driverId: string): Promise<void> {
+  if (env.DRIVER_STALE_AFTER_SECONDS <= 0) return;
+  await redis.set(driverSeenKey(driverId), String(Date.now()), "EX", env.DRIVER_STALE_AFTER_SECONDS);
+}
+
+/**
+ * Which of these drivers have pinged recently enough to be offered a ride.
+ *
+ * Everybody, when the check is switched off. If Redis cannot be asked the
+ * caller gets the error: dispatch already depends on Redis for the positions
+ * themselves, so there is no working path to protect by guessing here.
+ */
+export async function freshDriverIds(driverIds: string[]): Promise<Set<string>> {
+  if (env.DRIVER_STALE_AFTER_SECONDS <= 0 || driverIds.length === 0) return new Set(driverIds);
+  const seen = await redis.mget(driverIds.map(driverSeenKey));
+  return new Set(driverIds.filter((_, i) => seen[i] !== null));
 }
 
 /** Nearest first, within radiusM. Says nothing about whether they may drive. */

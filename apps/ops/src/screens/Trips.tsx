@@ -21,6 +21,7 @@ const TABS: { id: TripStatus; label: string }[] = [
   { id: "CANCELLED_BY_RIDER", label: "Rider cancelled" },
   { id: "CANCELLED_BY_DRIVER", label: "Driver cancelled" },
   { id: "NO_DRIVER_FOUND", label: "Nobody came" },
+  { id: "CANCELLED_BY_OPS", label: "Ended by us" },
 ];
 
 const STATUS_LABEL: Record<TripRow["status"], string> = {
@@ -33,6 +34,7 @@ const STATUS_LABEL: Record<TripRow["status"], string> = {
   CANCELLED_BY_RIDER: "Rider cancelled",
   CANCELLED_BY_DRIVER: "Driver cancelled",
   NO_DRIVER_FOUND: "Nobody came",
+  CANCELLED_BY_OPS: "Ended by us",
 };
 
 /** Past this, a rider gives up on the app and flags a taxi at the roadside. */
@@ -47,6 +49,8 @@ export function Trips() {
   const [tab, setTab] = useState<TripStatus>("LIVE");
   const [trips, setTrips] = useState<TripRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** The ride whose "end it" box is open. One at a time. */
+  const [ending, setEnding] = useState<string | null>(null);
 
   const load = useCallback(async (status: TripStatus, quiet = false) => {
     if (!quiet) setTrips(null);
@@ -66,11 +70,13 @@ export function Trips() {
 
   // Only the live list moves. Refreshing quietly keeps the rows in place
   // instead of blanking the screen every ten seconds while somebody reads it.
+  // It holds still while a box is open: a list that reshuffles under a
+  // half-typed reason is how the wrong ride gets ended.
   useEffect(() => {
-    if (tab !== "LIVE") return;
+    if (tab !== "LIVE" || ending !== null) return;
     const timer = setInterval(() => void load("LIVE", true), 10_000);
     return () => clearInterval(timer);
-  }, [tab, load]);
+  }, [tab, load, ending]);
 
   const stranded = (trips ?? []).filter(
     (t) => t.waitingSeconds !== null && t.waitingSeconds >= TOO_LONG_SECONDS,
@@ -99,6 +105,7 @@ export function Trips() {
           <span style={styles.th}>RIDER</span>
           <span style={styles.th}>DRIVER</span>
           <span style={styles.th}>STATE</span>
+          <span style={styles.th} />
         </div>
 
         {trips === null || trips.length === 0 ? (
@@ -108,9 +115,10 @@ export function Trips() {
         ) : (
           trips.map((t) => {
             const late = t.waitingSeconds !== null && t.waitingSeconds >= TOO_LONG_SECONDS;
+            const open = ending === t.id;
             return (
+              <div key={t.id}>
               <div
-                key={t.id}
                 className="ops-table-row"
                 style={COLUMNS}
                 {...(late ? { "data-flag": "urgent" } : {})}
@@ -138,10 +146,29 @@ export function Trips() {
                     <span style={styles.age}>
                       {t.waitingSeconds !== null
                         ? `waiting ${waitLabel(t.waitingSeconds)}`
-                        : since(t.requestedAt)}
+                        : t.status === "IN_PROGRESS" && t.startedAt
+                          ? `started ${since(t.startedAt)}`
+                          : since(t.requestedAt)}
                     </span>
                   </span>
                 </span>
+                <span style={styles.rowAction}>
+                  {tab === "LIVE" ? (
+                    <button type="button" onClick={() => setEnding(open ? null : t.id)} style={styles.endButton}>
+                      {open ? "Close" : "End it"}
+                    </button>
+                  ) : null}
+                </span>
+              </div>
+              {open ? (
+                <EndTrip
+                  trip={t}
+                  onDone={() => {
+                    setEnding(null);
+                    void load("LIVE", true);
+                  }}
+                />
+              ) : null}
               </div>
             );
           })
@@ -151,7 +178,100 @@ export function Trips() {
   );
 }
 
-const COLUMNS = { "--ops-cols": "2.2fr 1fr 1.2fr 1.4fr 1.3fr" } as React.CSSProperties;
+/**
+ * The way out of a ride that has died.
+ *
+ * Neither the rider nor the driver can cancel once a ride has started — that is
+ * deliberate — so when a driver's phone breaks mid-trip the ride sits "in
+ * progress", and because a rider may have one ride running, she cannot book
+ * another. This is who can let her go.
+ *
+ * Two endings, and the difference between them is money, so each says what it
+ * does to the fare before the button is pressed.
+ */
+function EndTrip({ trip, onDone }: { trip: TripRow; onDone: () => void }) {
+  const started = trip.status === "IN_PROGRESS";
+  const [how, setHow] = useState<"complete" | "cancel">(started ? "complete" : "cancel");
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function go() {
+    if (text.trim().length < 5) {
+      setError("Say why. It is kept on the ride with your name.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await ops.endTrip(trip.id, how, text.trim());
+      onDone();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "That did not work.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const fare = `${money(trip.priceXaf)} ${trip.paymentMethod === "CASH" ? "cash" : "MoMo"}`;
+
+  return (
+    <div style={{ ...styles.act, ...(how === "cancel" ? styles.actWarn : null) }}>
+      <div style={styles.actHead}>
+        End {trip.from} → {trip.to}
+      </div>
+
+      {/* Buttons, not radio inputs: the console's form styling is written for text fields. */}
+      <div style={styles.choices} role="radiogroup" aria-label="How to end it">
+        <button
+          type="button"
+          role="radio"
+          aria-checked={how === "complete"}
+          disabled={!started || busy}
+          onClick={() => setHow("complete")}
+          style={{ ...styles.choice, ...(how === "complete" ? styles.choiceOn : null), ...(!started ? styles.choiceOff : null) }}
+        >
+          <strong>The ride happened.</strong>{" "}
+          {started
+            ? trip.paymentMethod === "CASH"
+              ? `The driver is credited ${fare}, as if he had pressed Finish.`
+              : `The rider's phone is prompted for ${fare}, as if he had pressed Finish.`
+            : "Only once the driver has started it — this one has not."}
+        </button>
+        <button
+          type="button"
+          role="radio"
+          aria-checked={how === "cancel"}
+          disabled={busy}
+          onClick={() => setHow("cancel")}
+          style={{ ...styles.choice, ...(how === "cancel" ? styles.choiceOn : null) }}
+        >
+          <strong>It did not, or nobody can say.</strong> Nothing is charged and nothing is credited. The rider can book
+          again at once.
+        </button>
+      </div>
+
+      <label style={styles.field}>
+        <span style={styles.label}>Why — kept on the ride</span>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Driver rang: phone screen broke at Mile 16, he dropped her at Molyko."
+          rows={2}
+          disabled={busy}
+          className="ops-textarea"
+          autoFocus
+        />
+      </label>
+      {error ? <p style={styles.error}>{error}</p> : null}
+      <button type="button" onClick={() => void go()} disabled={busy} style={how === "cancel" ? styles.confirmWarn : styles.confirm}>
+        {busy ? "Working…" : how === "complete" ? "Finish this ride" : "Cancel this ride"}
+      </button>
+    </div>
+  );
+}
+
+const COLUMNS = { "--ops-cols": "2.2fr 1fr 1.2fr 1.4fr 1.3fr 0.7fr" } as React.CSSProperties;
 
 const styles: Record<string, React.CSSProperties> = {
   th: { fontSize: 12, fontWeight: 700, letterSpacing: "0.4px", color: "var(--c-muted)" },
@@ -164,4 +284,67 @@ const styles: Record<string, React.CSSProperties> = {
   state: { fontSize: 14, color: "var(--c-ink)" },
   stateLate: { fontSize: 14, fontWeight: 700, color: "var(--c-danger)" },
   age: { fontSize: 12, color: "var(--c-muted)" },
+
+  rowAction: { display: "flex", justifyContent: "flex-end" },
+  endButton: {
+    minHeight: 36,
+    padding: "0 12px",
+    borderRadius: 10,
+    border: "1.5px solid var(--c-line-strong)",
+    background: "var(--c-card)",
+    fontSize: 13,
+    fontWeight: 600,
+    color: "var(--c-ink-soft)",
+  },
+
+  act: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+    padding: "16px 18px",
+    background: "var(--c-action-tint)",
+    borderBottom: "1px solid var(--c-line)",
+  },
+  actWarn: { background: "var(--c-amber-tint)" },
+  actHead: { fontSize: 15, fontWeight: 700, color: "var(--c-ink)" },
+  choices: { display: "flex", flexDirection: "column", gap: 8 },
+  choice: {
+    display: "block",
+    width: "100%",
+    padding: "10px 14px",
+    borderRadius: 12,
+    border: "1.5px solid var(--c-line-strong)",
+    background: "var(--c-card)",
+    fontSize: 14,
+    lineHeight: 1.5,
+    textAlign: "left",
+    color: "var(--c-ink)",
+  },
+  choiceOn: { borderColor: "var(--c-action)", boxShadow: "inset 0 0 0 1px var(--c-action)" },
+  choiceOff: { opacity: 0.55 },
+  field: { display: "flex", flexDirection: "column", gap: 6 },
+  label: { fontSize: 13, fontWeight: 600, color: "var(--c-ink-soft)" },
+  error: { margin: 0, fontSize: 13, color: "var(--c-danger)" },
+  confirm: {
+    alignSelf: "flex-start",
+    minHeight: 46,
+    padding: "0 20px",
+    borderRadius: 12,
+    border: 0,
+    background: "var(--c-action)",
+    fontSize: 15,
+    fontWeight: 700,
+    color: "var(--c-on-action)",
+  },
+  confirmWarn: {
+    alignSelf: "flex-start",
+    minHeight: 46,
+    padding: "0 20px",
+    borderRadius: 12,
+    border: 0,
+    background: "var(--c-danger)",
+    fontSize: 15,
+    fontWeight: 700,
+    color: "var(--c-on-action)",
+  },
 };

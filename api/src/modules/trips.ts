@@ -13,16 +13,16 @@
 import crypto from "node:crypto";
 import { Router } from "express";
 import { z } from "zod";
-import type { Prisma, TripStatus } from "@prisma/client";
+import type { Payment, Prisma, TripStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { env } from "../env";
 import { ApiError, asyncHandler, param } from "../lib/http";
 import { requireAuth } from "../middleware/auth";
 import { rateLimit, RULES } from "../middleware/rateLimit";
-import { redis, offerKey, driverActiveTripKey } from "../lib/redis";
+import { redis, offerKey, driverActiveTripKey, driverOfferKey } from "../lib/redis";
 import { resolveZoneForPoint, nearestLandmark, placeLabel } from "./geo";
 import { quoteZonePair } from "./fares";
-import { offerToNextDriver } from "./dispatch";
+import { CARRYING_STATUSES, offerToNextDriver } from "./dispatch";
 import { recordFare } from "./ledger";
 import { chargeTripFare } from "./payments/service";
 import { tripShareRouter } from "./share";
@@ -107,6 +107,113 @@ function expectStatus(actual: TripStatus, allowed: TripStatus[]): void {
   if (!allowed.includes(actual)) {
     throw new ApiError(409, "wrong_state", `This trip is ${actual.toLowerCase()} and cannot change that way.`);
   }
+}
+
+/**
+ * Finish a ride that is in progress, and do everything finishing means.
+ *
+ * One function because three callers end rides: the driver pressing Finish, an
+ * operator ending one from the console, and the watchdog closing one whose
+ * driver never did. All three must write the same fare, count the same trip and
+ * tell the same people — a ride ended by ops that never reached the ledger
+ * would be a fare the driver earned and cannot see.
+ *
+ * Throws `wrong_state` if the ride is not in progress, which is also what stops
+ * two of those callers finishing the same ride twice.
+ */
+export async function completeTrip(
+  tripId: string,
+  actor: string,
+  meta?: Prisma.InputJsonObject,
+): Promise<Payment | null> {
+  const trip = await transition(tripId, ["IN_PROGRESS"], "COMPLETED", actor, { completedAt: new Date() });
+  if (meta) {
+    await prisma.tripEvent.create({ data: { tripId, status: "COMPLETED", actor, meta } });
+  }
+  // Cash is already in his hand, so that entry is written now. A mobile
+  // fare only becomes a ledger entry when the provider confirms it landed —
+  // completing the trip must not depend on Fapshi being reachable from the
+  // Soppo climb, and a declined prompt must not show up as earnings.
+  await recordFare(tripId);
+  const fare = await chargeTripFare(tripId).catch((err) => {
+    logger.error({ tripId, err: String(err) }, "could not start the mobile charge");
+    return null;
+  });
+  if (trip.driverId) {
+    await prisma.driver.update({ where: { id: trip.driverId }, data: { tripCount: { increment: 1 } } });
+    await redis.del(driverActiveTripKey(trip.driverId));
+    // When it was not him who ended it, this is how his phone learns.
+    if (actor !== trip.driverId) emitToDriver(trip.driverId, "trip:completed", { tripId, priceXaf: trip.priceXaf });
+  }
+
+  emitToRider(trip.riderId, "trip:completed", { tripId, priceXaf: trip.priceXaf });
+  emitToTrip(tripId, "trip:status", { tripId, status: "COMPLETED" });
+  logger.info({ tripId, driverId: trip.driverId, actor }, "trip completed");
+  return fare;
+}
+
+/**
+ * Where a fare paid by phone has got to, once the ride is over.
+ *
+ *   PENDING  the prompt is on her phone; he should not let her go yet
+ *   PAID     it landed
+ *   FAILED   it did not, and will not: the fare is now cash, to be taken
+ *            before she walks away
+ *
+ * Null for a cash ride, and for any ride not yet finished.
+ *
+ * The apps had no way to ask this. Both said "paid" the instant the driver
+ * pressed Finish — while the prompt was still unanswered, and after it had been
+ * refused. The server was already telling both phones about a failure over the
+ * socket, and neither was listening; a driver whose rider's MoMo was empty
+ * drove away believing the money was in his balance.
+ *
+ * No payment row at all on a finished mobile ride means the charge could not
+ * even be started. That is a failure too, and the answer is the same: cash.
+ */
+export type MobileFare = "PENDING" | "PAID" | "FAILED";
+async function mobileFareState(trip: { id: string; status: TripStatus; paymentMethod: string }): Promise<MobileFare | null> {
+  if (trip.paymentMethod === "CASH" || trip.status !== "COMPLETED") return null;
+  const latest = await prisma.payment.findFirst({
+    where: { tripId: trip.id, purpose: "TRIP_FARE" },
+    orderBy: { createdAt: "desc" },
+    select: { status: true },
+  });
+  if (!latest) return "FAILED";
+  if (latest.status === "SUCCESSFUL") return "PAID";
+  if (latest.status === "CREATED" || latest.status === "PENDING") return "PENDING";
+  return "FAILED";
+}
+
+/** Every status in which a ride is still going on. */
+export const LIVE_TRIP_STATUSES: TripStatus[] = ["REQUESTED", "OFFERED", "ACCEPTED", "ARRIVED", "IN_PROGRESS"];
+
+/**
+ * End a ride from outside it: an operator at the console, or the watchdog.
+ *
+ * Neither rider nor driver can cancel once the ride has started, and that is
+ * right — but it left no way out at all when a ride had plainly died. A driver
+ * whose phone broke mid-trip held his rider's account shut indefinitely,
+ * because she may only have one ride running. This is the way out. No fare is
+ * written and nothing is charged: if money changed hands, ops ends the ride as
+ * completed instead.
+ */
+export async function cancelTripFromOutside(tripId: string, actor: string, reason: string): Promise<void> {
+  const before = await prisma.trip.findUnique({ where: { id: tripId }, select: { driverId: true, riderId: true } });
+  if (!before) throw new ApiError(404, "no_trip", "That trip does not exist.");
+
+  await transition(tripId, LIVE_TRIP_STATUSES, "CANCELLED_BY_OPS", actor, {
+    cancelledAt: new Date(),
+    cancelReason: reason,
+  });
+  await redis.del(offerKey(tripId));
+  if (before.driverId) {
+    await redis.del(driverActiveTripKey(before.driverId));
+    emitToDriver(before.driverId, "trip:cancelled", { tripId });
+  }
+  emitToRider(before.riderId, "trip:cancelled_by_ops", { tripId });
+  emitToTrip(tripId, "trip:status", { tripId, status: "CANCELLED_BY_OPS" });
+  logger.info({ tripId, actor, reason }, "trip ended from outside");
 }
 
 export function tripsRouter(): Router {
@@ -309,6 +416,43 @@ export function tripsRouter(): Router {
     }),
   );
 
+  /**
+   * The ride this account is in the middle of, if there is one.
+   *
+   * The app knew which ride it was on only because it had just navigated to
+   * that screen. Close the app — a phone call, a flat battery, Android clearing
+   * memory — and on reopening it had no idea: a rider landed on "Where are you
+   * going?" with her driver outside and no PIN to read him, and a driver landed
+   * on his home screen with a passenger in the car and no FINISH button. Neither
+   * could get back, and the ride sat there until ops or the watchdog ended it.
+   *
+   * Both sides in one answer, because one account can be a driver who also
+   * rides. Declared before "/:id", or "current" would be read as a trip id.
+   */
+  router.get(
+    "/current",
+    requireAuth(),
+    asyncHandler(async (req, res) => {
+      const userId = req.user!.sub;
+      const [riding, driver] = await Promise.all([
+        prisma.trip.findFirst({
+          where: { riderId: userId, status: { in: LIVE_TRIP_STATUSES } },
+          orderBy: { requestedAt: "desc" },
+          select: { id: true, status: true },
+        }),
+        prisma.driver.findUnique({ where: { userId }, select: { id: true } }),
+      ]);
+      const driving = driver
+        ? await prisma.trip.findFirst({
+            where: { driverId: driver.id, status: { in: [...CARRYING_STATUSES] } },
+            orderBy: { requestedAt: "desc" },
+            select: { id: true, status: true },
+          })
+        : null;
+      res.json({ riding, driving });
+    }),
+  );
+
   router.get(
     "/:id",
     requireAuth(),
@@ -316,7 +460,7 @@ export function tripsRouter(): Router {
       const trip = await prisma.trip.findUnique({
         where: { id: param(req, "id") },
         include: {
-          driver: { include: { user: { select: { name: true, phone: true } } } },
+          driver: { include: { user: { select: { name: true, phone: true, deletedAt: true } } } },
           fromZone: { select: { code: true, name: true } },
           toZone: { select: { code: true, name: true } },
           rider: { select: { name: true, photoKey: true } },
@@ -335,6 +479,7 @@ export function tripsRouter(): Router {
         status: trip.status,
         priceXaf: trip.priceXaf,
         paymentMethod: trip.paymentMethod,
+        mobileFare: await mobileFareState(trip),
         pickupLabel: trip.pickupLabel,
         dropLabel: trip.dropLabel,
         from: trip.fromZone,
@@ -361,7 +506,9 @@ export function tripsRouter(): Router {
         driver: trip.driver
           ? {
               name: trip.driver.user.name,
-              phone: trip.driver.user.phone,
+              // Null once he has deleted his account: the column then holds
+              // a placeholder, and a Call button must not dial it.
+              phone: trip.driver.user.deletedAt ? null : trip.driver.user.phone,
               plate: trip.driver.plate,
               rating: trip.driver.rating,
               // Zero means "new" — the 5.0 every driver starts on is not a rating.
@@ -394,7 +541,18 @@ export function tripsRouter(): Router {
       if (holder !== driver.id) {
         throw new ApiError(409, "offer_gone", "That request has moved to another rider.");
       }
-      await redis.del(offerKey(trip.id));
+
+      // One passenger at a time. Dispatch no longer offers to a driver who is
+      // carrying somebody, but an offer made a second before he accepted
+      // another could still be sitting on his screen — so it is asked here too.
+      const carrying = await prisma.trip.findFirst({
+        where: { driverId: driver.id, status: { in: [...CARRYING_STATUSES] } },
+        select: { id: true },
+      });
+      if (carrying) {
+        throw new ApiError(409, "finish_current_ride", "Finish the ride you are on first.", { tripId: carrying.id });
+      }
+      await redis.del(offerKey(trip.id), driverOfferKey(driver.id));
 
       const updated = await transition(trip.id, ["OFFERED"], "ACCEPTED", driver.id, {
         driverId: driver.id,
@@ -466,22 +624,7 @@ export function tripsRouter(): Router {
       if (trip.driverId !== driver.id) throw new ApiError(403, "not_yours", "That trip is not yours.");
       expectStatus(trip.status, ["IN_PROGRESS"]);
 
-      await transition(trip.id, ["IN_PROGRESS"], "COMPLETED", driver.id, { completedAt: new Date() });
-      // Cash is already in his hand, so that entry is written now. A mobile
-      // fare only becomes a ledger entry when the provider confirms it landed —
-      // completing the trip must not depend on Fapshi being reachable from the
-      // Soppo climb, and a declined prompt must not show up as earnings.
-      await recordFare(trip.id);
-      const fare = await chargeTripFare(trip.id).catch((err) => {
-        logger.error({ tripId: trip.id, err: String(err) }, "could not start the mobile charge");
-        return null;
-      });
-      await prisma.driver.update({ where: { id: driver.id }, data: { tripCount: { increment: 1 } } });
-      await redis.del(driverActiveTripKey(driver.id));
-
-      emitToRider(trip.riderId, "trip:completed", { tripId: trip.id, priceXaf: trip.priceXaf });
-      emitToTrip(trip.id, "trip:status", { tripId: trip.id, status: "COMPLETED" });
-      logger.info({ tripId: trip.id, driverId: driver.id }, "trip completed");
+      const fare = await completeTrip(trip.id, driver.id);
       res.json({
         status: "COMPLETED",
         priceXaf: trip.priceXaf,
@@ -583,7 +726,7 @@ export function tripsRouter(): Router {
       const holder = await redis.get(offerKey(trip.id));
       if (holder !== driver.id) throw new ApiError(409, "offer_gone", "That request has already moved on.");
 
-      await redis.del(offerKey(trip.id));
+      await redis.del(offerKey(trip.id), driverOfferKey(driver.id));
       await prisma.tripEvent.create({
         data: { tripId: trip.id, status: "OFFERED", actor: driver.id, meta: { declined: true } },
       });
