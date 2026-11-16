@@ -24,7 +24,7 @@
 import { Platform } from "react-native";
 import Constants from "expo-constants";
 import { isRunningInExpoGo } from "expo";
-import * as Notifications from "expo-notifications";
+import { Notifications } from "./available";
 import { pushToken } from "@/api/session";
 
 /**
@@ -32,7 +32,7 @@ import { pushToken } from "@/api/session";
  * the offer card, the trip moving — so a banner on top of it is noise. It still
  * goes into the notification list.
  */
-Notifications.setNotificationHandler({
+Notifications?.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: false,
     shouldShowList: true,
@@ -46,7 +46,7 @@ Notifications.setNotificationHandler({
  * arrives on them. Offers are loud: a driver has twelve seconds.
  */
 async function ensureChannels(): Promise<void> {
-  if (Platform.OS !== "android") return;
+  if (Platform.OS !== "android" || !Notifications) return;
   await Notifications.setNotificationChannelAsync("offers", {
     name: "Ride offers",
     importance: Notifications.AndroidImportance.MAX,
@@ -70,7 +70,7 @@ function projectId(): string | null {
 export async function devicePushToken(): Promise<string | null> {
   // Asked directly rather than left to fail: on Android the library throws the
   // moment Expo Go asks for a token, and on iOS it warns on every sign-in.
-  if (isRunningInExpoGo()) return null;
+  if (isRunningInExpoGo() || !Notifications) return null;
   const id = projectId();
   if (!id) return null;
 

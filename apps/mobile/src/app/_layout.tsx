@@ -9,9 +9,8 @@
  */
 
 import { useEffect, useRef } from "react";
-import { Platform } from "react-native";
 import { Stack, useRootNavigationState, useRouter } from "expo-router";
-import * as Notifications from "expo-notifications";
+import { Notifications } from "@/notifications/available";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import * as SplashScreen from "expo-splash-screen";
@@ -40,8 +39,8 @@ void SplashScreen.preventAutoHideAsync();
  * only once the navigator exists — navigating before the root has mounted is
  * an error expo-router throws rather than ignores.
  */
-function NotificationRouting() {
-  const response = Notifications.useLastNotificationResponse();
+function NotificationRouting({ lib }: { lib: NonNullable<typeof Notifications> }) {
+  const response = lib.useLastNotificationResponse();
   const router = useRouter();
   const ready = Boolean(useRootNavigationState()?.key);
   const { me } = useSession();
@@ -102,7 +101,8 @@ export default function RootLayout() {
         {/* Not in a browser: there are no push notifications there, and the hook
             inside throws rather than returning nothing — which left the web
             build, the one used for looking at screens, a blank page. */}
-        {Platform.OS === "web" ? null : <NotificationRouting />}
+        {/* Not on the web, and not in Expo Go on Android: see notifications/available. */}
+        {Notifications ? <NotificationRouting lib={Notifications} /> : null}
       </SessionProvider>
     </SafeAreaProvider>
   );
