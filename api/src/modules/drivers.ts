@@ -10,7 +10,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { ApiError, asyncHandler } from "../lib/http";
 import { driverDocumentsRouter } from "./documents/routes";
-import { requireAuth } from "../middleware/auth";
+import { requireAuth, signToken } from "../middleware/auth";
 import { setDriverPosition, clearDriverPosition } from "../lib/presence";
 import { driverBalance, ensureAccessFee, overdueAccessFees, todaySummary, weeklyEarnings } from "./ledger";
 import { resolveZoneForPoint } from "./geo";
@@ -101,8 +101,10 @@ export function driversRouter(): Router {
 
       const homeZone = body.homeZone ? await prisma.zone.findUnique({ where: { code: body.homeZone } }) : null;
 
+      let phone = req.user!.phone;
       const driver = await prisma.$transaction(async (tx) => {
-        await tx.user.update({ where: { id: req.user!.sub }, data: { name: body.name, role: "DRIVER" } });
+        const user = await tx.user.update({ where: { id: req.user!.sub }, data: { name: body.name, role: "DRIVER" } });
+        phone = user.phone;
         return tx.driver.create({
           data: {
             userId: req.user!.sub,
@@ -119,6 +121,18 @@ export function driversRouter(): Router {
       res.status(201).json({
         id: driver.id,
         status: driver.status,
+        /**
+         * A token that says DRIVER.
+         *
+         * The app signs everybody in as a rider, so the token in his hand still
+         * says RIDER — and every driver route checks the token. Without a new
+         * one he applied successfully and was then refused at the very next
+         * screen: he could not send his documents, and after approval could not
+         * go online, until he happened to sign out and in again. No driver who
+         * registered through the app could work. The tests never saw it,
+         * because they signed drivers in with the role already set.
+         */
+        token: signToken({ sub: req.user!.sub, role: "DRIVER", phone }),
         // Say plainly what happens next; a driver waiting in silence is a driver lost.
         next: "Send photos of your CNI and the vehicle papers. Most are reviewed within one working day.",
       });

@@ -537,6 +537,34 @@ const pastTrip = await call("GET", `/trips/${paidRide.body.id}`, { token: r2 });
 check("a rider looking back at that ride is not handed a placeholder to dial", pastTrip.status === 200 && pastTrip.body.driver?.phone === null, JSON.stringify(pastTrip.body.driver));
 
 // ---------------------------------------------------------------------------
+console.log("\n=== becoming a driver the way the app does it ===");
+
+/*
+ * Every suite signs its drivers in with the role already set to DRIVER. The app
+ * never does: it signs everybody in as a rider, and the account becomes a
+ * driver's when the application is sent. So the token on a real applicant's
+ * phone says RIDER — and until this was fixed every driver route refused it.
+ */
+const APPLICANT_PHONE = `+2376577${nonce}`;
+const asRider = await signIn(APPLICANT_PHONE, "RIDER", "Etonde Mokake");
+const beforeApplying = await call("GET", "/drivers/me/documents", { token: asRider });
+check("a rider's token is refused on a driver's route", beforeApplying.status === 403, String(beforeApplying.status));
+const applied = await call("POST", "/drivers/apply", {
+  token: asRider,
+  body: { name: "Etonde Mokake", plate: `SW ${nonce} A`, cniNumber: `7${nonce}0009`, homeZone: "MUEA" },
+});
+check("applying hands back a token", applied.status === 201 && typeof applied.body.token === "string", JSON.stringify(Object.keys(applied.body)));
+const withNewToken = await call("GET", "/drivers/me/documents", { token: applied.body.token });
+check("which opens the documents screen he is sent to next", withNewToken.status === 200, JSON.stringify(withNewToken.body).slice(0, 120));
+
+// Another phone, still holding the token from before he applied.
+const healed = await call("GET", "/auth/me", { token: asRider });
+check("a phone with the old token is given a current one when it asks who it is", healed.status === 200 && healed.body.role === "DRIVER" && typeof healed.body.token === "string", JSON.stringify({ role: healed.body.role, token: typeof healed.body.token }));
+check("and that one works too", (await call("GET", "/drivers/me/documents", { token: healed.body.token })).status === 200);
+const current = await call("GET", "/auth/me", { token: applied.body.token });
+check("a token that is already right is not replaced", current.status === 200 && current.body.token === undefined, JSON.stringify(Object.keys(current.body)));
+
+// ---------------------------------------------------------------------------
 console.log("\n=== the pages anybody can open ===");
 
 const page = (path, lang) => fetch(`${API}${path}`, { headers: { accept: "text/html", ...(lang ? { "accept-language": lang } : {}) } }).then(async (r) => ({ status: r.status, type: r.headers.get("content-type"), text: await r.text() }));

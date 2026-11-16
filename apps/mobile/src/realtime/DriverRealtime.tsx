@@ -50,7 +50,7 @@ type RealtimeState = {
 const RealtimeContext = createContext<RealtimeState | null>(null);
 
 export function DriverRealtime({ children }: { children: ReactNode }) {
-  const { me } = useSession();
+  const { me, refresh } = useSession();
   const [offer, setOffer] = useState<TripOffer | null>(null);
   const [cancelledTripId, setCancelledTripId] = useState<string | null>(null);
   const [completedTripId, setCompletedTripId] = useState<string | null>(null);
@@ -156,7 +156,12 @@ export function DriverRealtime({ children }: { children: ReactNode }) {
       socket.on("disconnect", onDisconnect);
       socket.on("trip:offer", onOffer);
       const onCompleted = (payload: { tripId: string }) => setCompletedTripId(payload.tripId);
-      const onTakenOffline = () => setTakenOffline(true);
+      const onTakenOffline = (payload?: { reason?: string }) => {
+        // Suspended is not "your phone went quiet": ask who he is now, and the
+        // driver layout takes him to the screen that says so.
+        if (payload?.reason === "suspended") void refresh();
+        else setTakenOffline(true);
+      };
 
       socket.on("trip:cancelled", onCancelled);
       socket.on("trip:completed", onCompleted);

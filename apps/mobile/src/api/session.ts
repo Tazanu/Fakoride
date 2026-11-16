@@ -11,7 +11,7 @@
  * makes somebody a driver.
  */
 
-import { api } from "./client";
+import { api, setToken } from "./client";
 
 export type DriverStatus = "PENDING_REVIEW" | "ACTIVE" | "SUSPENDED" | "REJECTED";
 
@@ -65,7 +65,16 @@ export const auth = {
       { anonymous: true },
     ),
 
-  me: () => api.get<Me>("/auth/me"),
+  /**
+   * Who is signed in. When the server finds the token out of date about the
+   * account's role it sends a replacement along, which is kept here so that no
+   * screen has to know it happened.
+   */
+  me: () =>
+    api.get<Me & { token?: string }>("/auth/me").then(async ({ token, ...me }) => {
+      if (token) await setToken(token);
+      return me as Me;
+    }),
 
   /** End this session on the server, and forget this phone for push if it holds it. */
   signOut: (pushToken: string | null) =>

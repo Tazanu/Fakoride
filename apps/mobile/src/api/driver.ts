@@ -6,7 +6,7 @@
  * rendering `undefined` in front of a driver on the roadside.
  */
 
-import { api } from "./client";
+import { api, setToken } from "./client";
 import type { DriverStatus } from "./session";
 
 // --- shared shapes ----------------------------------------------------------
@@ -39,7 +39,15 @@ export const onboarding = {
     homeZone?: string;
     gender?: "UNSPECIFIED" | "WOMAN" | "MAN";
     hasSpareHelmet?: boolean;
-  }) => api.post<{ id: string; status: DriverStatus; next: string }>("/drivers/apply", body),
+  }) =>
+    api
+      .post<{ id: string; status: DriverStatus; next: string; token?: string }>("/drivers/apply", body)
+      .then(async (res) => {
+        // He signed in as a rider; this is the token that says he is a driver.
+        // Kept before anything else is asked, or the next request is refused.
+        if (res.token) await setToken(res.token);
+        return res;
+      }),
 
   updateProfile: (body: { gender?: "UNSPECIFIED" | "WOMAN" | "MAN"; hasSpareHelmet?: boolean; homeZone?: string }) =>
     api.patch<{ gender: string; hasSpareHelmet: boolean; homeZoneId: string | null }>("/drivers/me", body),

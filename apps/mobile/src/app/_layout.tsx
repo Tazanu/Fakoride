@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useRef } from "react";
+import { Platform } from "react-native";
 import { Stack, useRootNavigationState, useRouter } from "expo-router";
 import * as Notifications from "expo-notifications";
 import { StatusBar } from "expo-status-bar";
@@ -97,7 +98,10 @@ export default function RootLayout() {
             animation: "fade",
           }}
         />
-        <NotificationRouting />
+        {/* Not in a browser: there are no push notifications there, and the hook
+            inside throws rather than returning nothing — which left the web
+            build, the one used for looking at screens, a blank page. */}
+        {Platform.OS === "web" ? null : <NotificationRouting />}
       </SessionProvider>
     </SafeAreaProvider>
   );

@@ -713,6 +713,12 @@ export const S = {
     signOut: p("Sign out", "Se déconnecter"),
     underReview: p("Under review", "En cours d'examen"),
 
+    suspended: p("Your account is suspended", "Votre compte est suspendu"),
+    suspendedWhy: p(
+      "You cannot take rides for now. We sent you a text saying why. Call us and we will sort it out.",
+      "Vous ne pouvez pas prendre de courses pour le moment. Nous vous avons envoyé un SMS expliquant pourquoi. Appelez-nous pour régler cela.",
+    ),
+
     refused: p("We could not approve this application", "Nous n'avons pas pu approuver cette demande"),
     refusedWhy: p(
       "Call us and we will tell you exactly what was wrong. It is usually a document we could not read.",

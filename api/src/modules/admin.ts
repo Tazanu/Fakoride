@@ -23,6 +23,8 @@ import { FARE_ROUNDING_XAF, MIN_FARE_XAF } from "./fare-math";
 import { adminPaymentsRouter } from "./payments/routes";
 import { logger } from "../lib/logger";
 import { cancelTripFromOutside, completeTrip } from "./trips";
+import { tellDriver } from "../lib/driver-notice";
+import { emitToDriver } from "../realtime";
 
 // --- the verification queue ------------------------------------------------
 
@@ -215,6 +217,7 @@ export function adminRouter(): Router {
         }),
       ]);
 
+      tellDriver(driver.id, "approved");
       logger.info({ driverId: driver.id, by: req.user!.sub, missingDocuments: missing }, "driver verified");
       res.json({ id: updated.id, status: updated.status, verifiedAt: updated.verifiedAt });
     }),
@@ -234,6 +237,7 @@ export function adminRouter(): Router {
         }),
       ]);
       await clearDriverPosition(driver.id, driver.vehicleType);
+      tellDriver(driver.id, "refused", reason);
 
       res.json({ id: driver.id, status: "REJECTED" });
     }),
@@ -260,6 +264,9 @@ export function adminRouter(): Router {
         }),
       ]);
       await clearDriverPosition(driver.id, driver.vehicleType);
+      // His app, if it is open, flips its switch now rather than at his next tap.
+      emitToDriver(driver.id, "driver:offline", { reason: "suspended" });
+      tellDriver(driver.id, "suspended", reason);
 
       logger.warn({ driverId: driver.id, by: req.user!.sub, reason }, "driver suspended");
       res.json({ id: driver.id, status: "SUSPENDED" });
@@ -285,6 +292,7 @@ export function adminRouter(): Router {
           data: { driverId: driver.id, action: "REINSTATED", by: req.user!.sub, note: note ?? null },
         }),
       ]);
+      tellDriver(driver.id, "reinstated");
 
       res.json({ id: driver.id, status: "ACTIVE" });
     }),
