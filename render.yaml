@@ -73,6 +73,17 @@ services:
       - key: PUBLIC_API_URL
         value: https://fako-ride-api.onrender.com
 
+      # Who is texted the moment somebody presses Get help: your own phone, and
+      # anybody else on call. Comma-separated, like +237670000000,+237680000000.
+      # The API refuses to start with this empty — an alarm that reaches only a
+      # web page nobody has open is an alarm nobody answers.
+      - key: OPS_ALERT_PHONES
+        sync: false
+      # The number the app tells riders and drivers to call. Shown on the account
+      # screen and on the delete-account page. Leave empty and those simply hide.
+      - key: SUPPORT_PHONE
+        sync: false
+
       # Only if "enhanced push security" is switched on in the Expo project.
       - key: EXPO_ACCESS_TOKEN
         sync: false
