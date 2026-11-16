@@ -24,7 +24,7 @@ import { resolveZoneForPoint, nearestLandmark, placeLabel } from "./geo";
 import { quoteZonePair } from "./fares";
 import { CARRYING_STATUSES, offerToNextDriver } from "./dispatch";
 import { recordFare } from "./ledger";
-import { chargeTripFare } from "./payments/service";
+import { chargeTripFare, fareState, fareStates, takeCashInstead } from "./payments/service";
 import { tripShareRouter } from "./share";
 import { tripSosRouter } from "./safety";
 import { tripPhotoRouter } from "./profile";
@@ -51,6 +51,11 @@ const createSchema = z.object({
   needsHelmet: z.boolean().default(false),
   womanDriverOnly: z.boolean().default(false),
 });
+
+/** A ride that is still happening, from the rider's side. */
+const LIVE_FOR_RIDER: TripStatus[] = ["REQUESTED", "OFFERED", "ACCEPTED", "ARRIVED", "IN_PROGRESS"];
+/** And from the driver's: once he has taken it, until he finishes it. */
+const LIVE_FOR_DRIVER: TripStatus[] = ["ACCEPTED", "ARRIVED", "IN_PROGRESS"];
 
 function generatePin(): string {
   return String(crypto.randomInt(0, 10_000)).padStart(4, "0");
@@ -152,39 +157,6 @@ export async function completeTrip(
   return fare;
 }
 
-/**
- * Where a fare paid by phone has got to, once the ride is over.
- *
- *   PENDING  the prompt is on her phone; he should not let her go yet
- *   PAID     it landed
- *   FAILED   it did not, and will not: the fare is now cash, to be taken
- *            before she walks away
- *
- * Null for a cash ride, and for any ride not yet finished.
- *
- * The apps had no way to ask this. Both said "paid" the instant the driver
- * pressed Finish — while the prompt was still unanswered, and after it had been
- * refused. The server was already telling both phones about a failure over the
- * socket, and neither was listening; a driver whose rider's MoMo was empty
- * drove away believing the money was in his balance.
- *
- * No payment row at all on a finished mobile ride means the charge could not
- * even be started. That is a failure too, and the answer is the same: cash.
- */
-export type MobileFare = "PENDING" | "PAID" | "FAILED";
-async function mobileFareState(trip: { id: string; status: TripStatus; paymentMethod: string }): Promise<MobileFare | null> {
-  if (trip.paymentMethod === "CASH" || trip.status !== "COMPLETED") return null;
-  const latest = await prisma.payment.findFirst({
-    where: { tripId: trip.id, purpose: "TRIP_FARE" },
-    orderBy: { createdAt: "desc" },
-    select: { status: true },
-  });
-  if (!latest) return "FAILED";
-  if (latest.status === "SUCCESSFUL") return "PAID";
-  if (latest.status === "CREATED" || latest.status === "PENDING") return "PENDING";
-  return "FAILED";
-}
-
 /** Every status in which a ride is still going on. */
 export const LIVE_TRIP_STATUSES: TripStatus[] = ["REQUESTED", "OFFERED", "ACCEPTED", "ARRIVED", "IN_PROGRESS"];
 
@@ -247,7 +219,7 @@ export function tripsRouter(): Router {
       // a lock per rider, so taps that arrive together cannot both pass.
       const trip = await oneAtATime(`book:${req.user!.sub}`, async (tx) => {
         const running = await tx.trip.findFirst({
-          where: { riderId: req.user!.sub, status: { in: ["REQUESTED", "OFFERED", "ACCEPTED", "ARRIVED", "IN_PROGRESS"] } },
+          where: { riderId: req.user!.sub, status: { in: LIVE_FOR_RIDER } },
           select: { id: true },
         });
         if (running) {
@@ -333,9 +305,11 @@ export function tripsRouter(): Router {
           toZone: { select: { code: true, name: true } },
         },
       });
+      // So the list can say which rides were never paid for.
+      const fares = await fareStates(trips);
 
       res.json({
-        trips,
+        trips: trips.map((t) => ({ ...t, fare: fares.get(t.id) })),
         // A cursor rather than a page number: trips arrive while you scroll.
         nextBefore: trips.length === limit ? trips[trips.length - 1]!.requestedAt : null,
       });
@@ -417,39 +391,40 @@ export function tripsRouter(): Router {
   );
 
   /**
-   * The ride this account is in the middle of, if there is one.
+   * The ride this account is in the middle of, if any.
    *
-   * The app knew which ride it was on only because it had just navigated to
-   * that screen. Close the app — a phone call, a flat battery, Android clearing
-   * memory — and on reopening it had no idea: a rider landed on "Where are you
-   * going?" with her driver outside and no PIN to read him, and a driver landed
-   * on his home screen with a passenger in the car and no FINISH button. Neither
-   * could get back, and the ride sat there until ops or the watchdog ended it.
+   * The app only knew which ride was running while the screen for it was
+   * open. Close the app on the way to Molyko — or let Android close it — and
+   * opening it again landed on the home screen with no way back: the taxi
+   * still coming, the PIN unreachable, Get help gone. Booking again only said
+   * "you already have a ride running". This is how the app finds it again.
    *
-   * Both sides in one answer, because one account can be a driver who also
-   * rides. Declared before "/:id", or "current" would be read as a trip id.
+   * `?side=rider` or `?side=driver` says which half of the app is asking,
+   * because one account can be a driver who also rides: his rider screen must
+   * not be handed the ride he is driving. Without it, a driver is answered as
+   * a driver. Declared before "/:id", or "current" would be read as a trip id.
    */
   router.get(
     "/current",
     requireAuth(),
     asyncHandler(async (req, res) => {
-      const userId = req.user!.sub;
-      const [riding, driver] = await Promise.all([
-        prisma.trip.findFirst({
-          where: { riderId: userId, status: { in: LIVE_TRIP_STATUSES } },
-          orderBy: { requestedAt: "desc" },
-          select: { id: true, status: true },
-        }),
-        prisma.driver.findUnique({ where: { userId }, select: { id: true } }),
-      ]);
-      const driving = driver
-        ? await prisma.trip.findFirst({
-            where: { driverId: driver.id, status: { in: [...CARRYING_STATUSES] } },
-            orderBy: { requestedAt: "desc" },
-            select: { id: true, status: true },
-          })
+      const side = z.enum(["rider", "driver"]).optional().parse(req.query.side);
+      const asDriver = side ? side === "driver" : req.user!.role === "DRIVER";
+      const driver = asDriver
+        ? await prisma.driver.findUnique({ where: { userId: req.user!.sub }, select: { id: true } })
         : null;
-      res.json({ riding, driving });
+      // The driver half of an account with no driver record has no ride.
+      const trip =
+        asDriver && !driver
+          ? null
+          : await prisma.trip.findFirst({
+              where: driver
+                ? { driverId: driver.id, status: { in: LIVE_FOR_DRIVER } }
+                : { riderId: req.user!.sub, status: { in: LIVE_FOR_RIDER } },
+              orderBy: { requestedAt: "desc" },
+              select: { id: true, status: true, pickupLabel: true, dropLabel: true },
+            });
+      res.json({ trip });
     }),
   );
 
@@ -463,7 +438,7 @@ export function tripsRouter(): Router {
           driver: { include: { user: { select: { name: true, phone: true, deletedAt: true } } } },
           fromZone: { select: { code: true, name: true } },
           toZone: { select: { code: true, name: true } },
-          rider: { select: { name: true, photoKey: true } },
+          rider: { select: { name: true, photoKey: true, phone: true } },
         },
       });
       if (!trip) throw new ApiError(404, "no_trip", "That trip does not exist.");
@@ -473,13 +448,13 @@ export function tripsRouter(): Router {
       if (!isRider && !isDriver && req.user!.role !== "ADMIN") {
         throw new ApiError(403, "not_yours", "That trip is not yours.");
       }
+      const liveForDriver = isDriver && LIVE_FOR_DRIVER.includes(trip.status);
 
       res.json({
         id: trip.id,
         status: trip.status,
         priceXaf: trip.priceXaf,
         paymentMethod: trip.paymentMethod,
-        mobileFare: await mobileFareState(trip),
         pickupLabel: trip.pickupLabel,
         dropLabel: trip.dropLabel,
         from: trip.fromZone,
@@ -500,9 +475,22 @@ export function tripsRouter(): Router {
         // Who he is picking up, while he is picking her up. The sign-in screen
         // has always told riders "drivers see this when they accept your ride";
         // until now nothing sent it. First name only, and only while it is live.
-        ...(isDriver && ["ACCEPTED", "ARRIVED", "IN_PROGRESS"].includes(trip.status)
-          ? { rider: { firstName: trip.rider.name?.split(" ")[0] ?? null, hasPhoto: trip.rider.photoKey !== null } }
+        //
+        // Her number too, for the same window and no longer. His "Call her"
+        // button dialled nothing — the number was never sent — while the
+        // privacy page tells both sides they can call each other during a ride.
+        ...(liveForDriver
+          ? {
+              rider: {
+                firstName: trip.rider.name?.split(" ")[0] ?? null,
+                hasPhoto: trip.rider.photoKey !== null,
+                phone: trip.rider.phone,
+              },
+            }
           : {}),
+        // Where the money stands. Both phones used to say "paid" the moment the
+        // ride ended, whatever the provider went on to say.
+        fare: isRider || isDriver || req.user!.role === "ADMIN" ? await fareState(trip) : undefined,
         driver: trip.driver
           ? {
               name: trip.driver.user.name,
@@ -733,6 +721,48 @@ export function tripsRouter(): Router {
 
       const offered = await offerToNextDriver(trip.id);
       res.json({ declined: true, passedOn: offered });
+    }),
+  );
+
+  /**
+   * "Try again" on a phone payment that did not go through.
+   *
+   * Only for the rider, only for a finished ride she chose to pay by phone,
+   * and never a second prompt while one is already on her phone: the charge
+   * hands back the one in flight rather than sending another.
+   */
+  router.post(
+    "/:id/pay-again",
+    requireAuth("RIDER"),
+    asyncHandler(async (req, res) => {
+      const trip = await prisma.trip.findUnique({ where: { id: param(req, "id") } });
+      if (!trip || trip.riderId !== req.user!.sub) throw new ApiError(404, "no_trip", "That trip does not exist.");
+      if (trip.status !== "COMPLETED") throw new ApiError(409, "not_completed", "This ride is not finished yet.");
+      if (trip.paymentMethod === "CASH") throw new ApiError(409, "pays_cash", "This ride is paid in cash.");
+
+      const before = await fareState(trip);
+      if (before.state === "PAID" || before.state === "PAID_IN_CASH") {
+        throw new ApiError(409, "already_paid", "This ride is already paid.");
+      }
+      await chargeTripFare(trip.id);
+      res.json({ fare: await fareState(trip) });
+    }),
+  );
+
+  /** The driver took cash for a fare her phone did not pay. See takeCashInstead. */
+  router.post(
+    "/:id/paid-cash",
+    requireAuth("DRIVER"),
+    asyncHandler(async (req, res) => {
+      const { trip, driver } = await loadTripForDriver(param(req, "id"), req.user!.sub);
+      if (trip.driverId !== driver.id) throw new ApiError(403, "not_yours", "That trip is not yours.");
+      if (trip.status !== "COMPLETED") throw new ApiError(409, "not_completed", "Finish the ride first.");
+      if (trip.paymentMethod === "CASH") {
+        // Already recorded when he finished it; nothing to change.
+        res.json({ fare: await fareState(trip) });
+        return;
+      }
+      res.json({ fare: await takeCashInstead(trip.id, driver.id) });
     }),
   );
 

@@ -269,8 +269,8 @@ export const LEGAL: { terms: LegalDocument; privacy: LegalDocument } = {
           "body": [
             "We do not sell your information to anybody, and we do not use it to advertise to you.",
             "We share only what is needed, with:",
-            "• Your driver, during a trip: your first name, and your photograph if you added one. He is not shown your phone number.",
-            "• Your rider, during a trip: your name, your photograph if you added one, your plate, and your phone number so that she can call you.",
+            "• Your driver, during a trip: your first name, your photograph if you added one, and your phone number so that he can call you. Once the ride is over he no longer has any of them.",
+            "• Your rider, during a trip: your name, your photograph if you added one, your plate, and your phone number so that they can call you.",
             "• The people you saved as trusted contacts, if you press Get help: a text saying so, with a link to follow that trip.",
             "• Anyone you send a trip link to. That is your choice, the link expires, and you can revoke it.",
             "• The mobile money provider, so a payment can be made.",
@@ -293,7 +293,7 @@ export const LEGAL: { terms: LegalDocument; privacy: LegalDocument } = {
             "Under Cameroonian law — Law No. 2024/017 of 23 December 2024 on the protection of personal data — you can ask us to:",
             "• Show you what we hold about you.",
             "• Correct anything that is wrong. Your name is yours to change in the app at any time.",
-            "• Delete your account. You do not have to ask: open Account and press Delete my account. Your phone number, name, photograph, trusted contacts and, for drivers, your identity documents and their numbers are erased at once. If you no longer have the app, write to us and we will do it.",
+            "• Delete your account. You do not have to ask: open Account and press Delete my account. Your phone number, name, photograph and trusted contacts are erased at once. A driver's identity documents and their numbers are kept for as long as we are required to hold them, so that a ride he gave can still be answered for. If you no longer have the app, write to us and we will do it.",
             "• Give you a copy you can take elsewhere.",
             "• Stop processing that relies on your agreement, by withdrawing it.",
             "Ask us and we will answer. If you are not satisfied, you may complain to the national data protection authority."
@@ -324,7 +324,7 @@ export const LEGAL: { terms: LegalDocument; privacy: LegalDocument } = {
           "heading": "Changes, and reaching us",
           "body": [
             "If we change this, we will say so in the app rather than quietly updating a page nobody visits.",
-            "Write to us at privacy@fakoride.cm, or call the number shown on your Account screen."
+            "Write to us at privacy@fakoride.cm, or call the number on the Help screen."
           ]
         }
       ]
@@ -379,7 +379,7 @@ export const LEGAL: { terms: LegalDocument; privacy: LegalDocument } = {
           "body": [
             "Nous ne vendons vos informations à personne, et nous ne les utilisons pas pour vous adresser de la publicité.",
             "Nous ne partageons que le nécessaire, avec :",
-            "• Votre chauffeur, pendant une course : votre prénom, et votre photographie si vous en avez ajouté une. Votre numéro de téléphone ne lui est pas communiqué.",
+            "• Votre chauffeur, pendant une course : votre prénom, votre photographie si vous en avez ajouté une, et votre numéro de téléphone pour qu'il puisse vous appeler. Une fois la course terminée, il n'a plus accès à rien de cela.",
             "• Votre passager, pendant une course : votre nom, votre photographie si vous en avez ajouté une, votre plaque, et votre numéro de téléphone pour qu'il puisse vous appeler.",
             "• Les personnes que vous avez enregistrées comme contacts de confiance, si vous appuyez sur Demander de l'aide : un SMS les prévenant, avec un lien pour suivre cette course.",
             "• Toute personne à qui vous envoyez un lien de suivi. C'est votre choix, le lien expire, et vous pouvez le révoquer.",
@@ -403,7 +403,7 @@ export const LEGAL: { terms: LegalDocument; privacy: LegalDocument } = {
             "En vertu du droit camerounais — la loi n° 2024/017 du 23 décembre 2024 relative à la protection des données à caractère personnel — vous pouvez nous demander de :",
             "• Vous montrer ce que nous détenons à votre sujet.",
             "• Corriger ce qui est inexact. Votre nom vous appartient et se modifie dans l'application à tout moment.",
-            "• Supprimer votre compte. Inutile de nous le demander : ouvrez Compte et appuyez sur Supprimer mon compte. Votre numéro de téléphone, votre nom, votre photographie, vos contacts de confiance et, pour les chauffeurs, vos pièces d'identité et leurs numéros sont effacés aussitôt. Si vous n'avez plus l'application, écrivez-nous et nous le ferons.",
+            "• Supprimer votre compte. Inutile de nous le demander : ouvrez Compte et appuyez sur Supprimer mon compte. Votre numéro de téléphone, votre nom, votre photographie et vos contacts de confiance sont effacés aussitôt. Les pièces d'identité d'un chauffeur et leurs numéros sont conservés aussi longtemps que la loi nous y oblige, afin de pouvoir répondre d'une course qu'il a assurée. Si vous n'avez plus l'application, écrivez-nous et nous le ferons.",
             "• Vous remettre une copie que vous pouvez emporter ailleurs.",
             "• Cesser un traitement qui repose sur votre accord, en le retirant.",
             "Demandez-nous et nous répondrons. Si la réponse ne vous satisfait pas, vous pouvez saisir l'autorité nationale de protection des données."
@@ -434,7 +434,7 @@ export const LEGAL: { terms: LegalDocument; privacy: LegalDocument } = {
           "heading": "Modifications, et nous joindre",
           "body": [
             "Si nous modifions ce texte, nous le dirons dans l'application plutôt que de mettre à jour discrètement une page que personne ne consulte.",
-            "Écrivez-nous à privacy@fakoride.cm, ou appelez le numéro affiché sur l'écran Compte."
+            "Écrivez-nous à privacy@fakoride.cm, ou appelez le numéro indiqué sur l'écran Aide."
           ]
         }
       ]

@@ -26,6 +26,8 @@ import { oneAtATime } from "../../lib/locks";
 import { env } from "../../env";
 import { logger } from "../../lib/logger";
 import { emitToDriver, emitToRider } from "../../realtime";
+import { francs, notify } from "../../lib/push";
+import { ApiError } from "../../lib/http";
 import { serviceDateKey } from "../../lib/time";
 import { payments } from "./index";
 import { MIN_TRANSFER_XAF, PaymentProviderError, type ProviderStatusResult } from "./provider";
@@ -58,29 +60,156 @@ export async function chargeTripFare(tripId: string): Promise<Payment | null> {
   });
   if (!trip?.driverId) return null;
   if (trip.paymentMethod === "CASH") return null;
+  const driverId = trip.driverId;
 
-  // Completing twice must not charge twice.
-  const existing = await prisma.payment.findFirst({
-    where: { tripId, purpose: "TRIP_FARE", status: { notIn: ["FAILED", "EXPIRED"] } },
+  // Completing twice must not charge twice, and neither may "try again" tapped
+  // twice — so the check and the new row are one step, under the same lock the
+  // driver's "I took the cash" takes.
+  const decided = await oneAtATime(fareLock(tripId), async (tx) => {
+    const existing = await tx.payment.findFirst({
+      where: { tripId, purpose: "TRIP_FARE", status: { notIn: ["FAILED", "EXPIRED"] } },
+      orderBy: { createdAt: "desc" },
+    });
+    if (existing) return { fresh: false as const, payment: existing };
+    // He was handed the money at the kerb. Asking her phone for it again
+    // would be charging her twice.
+    if (await paidInCash(tx, tripId)) return { fresh: false as const, payment: null };
+    const created = await tx.payment.create({
+      data: {
+        purpose: "TRIP_FARE",
+        amountXaf: trip.priceXaf,
+        phone: trip.rider.phone,
+        medium: mediumFor(trip.paymentMethod),
+        tripId,
+        driverId,
+        provider: payments.name,
+      },
+    });
+    return { fresh: true as const, payment: created };
   });
-  if (existing) return existing;
-
-  const payment = await prisma.payment.create({
-    data: {
-      purpose: "TRIP_FARE",
-      amountXaf: trip.priceXaf,
-      phone: trip.rider.phone,
-      medium: mediumFor(trip.paymentMethod),
-      tripId,
-      driverId: trip.driverId,
-      provider: payments.name,
-    },
-  });
+  if (!decided.fresh) return decided.payment;
+  const payment = decided.payment;
 
   return initiate(payment, "collect", {
     message: `Fako Ride — ${trip.pickupLabel} to ${trip.dropLabel}`,
     name: trip.rider.name ?? undefined,
   });
+}
+
+/** One trip's fare, one decision at a time: charging it, settling it, taking cash for it. */
+const fareLock = (tripId: string) => `fare:${tripId}`;
+
+async function paidInCash(db: Pick<Prisma.TransactionClient, "ledgerEntry">, tripId: string): Promise<boolean> {
+  const entry = await db.ledgerEntry.findFirst({ where: { tripId, type: "FARE_CASH" }, select: { id: true } });
+  return entry !== null;
+}
+
+/**
+ * Where a finished trip's money stands, in the words both phones show.
+ *
+ *   NOT_DUE       the ride is not over
+ *   CASH          she chose cash; he takes it
+ *   WAITING       a prompt is on her phone, or about to be
+ *   PAID          the provider says it landed
+ *   FAILED        it did not; she can try again, or pay him in cash
+ *   PAID_IN_CASH  it did not, and he took cash instead
+ *
+ * Until now both screens said "paid" the moment the ride finished, whatever
+ * the provider went on to say — so a declined prompt looked, to both of them,
+ * exactly like a fare that had gone through.
+ */
+export type FareState = "NOT_DUE" | "CASH" | "WAITING" | "PAID" | "FAILED" | "PAID_IN_CASH";
+
+export type Fare = { state: FareState; reason: string | null };
+type FareTrip = { id: string; status: string; paymentMethod: string };
+type FareTry = { tripId: string | null; status: PaymentStatus; failureReason: string | null };
+
+/** The rule itself, from what is already loaded. `tries` newest first. */
+function fareFrom(trip: FareTrip, tries: FareTry[], paidInCash: boolean): Fare {
+  if (trip.status !== "COMPLETED") return { state: "NOT_DUE", reason: null };
+  if (trip.paymentMethod === "CASH") return { state: "CASH", reason: null };
+  if (tries.some((p) => p.status === "SUCCESSFUL")) return { state: "PAID", reason: null };
+  if (paidInCash) return { state: "PAID_IN_CASH", reason: null };
+  const latest = tries[0];
+  if (latest && (latest.status === "CREATED" || latest.status === "PENDING")) return { state: "WAITING", reason: null };
+  // Including no attempt at all: the charge could not even be started when
+  // the ride finished, and she should be able to start it now.
+  return { state: "FAILED", reason: latest?.failureReason ?? null };
+}
+
+export async function fareState(trip: FareTrip): Promise<Fare> {
+  return (await fareStates([trip])).get(trip.id)!;
+}
+
+/** For a page of trips at once: two queries, not two per trip. */
+export async function fareStates(trips: FareTrip[]): Promise<Map<string, Fare>> {
+  const due = trips.filter((t) => t.status === "COMPLETED" && t.paymentMethod !== "CASH").map((t) => t.id);
+  const [tries, cash] = due.length
+    ? await Promise.all([
+        prisma.payment.findMany({
+          where: { tripId: { in: due }, purpose: "TRIP_FARE" },
+          orderBy: { createdAt: "desc" },
+          select: { tripId: true, status: true, failureReason: true },
+        }),
+        prisma.ledgerEntry.findMany({ where: { tripId: { in: due }, type: "FARE_CASH" }, select: { tripId: true } }),
+      ])
+    : [[], []];
+  const paidInCash = new Set(cash.map((e) => e.tripId));
+  return new Map(
+    trips.map((t) => [t.id, fareFrom(t, tries.filter((p) => p.tripId === t.id), paidInCash.has(t.id))]),
+  );
+}
+
+/**
+ * The driver took cash for a fare her phone did not pay.
+ *
+ * The comment on onFailure always said a failed fare "becomes cash the driver
+ * has to collect", and nothing recorded that he had: his earnings went without
+ * the ride, and ops could not tell a fare collected at the kerb from one that
+ * was never paid. Now it is a FARE_CASH entry like any cash ride — which, like
+ * any cash ride, is his already and not added to what we hold for him.
+ *
+ * Refused once the phone payment has landed: then he must not take cash too.
+ * A prompt still waiting on her phone is not refused — she is standing there
+ * with the money — and any of those that later goes through is flagged for a
+ * refund by settle() rather than paid to him twice.
+ */
+export async function takeCashInstead(tripId: string, driverId: string): Promise<Fare> {
+  await oneAtATime(fareLock(tripId), async (tx) => {
+    const paid = await tx.payment.findFirst({
+      where: { tripId, purpose: "TRIP_FARE", status: "SUCCESSFUL" },
+      select: { id: true },
+    });
+    if (paid) throw new ApiError(409, "already_paid", "Her phone payment went through — do not take cash as well.");
+    if (await paidInCash(tx, tripId)) return;
+
+    const trip = await tx.trip.findUniqueOrThrow({ where: { id: tripId }, select: { priceXaf: true } });
+    await tx.ledgerEntry.create({
+      data: {
+        driverId,
+        tripId,
+        type: "FARE_CASH",
+        amountXaf: trip.priceXaf,
+        note: "Taken in cash after the phone payment did not go through",
+      },
+    });
+    // A charge the provider never accepted would otherwise be re-sent by the
+    // reconciler and put a prompt on her phone for a fare she has paid.
+    await tx.payment.updateMany({
+      where: { tripId, purpose: "TRIP_FARE", status: "CREATED" },
+      data: { status: "FAILED", failureReason: "Paid in cash instead" },
+    });
+    await tx.tripEvent.create({
+      data: { tripId, status: "COMPLETED", actor: driverId, meta: { paidInCashInstead: true } },
+    });
+  });
+
+  const trip = await prisma.trip.findUniqueOrThrow({
+    where: { id: tripId },
+    select: { id: true, status: true, paymentMethod: true, riderId: true },
+  });
+  emitToRider(trip.riderId, "trip:fare", { tripId });
+  return fareState(trip);
 }
 
 // --- the daily access fee ---------------------------------------------------
@@ -499,7 +628,11 @@ async function settle(payment: Payment, result: ProviderStatusResult): Promise<P
   const confirmedAt = result.confirmedAt ? new Date(result.confirmedAt) : new Date();
 
   try {
-    return await prisma.$transaction(async (tx) => {
+    const settled = await prisma.$transaction(async (tx) => {
+      // The same lock "I took the cash" takes, so the two cannot cross.
+      if (payment.purpose === "TRIP_FARE" && payment.tripId) {
+        await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext(${fareLock(payment.tripId)}))`;
+      }
       const claimed = await tx.payment.updateMany({
         where: { id: payment.id, status: { not: "SUCCESSFUL" } },
         data: {
@@ -522,6 +655,20 @@ async function settle(payment: Payment, result: ProviderStatusResult): Promise<P
         return await tx.payment.findUniqueOrThrow({ where: { id: payment.id } });
       }
 
+      // She paid him in cash, and then the prompt she had been sent went
+      // through as well. The money is with us and it is hers: no earnings
+      // entry, so he is not paid twice, and a reason a person will act on.
+      if (payment.purpose === "TRIP_FARE" && payment.tripId && (await paidInCash(tx, payment.tripId))) {
+        logger.error(
+          { paymentId: payment.id, tripId: payment.tripId, amountXaf: payment.amountXaf },
+          "payment: fare paid by phone after it was paid in cash — REFUND THE RIDER",
+        );
+        return await tx.payment.update({
+          where: { id: payment.id },
+          data: { failureReason: "Also paid in cash — refund the rider" },
+        });
+      }
+
       const entry = await tx.ledgerEntry.create({
         data: {
           driverId: payment.driverId!,
@@ -539,6 +686,8 @@ async function settle(payment: Payment, result: ProviderStatusResult): Promise<P
         data: { ledgerEntryId: entry.id },
       });
     });
+    if (settled.purpose === "TRIP_FARE" && settled.tripId) void tellBothAboutFare(settled.tripId, "trip:fare");
+    return settled;
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
       // Two settlements raced. The other one won, which is the correct outcome.
@@ -582,7 +731,20 @@ async function onFailure(payment: Payment): Promise<void> {
     const detail = { tripId: payment.tripId, amountXaf: trip.priceXaf, reason: payment.failureReason };
     emitToRider(trip.riderId, "trip:payment_failed", detail);
     if (trip.driverId) emitToDriver(trip.driverId, "trip:payment_failed", detail);
+    // She may already have walked off with the phone in her bag. Not when he
+    // has taken cash for it — then there is nothing for her to do.
+    if (payment.failureReason !== "Paid in cash instead") {
+      notify(trip.riderId, "payment_failed", { price: francs(trip.priceXaf) }, { tripId: payment.tripId });
+    }
   }
+}
+
+/** The fare moved: both screens re-read it. */
+async function tellBothAboutFare(tripId: string, event: "trip:fare"): Promise<void> {
+  const trip = await prisma.trip.findUnique({ where: { id: tripId }, select: { riderId: true, driverId: true } });
+  if (!trip) return;
+  emitToRider(trip.riderId, event, { tripId });
+  if (trip.driverId) emitToDriver(trip.driverId, event, { tripId });
 }
 
 // --- reconciliation ---------------------------------------------------------
@@ -640,6 +802,14 @@ export async function reconcilePendingPayments(limit = 50): Promise<number> {
 /** A payment the provider never accepted. Re-sent, not re-created. */
 async function retryInitiation(payment: Payment): Promise<void> {
   if (payment.purpose === "TRIP_FARE" && payment.tripId) {
+    const tripId = payment.tripId;
+    if (await paidInCash(prisma, tripId)) {
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: { status: "FAILED", failureReason: "Paid in cash instead" },
+      });
+      return;
+    }
     const trip = await prisma.trip.findUnique({
       where: { id: payment.tripId },
       select: { pickupLabel: true, dropLabel: true },

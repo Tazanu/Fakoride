@@ -3,5 +3,5 @@
 -- enum value in the transaction that created it.
 ALTER TYPE "TripStatus" ADD VALUE 'CANCELLED_BY_OPS';
 
--- When the owner deleted the account. See the comment on User in schema.prisma.
-ALTER TABLE "User" ADD COLUMN "deletedAt" TIMESTAMP(3);
+-- User."deletedAt" is added by 20261011090000_account_deletion, which was
+-- written on the other branch first.

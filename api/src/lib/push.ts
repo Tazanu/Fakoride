@@ -33,7 +33,14 @@ export const EXPO_TOKEN = /^Expo(nent)?PushToken\[[^\]]+\]$/;
 /** A hung push must not hold a dispatch loop open. */
 const PUSH_TIMEOUT_MS = 8_000;
 
-export type PushKind = "offer" | "accepted" | "arrived" | "no_driver" | "driver_cancelled" | "taken_offline";
+export type PushKind =
+  | "offer"
+  | "accepted"
+  | "arrived"
+  | "no_driver"
+  | "driver_cancelled"
+  | "taken_offline"
+  | "payment_failed";
 
 type Words = { title: string; body: string };
 
@@ -67,6 +74,12 @@ const TEXT: Record<PushKind, { en: Words; fr: Words }> = {
     en: { title: "You are offline", body: "We lost your position, so rides stopped coming. Open Fako Ride to go back online." },
     fr: { title: "Vous êtes hors ligne", body: "Nous avons perdu votre position. Ouvrez Fako Ride pour vous remettre en ligne." },
   },
+  // Said plainly that nothing left her account, because that is the first
+  // thing anybody wonders about a payment that failed.
+  payment_failed: {
+    en: { title: "Your payment did not go through", body: "Nothing was taken. Pay the {price} FCFA in cash, or open the app to try again." },
+    fr: { title: "Votre paiement n'a pas abouti", body: "Rien n'a été prélevé. Payez les {price} FCFA en espèces, ou ouvrez l'application pour réessayer." },
+  },
 };
 
 /**
@@ -80,6 +93,7 @@ const CHANNEL: Record<PushKind, string> = {
   no_driver: "trips",
   driver_cancelled: "trips",
   taken_offline: "trips",
+  payment_failed: "trips",
 };
 
 /** 1500 → "1 500", the way a price is written on a kiosk here. */

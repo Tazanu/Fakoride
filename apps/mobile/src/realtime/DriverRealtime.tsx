@@ -7,6 +7,8 @@
  *   trip:cancelled  the rider walked away, wherever in the app he happens to be
  *   trip:completed  somebody else finished his ride: ops, or the watchdog
  *   driver:offline  the server took him offline because his phone went quiet
+ *   trip:payment_failed / trip:fare
+ *                   the money on a finished ride moved, or did not
  *
  * An offer is deliberately NOT a screen. A driver who is looking at his earnings
  * when a ride comes in must see it there, without losing what he was doing, so
@@ -44,6 +46,8 @@ type RealtimeState = {
   /** The server took him offline. The home screen flips its switch and says why. */
   takenOffline: boolean;
   acknowledgeTakenOffline: () => void;
+  /** Which trip's money just moved, and a counter so the same trip can move twice. */
+  fareNews: { tripId: string; n: number } | null;
   connected: boolean;
 };
 
@@ -55,6 +59,7 @@ export function DriverRealtime({ children }: { children: ReactNode }) {
   const [cancelledTripId, setCancelledTripId] = useState<string | null>(null);
   const [completedTripId, setCompletedTripId] = useState<string | null>(null);
   const [takenOffline, setTakenOffline] = useState(false);
+  const [fareNews, setFareNews] = useState<{ tripId: string; n: number } | null>(null);
   const [connected, setConnected] = useState(false);
 
   /**
@@ -152,6 +157,11 @@ export function DriverRealtime({ children }: { children: ReactNode }) {
         setOffer((current) => (current?.tripId === payload.tripId ? null : current));
       };
 
+      // He is standing at the kerb waiting to hear whether her phone paid.
+      // The server has always said; until now nothing here listened.
+      const onFare = (payload: { tripId: string }) =>
+        setFareNews((prev) => ({ tripId: payload.tripId, n: (prev?.n ?? 0) + 1 }));
+
       socket.on("connect", onConnect);
       socket.on("disconnect", onDisconnect);
       socket.on("trip:offer", onOffer);
@@ -166,6 +176,8 @@ export function DriverRealtime({ children }: { children: ReactNode }) {
       socket.on("trip:cancelled", onCancelled);
       socket.on("trip:completed", onCompleted);
       socket.on("driver:offline", onTakenOffline);
+      socket.on("trip:payment_failed", onFare);
+      socket.on("trip:fare", onFare);
       if (socket.connected) setConnected(true);
 
       cleanup.current = () => {
@@ -175,6 +187,8 @@ export function DriverRealtime({ children }: { children: ReactNode }) {
         socket.off("trip:cancelled", onCancelled);
         socket.off("trip:completed", onCompleted);
         socket.off("driver:offline", onTakenOffline);
+        socket.off("trip:payment_failed", onFare);
+        socket.off("trip:fare", onFare);
       };
     })();
 
@@ -214,9 +228,10 @@ export function DriverRealtime({ children }: { children: ReactNode }) {
       completedTripId,
       takenOffline,
       acknowledgeTakenOffline,
+      fareNews,
       connected,
     }),
-    [offer, clearOffer, cancelledTripId, acknowledgeCancellation, completedTripId, takenOffline, acknowledgeTakenOffline, connected],
+    [offer, clearOffer, cancelledTripId, acknowledgeCancellation, completedTripId, takenOffline, acknowledgeTakenOffline, fareNews, connected],
   );
 
   return <RealtimeContext.Provider value={value}>{children}</RealtimeContext.Provider>;

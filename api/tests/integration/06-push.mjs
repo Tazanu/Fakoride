@@ -357,7 +357,9 @@ await call("POST", `/trips/${kerb.body.id}/accept`, { token: driverToken });
 
 const asDriver = await call("GET", `/trips/${kerb.body.id}`, { token: driverToken });
 check("the driver is told who he is picking up — first name only", asDriver.body.rider?.firstName === "Enanga" && asDriver.body.rider?.hasPhoto === true, JSON.stringify(asDriver.body.rider));
-check("and never her phone number", !JSON.stringify(asDriver.body).includes(RIDER_PHONE));
+// His "Call her" button dialled nothing: the number was never sent. The
+// privacy page tells both sides they can call each other during a ride.
+check("and her number, so Call her calls her", asDriver.body.rider?.phone === RIDER_PHONE, JSON.stringify(asDriver.body.rider));
 
 const herFace = await getPhoto(`/trips/${kerb.body.id}/photo`, driverToken);
 check("he sees her face while he is coming for her", herFace.status === 200 && herFace.bytes.equals(riderFace), String(herFace.status));
@@ -373,6 +375,7 @@ check("a ride still under way cannot be rated", tooSoon.status === 409 && tooSoo
 await call("POST", `/trips/${kerb.body.id}/complete`, { token: driverToken });
 const afterwards = await call("GET", `/trips/${kerb.body.id}`, { token: driverToken });
 check("once it is over the driver no longer has her name", afterwards.body.rider === undefined, JSON.stringify(afterwards.body.rider));
+check("nor her number", !JSON.stringify(afterwards.body).includes(RIDER_PHONE));
 check("nor her face", (await getPhoto(`/trips/${kerb.body.id}/photo`, driverToken)).status === 409);
 
 const ratingRow = sql(`SELECT "ratingCount" || '|' || "rating" FROM "Driver" WHERE id='${driver.id}'`);

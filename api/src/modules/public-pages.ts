@@ -122,14 +122,13 @@ const DELETE_TEXT = {
       "Your phone number is removed from the account, so nobody can sign in to it.",
       "Your name and your photograph. The photograph file is deleted, not hidden.",
       "Your trusted contacts.",
-      "For drivers: the photographs of your documents, and your identity card and licence numbers.",
       "You are signed out on every phone.",
     ],
     stays: "What is kept",
     staysList: [
       "The record of rides you took or drove, what was paid for them, and any complaint or alarm raised on them. These are kept because a fare can be disputed and a complaint has to be answerable after an account is gone, and because the law requires financial records to be held. They are no longer attached to your name.",
       "Mobile money payments keep the number that paid or was paid, as the payment provider's record does.",
-      "For drivers: the plate of the taxi, which is what a rider with a complaint remembers.",
+      "For drivers: the plate of the taxi, which is what a rider with a complaint remembers, and your identity documents and their numbers, for as long as we are required to hold them. The account is taken off the road for good, so no ride can be offered to it.",
     ],
     first: "Before you delete",
     firstList: [
@@ -151,14 +150,13 @@ const DELETE_TEXT = {
       "Votre numéro de téléphone est retiré du compte : plus personne ne peut s'y connecter.",
       "Votre nom et votre photographie. Le fichier de la photographie est supprimé, pas simplement masqué.",
       "Vos contacts de confiance.",
-      "Pour les chauffeurs : les photographies de vos documents, ainsi que vos numéros de carte d'identité et de permis.",
       "Vous êtes déconnecté de tous les téléphones.",
     ],
     stays: "Ce qui est conservé",
     staysList: [
       "L'historique des courses que vous avez prises ou effectuées, ce qui a été payé, et toute réclamation ou alerte qui s'y rapporte. Ils sont conservés parce qu'un tarif peut être contesté et qu'une réclamation doit pouvoir recevoir une réponse après la suppression d'un compte, et parce que la loi impose de conserver les documents financiers. Ils ne sont plus rattachés à votre nom.",
       "Les paiements par mobile money conservent le numéro qui a payé ou a été payé, comme le fait le registre du prestataire de paiement.",
-      "Pour les chauffeurs : la plaque du taxi, dont se souvient un passager qui fait une réclamation.",
+      "Pour les chauffeurs : la plaque du taxi, dont se souvient un passager qui fait une réclamation, ainsi que vos pièces d'identité et leurs numéros, aussi longtemps que la loi nous y oblige. Le compte est retiré de la route définitivement : aucune course ne peut plus lui être proposée.",
     ],
     first: "Avant de supprimer",
     firstList: [
@@ -195,7 +193,7 @@ export function renderDeleteAccountPage(lang: Lang, supportPhone: string | null)
   );
 }
 
-/** Mounted at the root: /legal/* and /support. Public, and cacheable — nothing here is anybody's data. */
+/** Mounted at the root: /legal/*. (/support is in app.ts.) Public, and cacheable — nothing here is anybody's data. */
 export function publicPagesRouter(): Router {
   const router = Router();
 
@@ -216,21 +214,7 @@ export function publicPagesRouter(): Router {
   });
 
   router.get("/legal/delete-account", (req, res) => {
-    html(res, renderDeleteAccountPage(langOf(req), env.SUPPORT_PHONE ?? null));
-  });
-
-  /**
-   * The number to call.
-   *
-   * Half the app says "Call us" — when an application is refused, when a plate
-   * is already registered, on the privacy page — and there was no number
-   * anywhere to call. Served rather than built into the app, so changing the
-   * office phone is a setting on the server and not a new release everybody
-   * has to install.
-   */
-  router.get("/support", (_req, res) => {
-    res.setHeader("cache-control", "public, max-age=300");
-    res.json({ phone: env.SUPPORT_PHONE ?? null, email: "hello@fakoride.cm" });
+    html(res, renderDeleteAccountPage(langOf(req), env.SUPPORT_PHONE || null));
   });
 
   return router;

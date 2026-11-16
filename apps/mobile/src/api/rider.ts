@@ -7,6 +7,7 @@
  */
 
 import { api } from "./client";
+import type { Fare } from "./session";
 
 // --- shared shapes ----------------------------------------------------------
 
@@ -202,12 +203,6 @@ export type TripDetail = {
   status: TripStatus;
   priceXaf: number;
   paymentMethod: PaymentMethod;
-  /**
-   * A fare paid by phone, once the ride is over: PENDING while the prompt is
-   * unanswered, PAID when it lands, FAILED when it will not — then it is cash.
-   * Null for cash, and until the ride is finished.
-   */
-  mobileFare?: "PENDING" | "PAID" | "FAILED" | null;
   pickupLabel: string;
   dropLabel: string;
   from: { code: string; name: string };
@@ -226,6 +221,8 @@ export type TripDetail = {
   driver: TripDriver | null;
   /** Her stars for this ride, or null until she rates it. */
   riderStars?: number | null;
+  /** Whether the money actually moved. "You paid" is only said when it did. */
+  fare: Fare;
   needsHelmet: boolean;
   womanDriverOnly: boolean;
   requestedAt: string;
@@ -289,6 +286,9 @@ export const trips = {
 
   cancel: (id: string, reason?: string) =>
     api.post<{ status: string }>(`/trips/${id}/cancel`, { reason }),
+
+  /** A phone payment that did not go through: put the prompt on her phone again. */
+  payAgain: (id: string) => api.post<{ fare: Fare }>(`/trips/${id}/pay-again`),
 
   rate: (id: string, stars: number, comment?: string) =>
     api.post<{ rated: true }>(`/trips/${id}/rate`, { stars, ...(comment ? { comment } : {}) }),

@@ -99,12 +99,30 @@ export const S = {
     wentWrong: p("Something went wrong. Try again.", "Une erreur s'est produite. Réessayez."),
   },
 
-  /** The card on a home screen that leads back to a ride still going on. */
-  live: {
-    riding: p("You have a ride in progress", "Vous avez une course en cours"),
-    driving: p("You are on a ride", "Vous êtes en course"),
-    tapToOpen: p("Tap to go back to it.", "Touchez pour y revenir."),
-    open: p("Open", "Ouvrir"),
+  /** Every ride on this account. */
+  rides: {
+    title: p("Your rides", "Vos courses"),
+    link: p("Your rides", "Vos courses"),
+    linkWhy: p("Every ride, what it cost, and whether it was paid.", "Toutes vos courses, leur prix, et si elles ont été payées."),
+    nothing: p("No rides yet.", "Aucune course pour l'instant."),
+    loading: p("Loading…", "Chargement…"),
+    older: p("Show older rides", "Voir les plus anciennes"),
+    offline: p("No network. Pull down to try again.", "Pas de réseau. Tirez vers le bas pour réessayer."),
+    couldNotLoad: p("Your rides did not load. Pull down to try again.", "Vos courses ne se sont pas chargées. Tirez vers le bas pour réessayer."),
+    done: p("Done", "Terminée"),
+    live: p("Happening now", "En cours"),
+    cancelled: p("Cancelled", "Annulée"),
+    noTaxi: p("No taxi took it", "Aucun taxi ne l'a prise"),
+    notPaid: p("Not paid", "Non payée"),
+    waiting: p("Payment on its way", "Paiement en cours"),
+    paidCash: p("Paid in cash", "Payée en espèces"),
+  },
+
+  /** Coming back to a ride that is still happening. */
+  resume: {
+    rider: p("Your ride is on", "Votre course est en cours"),
+    driver: p("You have a ride going", "Vous avez une course en cours"),
+    why: p("{from} → {to}. Tap to go back to it.", "{from} → {to}. Touchez pour y revenir."),
   },
 
   home: {
@@ -189,7 +207,6 @@ export const S = {
       "Vos signalements, et les réponses reçues",
     ),
     signOut: p("Sign out", "Se déconnecter"),
-    callUs: p("Call Fako Ride", "Appeler Fako Ride"),
 
     deleteAccount: p("Delete my account", "Supprimer mon compte"),
     deleteAsk: p("Delete your account?", "Supprimer votre compte ?"),
@@ -402,6 +419,7 @@ export const S = {
    * screen at a time, and the money stated before anything else.
    */
   job: {
+    callHer: p("Call the rider", "Appeler le passager"),
     goGetHer: p("Go and get her", "Allez la chercher"),
     pickingUp: p("Picking up {name}", "Vous prenez {name}"),
     pickingUpRider: p("Picking up your rider", "Vous prenez votre passager"),
@@ -438,16 +456,24 @@ export const S = {
       "Paid by phone. It lands in your balance.",
       "Payé par téléphone. Cela arrive dans votre solde.",
     ),
-    phoneWaiting: p("Waiting for the payment", "En attente du paiement"),
-    phoneWaitingWhy: p(
-      "The rider has a prompt on their phone to approve. Do not let them go until this says paid.",
-      "Le passager doit valider le paiement sur son téléphone. Ne le laissez pas partir avant que ceci indique payé.",
+    payWaiting: p("Waiting for her phone payment", "En attente de son paiement par téléphone"),
+    payWaitingWhy: p(
+      "Stay a moment — it usually takes under a minute.",
+      "Restez un instant — cela prend en général moins d'une minute.",
     ),
-    phoneFailed: p("The phone payment did not go through", "Le paiement par téléphone a échoué"),
-    phoneFailedTakeCash: p(
-      "Take {amount} FCFA in cash now, before the rider leaves.",
-      "Prenez {amount} FCFA en espèces maintenant, avant que le passager ne parte.",
+    payFailed: p("Her phone payment did not go through", "Son paiement par téléphone n'a pas abouti"),
+    payFailedWhy: p(
+      "Take {amount} FCFA in cash, then tap below so it counts in your earnings.",
+      "Prenez {amount} FCFA en espèces, puis appuyez ci-dessous pour que cela compte dans vos gains.",
     ),
+    tookCash: p("I TOOK THE CASH", "J'AI REÇU L'ARGENT"),
+    paidInCash: p("Paid in cash. It is in your earnings.", "Payé en espèces. C'est dans vos gains."),
+    alreadyPaid: p(
+      "Her phone payment went through — do not take cash as well.",
+      "Son paiement est passé — ne prenez pas d'espèces en plus.",
+    ),
+    noNumber: p("Her number is not available.", "Son numéro n'est pas disponible."),
+    notPaidLeave: p("She did not pay — leave it", "Elle n'a pas payé — laisser"),
 
     dropRide: p("Drop this ride", "Abandonner cette course"),
     getHelp: p("GET HELP", "DEMANDER DE L'AIDE"),
@@ -606,9 +632,21 @@ export const S = {
     ),
 
     youPaid: p("You paid", "Vous avez payé"),
-    approveOnPhone: p("Approve the payment on your phone", "Validez le paiement sur votre téléphone"),
-    payFailed: p("Payment failed — pay your driver in cash", "Paiement échoué — payez votre chauffeur en espèces"),
     payOnArrival: p("You pay on arrival", "Vous payez à l'arrivée"),
+    toPay: p("Still to pay", "Reste à payer"),
+    paidCash: p("Paid in cash", "Payé en espèces"),
+    payWaiting: p("Check your phone", "Regardez votre téléphone"),
+    payWaitingWhy: p(
+      "A payment request for {amount} FCFA is on its way. Enter your PIN to approve it.",
+      "Une demande de paiement de {amount} FCFA arrive. Entrez votre code pour la valider.",
+    ),
+    payFailed: p("Your payment did not go through", "Votre paiement n'a pas abouti"),
+    payFailedWhy: p(
+      "Nothing was taken. Try again, or pay the driver {amount} FCFA in cash.",
+      "Rien n'a été prélevé. Réessayez, ou payez {amount} FCFA en espèces au chauffeur.",
+    ),
+    payAgain: p("Try again", "Réessayer"),
+    payAgainBusy: p("Sending…", "Envoi…"),
     cash: p("Cash", "Espèces"),
     momo: p("MTN MoMo", "MTN MoMo"),
     orangeMoney: p("Orange Money", "Orange Money"),
@@ -733,13 +771,14 @@ export const S = {
     signOut: p("Sign out", "Se déconnecter"),
     underReview: p("Under review", "En cours d'examen"),
 
+    refused: p("We could not approve this application", "Nous n'avons pas pu approuver cette demande"),
     suspended: p("Your account is suspended", "Votre compte est suspendu"),
     suspendedWhy: p(
-      "You cannot take rides for now. We sent you a text saying why. Call us and we will sort it out.",
-      "Vous ne pouvez pas prendre de courses pour le moment. Nous vous avons envoyé un SMS expliquant pourquoi. Appelez-nous pour régler cela.",
+      "You cannot take rides for now. If you think this is a mistake, talk to us.",
+      "Vous ne pouvez pas prendre de courses pour l'instant. Si vous pensez que c'est une erreur, parlez-nous.",
     ),
-
-    refused: p("We could not approve this application", "Nous n'avons pas pu approuver cette demande"),
+    theReason: p("The reason we gave", "La raison donnée"),
+    talkToUs: p("Talk to us", "Parlez-nous"),
     refusedWhy: p(
       "Call us and we will tell you exactly what was wrong. It is usually a document we could not read.",
       "Appelez-nous et nous vous dirons exactement ce qui n'allait pas. C'est généralement un document illisible.",
@@ -818,6 +857,24 @@ export const S = {
     LOST_ITEM: p("Something left behind", "Un oubli dans le taxi"),
     APP_PROBLEM: p("The app", "L'application"),
     OTHER: p("Something else", "Autre chose"),
+  },
+
+  /** Reaching a person. */
+  help: {
+    title: p("Help", "Aide"),
+    link: p("Help and support", "Aide et assistance"),
+    why: p(
+      "A person answers. Tell us what happened and which ride it was.",
+      "Une personne vous répond. Dites-nous ce qui s'est passé et de quelle course il s'agit.",
+    ),
+    call: p("Call us", "Appelez-nous"),
+    whatsapp: p("WhatsApp", "WhatsApp"),
+    email: p("Write to us", "Écrivez-nous"),
+    police: p("In danger? Call the police: 117", "En danger ? Appelez la police : 117"),
+    policeWhy: p(
+      "Then press Get help in the app — we see where you are.",
+      "Puis appuyez sur Demander de l'aide dans l'application — nous voyons où vous êtes.",
+    ),
   },
 
   /** The people texted when Get help is pressed. */

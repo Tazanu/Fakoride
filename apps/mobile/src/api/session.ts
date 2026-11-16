@@ -23,6 +23,8 @@ export type Driver = {
   online: boolean;
   rating: number;
   tripCount: number;
+  /** What ops wrote when they suspended or turned him down. Null otherwise. */
+  statusReason?: string | null;
 };
 
 export type Me = {
@@ -93,27 +95,46 @@ export const profile = {
 
   /**
    * Delete this account, for good. Refused with `trip_in_progress`,
-   * `balance_held` or `payment_in_flight` when something has to finish first.
+   * `money_held` or `payment_in_flight` when something has to finish first.
+   * The server wants the word itself, so a stray request cannot do it.
    */
-  deleteAccount: () => api.delete<null>("/me"),
+  deleteAccount: () => api.delete<{ deleted: true }>("/me", { body: { confirm: "DELETE" } }),
 };
 
-/**
- * The ride this account is in the middle of — as a rider, as a driver, or
- * neither. Asked whenever a home screen comes into view, so that reopening the
- * app in the middle of a ride leads back to it. See ui/live-ride.
- */
-export type LiveTrip = { id: string; status: string };
-export const liveTrips = {
-  current: () => api.get<{ riding: LiveTrip | null; driving: LiveTrip | null }>("/trips/current"),
+/** Where a finished ride's money stands. See fareState on the server. */
+export type FareState = "NOT_DUE" | "CASH" | "WAITING" | "PAID" | "FAILED" | "PAID_IN_CASH";
+export type Fare = { state: FareState; reason: string | null };
+
+export type CurrentRide = { id: string; status: string; pickupLabel: string; dropLabel: string };
+
+/** One line of "Your rides". */
+export type RideSummary = {
+  id: string;
+  status: string;
+  priceXaf: number;
+  paymentMethod: "CASH" | "MOMO" | "ORANGE_MONEY";
+  pickupLabel: string;
+  dropLabel: string;
+  requestedAt: string;
+  completedAt: string | null;
+  fare: Fare;
 };
 
-/**
- * The number to call. Asked of the server rather than built into the app, so
- * changing the office phone does not need a new release. Null until one is set.
- */
+export const rides = {
+  /** The ride this account is in the middle of — so closing the app does not lose it. */
+  current: (side: "rider" | "driver") => api.get<{ trip: CurrentRide | null }>(`/trips/current?side=${side}`),
+  /** Newest first. `before` is the cursor the last page handed back. */
+  list: (before?: string) =>
+    api.get<{ trips: RideSummary[]; nextBefore: string | null }>(
+      `/trips?limit=20${before ? `&before=${encodeURIComponent(before)}` : ""}`,
+    ),
+};
+
+export type SupportContacts = { phone: string | null; whatsapp: string | null; email: string };
+
+/** How to reach a person. Public, and set on the server so it can change without an update. */
 export const support = {
-  get: () => api.get<{ phone: string | null; email: string }>("/support"),
+  get: () => api.get<SupportContacts>("/support", { anonymous: true }),
 };
 
 export type TrustedContact = { id: string; name: string; phone: string };

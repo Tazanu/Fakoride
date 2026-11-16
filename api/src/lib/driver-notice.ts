@@ -81,7 +81,7 @@ export function tellDriver(driverId: string, kind: DriverNotice, reason?: string
     .then((driver) => {
       // A deleted account has a placeholder where the number was.
       if (!driver || driver.user.deletedAt) return;
-      const text = driverNoticeText(kind, driver.user.language, { reason, supportPhone: env.SUPPORT_PHONE ?? null });
+      const text = driverNoticeText(kind, driver.user.language, { reason, supportPhone: env.SUPPORT_PHONE || null });
       return smsSender.send(driver.user.phone, text);
     })
     .catch((err: unknown) => logger.error({ driverId, kind, err: String(err) }, "could not text a driver about a decision"));

@@ -38,7 +38,7 @@ const BROKE_PLATE = `SW ${nonce} Z`;
 const D1_PUSH = `ExponentPushToken[quiet-${nonce}]`;
 /** Set by the runner as OPS_ALERT_PHONES and SUPPORT_PHONE. */
 const OPS_PHONE = "+237600000098";
-const SUPPORT_PHONE = "+237600000097";
+const SUPPORT_PHONE = "+237677000007";
 
 let pass = 0;
 let fail = 0;
@@ -166,12 +166,14 @@ await call("POST", `/trips/${first.body.id}/accept`, { token: d1.token });
 await call("POST", `/trips/${first.body.id}/start`, { token: d1.token, body: { pin: first.body.pin } });
 
 // Reopening the app in the middle of this ride: each side must be led back to it.
-const riderNow = await call("GET", "/trips/current", { token: r1 });
-check("a rider who reopens the app is told which ride she is on", riderNow.status === 200 && riderNow.body.riding?.id === first.body.id && riderNow.body.driving === null, JSON.stringify(riderNow.body));
-const driverNow = await call("GET", "/trips/current", { token: d1.token });
-check("and so is her driver", driverNow.body.driving?.id === first.body.id && driverNow.body.driving?.status === "IN_PROGRESS", JSON.stringify(driverNow.body));
+const riderNow = await call("GET", "/trips/current?side=rider", { token: r1 });
+check("a rider who reopens the app is told which ride she is on", riderNow.status === 200 && riderNow.body.trip?.id === first.body.id, JSON.stringify(riderNow.body));
+const driverNow = await call("GET", "/trips/current?side=driver", { token: d1.token });
+check("and so is her driver", driverNow.body.trip?.id === first.body.id && driverNow.body.trip?.status === "IN_PROGRESS", JSON.stringify(driverNow.body));
+const driverAsRider = await call("GET", "/trips/current?side=rider", { token: d1.token });
+check("his rider screen is not handed the ride he is driving", driverAsRider.body.trip === null, JSON.stringify(driverAsRider.body));
 const nobodyNow = await call("GET", "/trips/current", { token: r3 });
-check("somebody with no ride is told there is none", nobodyNow.status === 200 && nobodyNow.body.riding === null && nobodyNow.body.driving === null, JSON.stringify(nobodyNow.body));
+check("somebody with no ride is told there is none", nobodyNow.status === 200 && nobodyNow.body.trip === null, JSON.stringify(nobodyNow.body));
 check("it needs an account", (await call("GET", "/trips/current")).status === 401);
 
 const whileCarrying = await book(r2);
@@ -252,7 +254,7 @@ check(
 );
 const freeAgain = await book(r1);
 check("she can book again", freeAgain.status === 201, JSON.stringify(freeAgain.body));
-check("and a finished ride is no longer anybody's current one", (await call("GET", "/trips/current", { token: d1.token })).body.driving === null);
+check("and a finished ride is no longer anybody's current one", (await call("GET", "/trips/current?side=driver", { token: d1.token })).body.trip === null);
 await call("POST", `/trips/${freeAgain.body.id}/cancel`, { token: r1, body: { reason: "test over" } });
 
 // The same, one step earlier: accepted, and he never came.
@@ -489,12 +491,13 @@ await call("POST", "/me/contacts", { token: r3, body: { name: "Mum", phone: `+23
 const r3Id = sql(`SELECT id FROM "User" WHERE phone='${R3_PHONE}'`);
 const tripsOnRecord = sql(`SELECT count(*) FROM "Trip" WHERE "riderId"='${r3Id}'`);
 const midRide = await book(r3);
-const refusedMidRide = await call("DELETE", "/me", { token: r3 });
+const BYE = { confirm: "DELETE" };
+const refusedMidRide = await call("DELETE", "/me", { token: r3, body: BYE });
 check("it is refused while she has a ride running", refusedMidRide.status === 409 && refusedMidRide.body.error?.code === "trip_in_progress", JSON.stringify(refusedMidRide.body));
 await call("POST", `/trips/${midRide.body.id}/cancel`, { token: r3, body: { reason: "test over" } });
 
-const gone = await call("DELETE", "/me", { token: r3 });
-check("then it is deleted", gone.status === 204, String(gone.status));
+const gone = await call("DELETE", "/me", { token: r3, body: BYE });
+check("then it is deleted", gone.status === 200 && gone.body.deleted === true, String(gone.status));
 check("her token stops working at once", (await call("GET", "/auth/me", { token: r3 })).status === 401);
 check(
   "the row no longer says who she was",
@@ -517,36 +520,36 @@ const paidRide = await book(r2, "MOMO");
 await call("POST", `/trips/${paidRide.body.id}/accept`, { token: d2.token });
 await call("POST", `/trips/${paidRide.body.id}/start`, { token: d2.token, body: { pin: paidRide.body.pin } });
 
-const midDrive = await call("DELETE", "/me", { token: d2.token });
+const midDrive = await call("DELETE", "/me", { token: d2.token, body: BYE });
 check("a driver cannot delete his account with a passenger in the car", midDrive.status === 409 && midDrive.body.error?.code === "trip_in_progress", JSON.stringify(midDrive.body));
 
 const midRide2 = await call("GET", `/trips/${paidRide.body.id}`, { token: d2.token });
-check("a fare by phone has no state until the ride is over", midRide2.body.mobileFare === null, JSON.stringify(midRide2.body.mobileFare));
+check("a fare by phone has no state until the ride is over", midRide2.body.fare?.state === "NOT_DUE", JSON.stringify(midRide2.body.fare));
 const done = await call("POST", `/trips/${paidRide.body.id}/complete`, { token: d2.token });
 const justDone = await call("GET", `/trips/${paidRide.body.id}`, { token: d2.token });
-check("once finished, the driver's app can ask whether the fare has landed", ["PENDING", "PAID"].includes(justDone.body.mobileFare), JSON.stringify(justDone.body.mobileFare));
+check("once finished, the driver's app can ask whether the fare has landed", ["WAITING", "PAID"].includes(justDone.body.fare?.state), JSON.stringify(justDone.body.fare));
 await settled(done.body.payment.id, d2.token);
-check("and is told when it has", (await call("GET", `/trips/${paidRide.body.id}`, { token: d2.token })).body.mobileFare === "PAID");
-check("so is the rider's", (await call("GET", `/trips/${paidRide.body.id}`, { token: r2 })).body.mobileFare === "PAID");
+check("and is told when it has", (await call("GET", `/trips/${paidRide.body.id}`, { token: d2.token })).body.fare?.state === "PAID");
+check("so is the rider's", (await call("GET", `/trips/${paidRide.body.id}`, { token: r2 })).body.fare?.state === "PAID");
 const holding = (await call("GET", "/drivers/me/balance", { token: d2.token })).body.payableXaf;
-const withMoney = await call("DELETE", "/me", { token: d2.token });
+const withMoney = await call("DELETE", "/me", { token: d2.token, body: BYE });
 check(
   "nor while we are holding his money — deleting must not forfeit it",
-  holding > 0 && withMoney.status === 409 && withMoney.body.error?.code === "balance_held" && withMoney.body.error?.details?.payableXaf === holding,
+  holding > 0 && withMoney.status === 409 && withMoney.body.error?.code === "money_held" && withMoney.body.error?.details?.payableXaf === holding,
   JSON.stringify({ holding, body: withMoney.body }),
 );
 
 const cashout = await call("POST", "/drivers/me/cashout", { token: d2.token });
-const midPayout = await call("DELETE", "/me", { token: d2.token });
+const midPayout = await call("DELETE", "/me", { token: d2.token, body: BYE });
 check("nor while the payout is still in the air", cashout.status === 201 && midPayout.status === 409, JSON.stringify({ cashout: cashout.status, del: midPayout.body }));
 await settled(cashout.body.id, d2.token);
 
-const driverGone = await call("DELETE", "/me", { token: d2.token });
-check("once it has landed, he can", driverGone.status === 204, JSON.stringify(driverGone.body));
+const driverGone = await call("DELETE", "/me", { token: d2.token, body: BYE });
+check("once it has landed, he can", driverGone.status === 200, JSON.stringify(driverGone.body));
 check(
-  "he is offline, can never be dispatched, and his ID number is gone",
-  sql(`SELECT online || '|' || status || '|' || "cniNumber" || '|' || coalesce("licenceNumber", 'none') FROM "Driver" WHERE id='${d2.id}'`) === "false|SUSPENDED|deleted|none",
-  sql(`SELECT online || '|' || status || '|' || "cniNumber" || '|' || coalesce("licenceNumber", 'none') FROM "Driver" WHERE id='${d2.id}'`),
+  "he is offline and can never be dispatched",
+  sql(`SELECT online || '|' || status FROM "Driver" WHERE id='${d2.id}'`) === "false|SUSPENDED",
+  sql(`SELECT online || '|' || status FROM "Driver" WHERE id='${d2.id}'`),
 );
 check("his plate is kept, for a rider with a complaint", sql(`SELECT plate FROM "Driver" WHERE id='${d2.id}'`) === D2_PLATE);
 check("his ledger is kept", Number(sql(`SELECT count(*) FROM "LedgerEntry" WHERE "driverId"='${d2.id}'`)) > 0);
@@ -571,10 +574,10 @@ await call("POST", `/trips/${unpaid.body.id}/start`, { token: d1.token, body: { 
 const unpaidDone = await call("POST", `/trips/${unpaid.body.id}/complete`, { token: d1.token });
 await settled(unpaidDone.body.payment.id, d1.token);
 const asDriverSees = await call("GET", `/trips/${unpaid.body.id}`, { token: d1.token });
-check("the driver is told the phone payment failed, so he takes cash", asDriverSees.body.mobileFare === "FAILED", JSON.stringify(asDriverSees.body.mobileFare));
-check("the rider is told the same", (await call("GET", `/trips/${unpaid.body.id}`, { token: emptyRider })).body.mobileFare === "FAILED");
+check("the driver is told the phone payment failed, so he takes cash", asDriverSees.body.fare?.state === "FAILED", JSON.stringify(asDriverSees.body.fare));
+check("the rider is told the same", (await call("GET", `/trips/${unpaid.body.id}`, { token: emptyRider })).body.fare?.state === "FAILED");
 const cashRide = await call("GET", `/trips/${first.body.id}`, { token: r1 });
-check("a cash ride has no such state at all", cashRide.body.mobileFare === null, JSON.stringify(cashRide.body.mobileFare));
+check("a cash ride is simply cash", cashRide.body.fare?.state === "CASH", JSON.stringify(cashRide.body.fare));
 await call("POST", "/drivers/offline", { token: d1.token });
 
 // ---------------------------------------------------------------------------

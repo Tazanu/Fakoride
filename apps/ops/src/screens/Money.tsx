@@ -227,7 +227,12 @@ export function Money() {
                   <span style={p.status === "SUCCESSFUL" ? styles.ok : p.status === "FAILED" || p.status === "EXPIRED" ? styles.bad : styles.waiting}>
                     {STATUS[p.status] ?? p.status}
                   </span>
-                  {p.failureReason ? <span style={styles.reason}>{p.failureReason}</span> : null}
+                  {/* On a paid row a reason means paid twice — her money to give back. */}
+                  {p.failureReason ? (
+                    <span style={p.status === "SUCCESSFUL" ? { ...styles.reason, ...styles.bad } : styles.reason}>
+                      {p.failureReason}
+                    </span>
+                  ) : null}
                 </span>
                 <span data-label="When" style={styles.muted}>
                   {when(p.createdAt)}

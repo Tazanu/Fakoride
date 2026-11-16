@@ -88,6 +88,21 @@ const schema = z.object({
    * text messages — a trusted contact's "follow the ride" — start with this.
    */
   PUBLIC_API_URL: z.string().url().default("http://localhost:4000"),
+  /**
+   * How a person reaches a person. Shown on the app's Help screen, and the
+   * privacy page tells people to call it, so it lives here rather than in the
+   * app — it can change without anybody installing an update. Unset, the Help
+   * screen offers email only.
+   */
+  // Kept as digits, however it was typed into Render ("+237 6 77 00 00 07"):
+  // it ends up in tel: links and text messages.
+  SUPPORT_PHONE: z
+    .string()
+    .transform((v) => v.replace(/[^\d+]/g, "") || undefined)
+    .optional(),
+  /** If WhatsApp is on a different number. Defaults to SUPPORT_PHONE. */
+  SUPPORT_WHATSAPP: z.string().optional(),
+  SUPPORT_EMAIL: z.string().email().default("hello@fakoride.cm"),
   /** Scales every rate limit at once — 3 for a launch day on campus Wi-Fi. */
   RATE_LIMIT_MULTIPLIER: z.coerce.number().positive().default(1),
 
@@ -137,8 +152,6 @@ const schema = z.object({
     .string()
     .default("")
     .transform((v) => v.split(",").map((p) => p.trim()).filter(Boolean)),
-  /** The number riders and drivers are told to call. Shown in the app. */
-  SUPPORT_PHONE: z.string().trim().optional(),
 
   ACCESS_FEE_XAF: z.coerce.number().int().default(500),
   MOBILE_PAYMENT_DISCOUNT_XAF: z.coerce.number().int().default(15),

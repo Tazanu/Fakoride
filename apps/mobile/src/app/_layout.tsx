@@ -27,6 +27,7 @@ import { SessionProvider, useSession } from "@/session/SessionProvider";
 // For its side effect: defines the task Android delivers a driver's position
 // to. It must exist before any screen does — see the file.
 import "@/driver/presence";
+import { openingRide } from "@/ui/back-to-ride";
 import { palette } from "@/theme";
 
 void SplashScreen.preventAutoHideAsync();
@@ -55,7 +56,7 @@ function NotificationRouting() {
     const data = response.notification.request.content.data as { kind?: string; tripId?: string };
     if (data.kind === "offer") {
       if (me.driver) router.replace("/(driver)");
-    } else if (typeof data.tripId === "string") {
+    } else if (typeof data.tripId === "string" && openingRide(data.tripId)) {
       router.push({ pathname: "/(rider)/trip/[id]", params: { id: data.tripId } });
     }
   }, [response, me, ready, router]);

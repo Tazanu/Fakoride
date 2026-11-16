@@ -42,7 +42,8 @@ const SUITES = [
   "05-remaining-surface.mjs",
   "06-push.mjs",
   "07-two-servers.mjs",
-  "08-launch-fixes.mjs",
+  "08-fares-and-the-way-back.mjs",
+  "09-launch-fixes.mjs",
 ];
 
 /** Each run's own database. The prefix is what the drop below checks for. */
@@ -273,9 +274,11 @@ const server = spawn(process.execPath, [TSX, "src/server.ts"], {
     // Who is texted when somebody presses Get help, and the number the app
     // tells people to call. Read back out of the log like the sign-in codes.
     OPS_ALERT_PHONES: "+237600000098",
-    SUPPORT_PHONE: "+237600000097",
     // Never Expo itself: a test run must not wake a real phone.
     EXPO_PUSH_URL: `${PUSH_STANDIN}/--/api/v2/push/send`,
+    // Written the way a person types it into Render, spaces and all.
+    SUPPORT_PHONE: "+237 6 77 00 00 07",
+    SUPPORT_WHATSAPP: "",
   },
 });
 server.stdout.pipe(logFile);

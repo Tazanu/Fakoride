@@ -7,7 +7,7 @@
  */
 
 import { api, setToken } from "./client";
-import type { DriverStatus } from "./session";
+import type { DriverStatus, Fare } from "./session";
 
 // --- shared shapes ----------------------------------------------------------
 
@@ -121,20 +121,18 @@ export type TripDetail = {
   status: TripStatus;
   priceXaf: number;
   paymentMethod: PaymentMethod;
-  /**
-   * A fare paid by phone, once the ride is over: PENDING while the prompt is
-   * unanswered, PAID when it lands, FAILED when it will not — then it is cash.
-   * Null for cash, and until the ride is finished.
-   */
-  mobileFare?: "PENDING" | "PAID" | "FAILED" | null;
   pickupLabel: string;
   dropLabel: string;
   from: { code: string; name: string };
   to: { code: string; name: string };
   /** Never present for a driver. He types what the rider reads out. */
   pin?: undefined;
-  /** Who he is picking up — first name only, and only while the ride is live. */
-  rider?: { firstName: string | null; hasPhoto: boolean };
+  /**
+   * Who he is picking up — first name only, and only while the ride is live.
+   * Her number for the same window, so "Call her" calls her.
+   */
+  rider?: { firstName: string | null; hasPhoto: boolean; phone: string };
+  fare: Fare;
   needsHelmet: boolean;
   womanDriverOnly: boolean;
   requestedAt: string;
@@ -169,6 +167,9 @@ export const trips = {
 
   cancel: (id: string, reason?: string) =>
     api.post<{ status: string; requeued?: boolean }>(`/trips/${id}/cancel`, { reason }),
+
+  /** Her phone payment failed and she paid him at the kerb. */
+  paidCash: (id: string) => api.post<{ fare: Fare }>(`/trips/${id}/paid-cash`),
 
   sos: (id: string, body: { lat?: number; lng?: number; note?: string }) =>
     api.post<{ alertId: string; status: string; next: string; contactsTold: number }>(`/trips/${id}/sos`, body),

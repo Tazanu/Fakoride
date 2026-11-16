@@ -304,6 +304,17 @@ check("and he cannot go online", stillBlocked.status === 403, JSON.stringify(sti
 const record = await call("GET", `/admin/drivers/${applicant.id}`, { token: adminToken });
 check("the reason is kept, in words a person can read back to him", record.body.history?.[0]?.note?.includes("does not match"), JSON.stringify(record.body.history?.[0]));
 
+// Kept, and until now never shown to him: his app had nothing to read it from.
+const hisView = await call("GET", "/auth/me", { token: rejectToken });
+check("and he is told it himself, in the app", hisView.body.driver?.status === "REJECTED" && hisView.body.driver?.statusReason?.includes("does not match"), JSON.stringify(hisView.body.driver));
+
+console.log("\n=== help ===");
+const help = await call("GET", "/support");
+check("anybody can find out how to reach a person, signed in or not", help.status === 200, JSON.stringify(help.status));
+check("the number comes back as digits a phone can dial", help.body.phone === "+237677000007", JSON.stringify(help.body));
+check("WhatsApp falls back to the same number", help.body.whatsapp === "+237677000007", JSON.stringify(help.body));
+check("and there is always an email address", typeof help.body.email === "string" && help.body.email.includes("@"), JSON.stringify(help.body));
+
 console.log("\n=== ID photos, kept in the database ===");
 /*
  * Until now no suite uploaded anything: every driver was verified with the

@@ -10,6 +10,8 @@
  *   trip:started          the PIN worked and they are moving
  *   trip:completed        done
  *   trip:driver_cancelled he dropped it; we are looking again
+ *   trip:payment_failed   her phone payment did not go through
+ *   trip:fare             it did, or he took cash for it
  *
  * Everything here is a status change on one trip, so rather than hold six
  * flags this keeps the last event and a version counter. The trip screen
@@ -41,7 +43,8 @@ export type TripEvent =
   | "completed"
   | "driver_cancelled"
   | "cancelled_by_ops"
-  | "payment_failed";
+  | "payment_failed"
+  | "fare";
 
 type RealtimeState = {
   /** The last thing that happened, and which trip it happened to. */
@@ -110,9 +113,10 @@ export function RiderRealtime({ children }: { children: ReactNode }) {
         ["trip:driver_cancelled", bump("driver_cancelled")],
         // Fako Ride ended it: an operator, or a ride its driver never started.
         ["trip:cancelled_by_ops", bump("cancelled_by_ops")],
-        // Her mobile money did not go through. The server has always sent this;
-        // nothing was listening, so the screen went on saying "You paid".
+        // The server has always sent this, and nothing listened: a declined
+        // prompt left her screen saying "You paid".
         ["trip:payment_failed", bump("payment_failed")],
+        ["trip:fare", bump("fare")],
       ];
       for (const [name, fn] of handlers) socket.on(name, fn);
 

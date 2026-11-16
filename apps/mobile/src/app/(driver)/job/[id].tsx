@@ -8,7 +8,7 @@
  *   ACCEPTED     I AM HERE       he has reached her
  *   ARRIVED      the PIN gate    she reads four digits, he types them
  *   IN_PROGRESS  FINISH RIDE     he has dropped her
- *   COMPLETED    the fare, and how it is being paid
+ *   COMPLETED    the fare, and whether it has actually been paid
  *
  * The PIN is the whole safety design and it only works in this direction: the
  * rider holds it, the driver asks for it. He never sees it, which is why
@@ -21,6 +21,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -63,8 +64,26 @@ function errorFor(err: unknown): Phrase {
     // "bad_state" for a long time, so the message never once appeared.
     case "wrong_state":
       return S.job.movedOn;
+    case "already_paid":
+      return S.job.alreadyPaid;
     default:
       return S.driver.didNotWorkTryAgain;
+  }
+}
+
+/** What he is told once the ride is over, by where the money stands. */
+function doneLine(trip: TripDetail): Phrase {
+  switch (trip.fare.state) {
+    case "CASH":
+      return S.job.takeCash;
+    case "WAITING":
+      return S.job.payWaiting;
+    case "FAILED":
+      return S.job.payFailed;
+    case "PAID_IN_CASH":
+      return S.job.paidInCash;
+    default:
+      return S.job.paidByPhone;
   }
 }
 
@@ -89,7 +108,7 @@ export default function Trip() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const t = useT();
-  const { cancelledTripId, acknowledgeCancellation, completedTripId } = useDriverRealtime();
+  const { cancelledTripId, acknowledgeCancellation, completedTripId, fareNews } = useDriverRealtime();
   // The PIN gate puts a keypad over the bottom half of this screen.
   const scroll = useScrollPastKeyboard();
 
@@ -118,6 +137,24 @@ export default function Trip() {
     void load();
   }, [load]);
 
+  // Her phone paid, or did not: read the trip again.
+  useEffect(() => {
+    if (id && fareNews?.tripId === id) void load();
+  }, [fareNews, id, load]);
+
+  /**
+   * While her prompt is out, look every few seconds.
+   *
+   * He is standing at the kerb deciding whether to let her walk away. The
+   * socket usually says first; this is for when it does not.
+   */
+  const fareWaiting = trip?.status === "COMPLETED" && trip.fare.state === "WAITING";
+  useEffect(() => {
+    if (!fareWaiting) return;
+    const every = setInterval(() => void load(), 5_000);
+    return () => clearInterval(every);
+  }, [fareWaiting, load]);
+
   /**
    * She cancelled.
    *
@@ -141,18 +178,6 @@ export default function Trip() {
   useEffect(() => {
     if (id && completedTripId === id) void load();
   }, [completedTripId, id, load]);
-
-  /**
-   * A fare paid by phone is not paid until it lands. Keep asking, every few
-   * seconds, for as long as the prompt is on her phone — the answer decides
-   * whether he may let her go.
-   */
-  const farePending = trip?.status === "COMPLETED" && trip.paymentMethod !== "CASH" && (trip.mobileFare ?? "PENDING") === "PENDING";
-  useEffect(() => {
-    if (!farePending) return;
-    const timer = setInterval(() => void load(), 3000);
-    return () => clearInterval(timer);
-  }, [farePending, load]);
 
   /**
    * His position, while it matters.
@@ -219,6 +244,31 @@ export default function Trip() {
     } finally {
       setBusy(false);
     }
+  }
+
+  /** She paid him at the kerb instead. Recorded, so it counts in his earnings. */
+  async function tookCash() {
+    if (!id) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { fare } = await trips.paidCash(id);
+      setTrip((current) => (current ? { ...current, fare } : current));
+    } catch (err) {
+      setError(errorFor(err));
+      if (err instanceof ApiError && err.code === "already_paid") await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function callHer() {
+    const phone = trip?.rider?.phone;
+    if (!phone) {
+      setError(S.job.noNumber);
+      return;
+    }
+    void Linking.openURL(`tel:${phone}`);
   }
 
   function confirmCancel() {
@@ -332,28 +382,20 @@ export default function Trip() {
 
         {done ? (
           <View style={styles.doneBlock}>
-            {/*
-              What he is owed, and whether he has it. This said "Paid by phone"
-              the moment he pressed Finish — before she had answered the prompt,
-              and still after her MoMo had refused it. He let her go and found
-              out from his balance.
-            */}
-            {trip.paymentMethod === "CASH" ? (
-              <Text style={styles.doneText}>{t(S.job.takeCash)}</Text>
-            ) : trip.mobileFare === "PAID" ? (
-              <Text style={styles.doneText}>{t(S.job.paidByPhone)}</Text>
-            ) : trip.mobileFare === "FAILED" ? (
-              <View style={styles.fareFailed}>
-                <Text style={styles.fareFailedTitle}>{t(S.job.phoneFailed)}</Text>
-                <Text style={styles.fareFailedBody}>{t(S.job.phoneFailedTakeCash, { amount: xaf(trip.priceXaf) })}</Text>
-              </View>
+            <Text style={styles.doneText}>{t(doneLine(trip))}</Text>
+            {trip.fare.state === "WAITING" ? <Text style={styles.doneWhy}>{t(S.job.payWaitingWhy)}</Text> : null}
+            {trip.fare.state === "FAILED" ? (
+              <>
+                <Text style={styles.doneWhy}>{t(S.job.payFailedWhy, { amount: xaf(trip.priceXaf) })}</Text>
+                <Primary label={t(S.job.tookCash)} busy={busy} onPress={() => void tookCash()} />
+                {/* She walked off without paying: he is not kept on this screen. */}
+                <Pressable onPress={() => router.replace("/(driver)")} accessibilityRole="button" style={styles.minor}>
+                  <Text style={styles.minorLabel}>{t(S.job.notPaidLeave)}</Text>
+                </Pressable>
+              </>
             ) : (
-              <View style={styles.fareWaiting}>
-                <Text style={styles.fareWaitingTitle}>{t(S.job.phoneWaiting)}</Text>
-                <Text style={styles.fareWaitingBody}>{t(S.job.phoneWaitingWhy)}</Text>
-              </View>
+              <Primary label={t(S.job.done)} busy={false} onPress={() => router.replace("/(driver)")} />
             )}
-            <Primary label={t(S.job.done)} busy={false} onPress={() => router.replace("/(driver)")} />
           </View>
         ) : null}
 
@@ -371,6 +413,10 @@ export default function Trip() {
               it produced an error halfway up the hill.
             */}
             <View style={styles.minorActions}>
+              {/* This dialled an empty number: the API never sent hers. */}
+              <Pressable onPress={callHer} accessibilityRole="button" style={styles.minor}>
+                <Text style={styles.minorLabel}>{t(S.job.callHer)}</Text>
+              </Pressable>
               {status === "IN_PROGRESS" ? null : (
               <Pressable onPress={confirmCancel} accessibilityRole="button" style={styles.minor}>
                 <Text style={[styles.minorLabel, styles.minorDanger]}>{t(S.job.dropRide)}</Text>
@@ -497,19 +543,7 @@ const styles = StyleSheet.create({
 
   doneBlock: { gap: space.md },
   doneText: { ...type.bodyPlain, color: c.inkSoft },
-  fareWaiting: { borderRadius: radius.md, backgroundColor: c.amberTint, padding: space.lg, gap: space.xs },
-  fareWaitingTitle: { ...type.bodyStrong, color: c.ink },
-  fareWaitingBody: { ...type.bodyPlain, color: c.inkSoft },
-  fareFailed: {
-    borderRadius: radius.md,
-    borderWidth: 1.5,
-    borderColor: c.dangerEdge,
-    backgroundColor: c.dangerTint,
-    padding: space.lg,
-    gap: space.xs,
-  },
-  fareFailedTitle: { ...type.bodyStrong, color: c.danger },
-  fareFailedBody: { ...type.bodyStrong, color: c.ink },
+  doneWhy: { ...type.secondary, color: c.muted },
 
   minorActions: { flexDirection: "row", gap: space.md, marginTop: space.sm },
   minor: { flex: 1, minHeight: touch.min, alignItems: "center", justifyContent: "center" },

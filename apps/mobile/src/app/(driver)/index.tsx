@@ -42,7 +42,7 @@ import { useDriverRealtime } from "@/realtime/DriverRealtime";
 import { findMe, useWhereIAm } from "@/ui/position";
 import { MapPanel, Sheet } from "@/ui/map";
 import { ServiceNotice } from "@/ui/notice";
-import { LiveRide, rememberOpened } from "@/ui/live-ride";
+import { BackToRide, openingRide } from "@/ui/back-to-ride";
 import { S } from "@/content/strings";
 import { useT, type Phrase } from "@/ui/i18n";
 import { palette, radius, space, touch, type, xaf } from "@/theme";
@@ -219,13 +219,14 @@ export default function Home() {
       await trips.accept(offer.tripId);
       const id = offer.tripId;
       // He is going there himself; the home screen need not send him again.
-      rememberOpened(id);
+      openingRide(id);
       clearOffer();
       router.push({ pathname: "/(driver)/job/[id]", params: { id } });
     } catch (err) {
       // Somebody else took it, or it expired while he was deciding. Neither is
       // his fault and neither is worth a dialog — the offer just goes.
-      // `offer_gone` is what the server actually says; the other two are older names for it.
+      // `offer_gone` is what the server actually says; the other two are older
+      // names for it. `finish_current_ride`: he already has somebody in the car.
       if (
         err instanceof ApiError &&
         ["offer_gone", "wrong_state", "finish_current_ride", "already_taken", "offer_expired"].includes(err.code)
@@ -292,7 +293,7 @@ export default function Home() {
 
       <Sheet handle={false} style={styles.sheet}>
         <ServiceNotice />
-        <LiveRide side="driver" />
+        <BackToRide side="driver" />
 
         <View style={styles.stats}>
           <Stat label={t(S.driver.today)} value={`${xaf(today?.earnedXaf ?? 0)} F`} />

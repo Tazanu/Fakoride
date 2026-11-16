@@ -31,10 +31,10 @@ import {
 } from "@/ui/icons";
 import { ApiError } from "@/api/client";
 import { fares, trips, type PaymentMethod, type Quote } from "@/api/rider";
+import { rides } from "@/api/session";
 import { MapButton, MapPanel, Sheet } from "@/ui/map";
 import { S } from "@/content/strings";
-import { liveTrips } from "@/api/session";
-import { rememberOpened } from "@/ui/live-ride";
+import { openingRide } from "@/ui/back-to-ride";
 import { useT, type Phrase } from "@/ui/i18n";
 import { palette, radius, space, touch, type, xaf } from "@/theme";
 
@@ -111,16 +111,16 @@ export default function Confirm() {
         paymentMethod: payment,
         womanDriverOnly,
       });
-      rememberOpened(trip.id);
+      openingRide(trip.id);
       router.replace({ pathname: "/(rider)/trip/[id]", params: { id: trip.id } });
     } catch (err) {
-      // "You already have a ride running" was true and no help at all: it did
-      // not say which ride or how to reach it. Take her to it.
+      // She has a ride running already — take her to it, rather than telling
+      // her so and leaving her with no way to reach it.
       if (err instanceof ApiError && err.code === "trip_in_progress") {
-        const running = await liveTrips.current().catch(() => null);
-        if (running?.riding) {
-          rememberOpened(running.riding.id);
-          router.replace({ pathname: "/(rider)/trip/[id]", params: { id: running.riding.id } });
+        const running = await rides.current("rider").catch(() => null);
+        if (running?.trip) {
+          openingRide(running.trip.id);
+          router.replace({ pathname: "/(rider)/trip/[id]", params: { id: running.trip.id } });
           return;
         }
       }

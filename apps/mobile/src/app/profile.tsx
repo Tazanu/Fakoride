@@ -24,7 +24,7 @@ import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { CameraIcon, CaretLeftIcon, UserIcon } from "@/ui/icons";
 import { ApiError, fetchPhotoDataUri } from "@/api/client";
-import { profile, support } from "@/api/session";
+import { profile } from "@/api/session";
 import { S } from "@/content/strings";
 import { useT, type Phrase } from "@/ui/i18n";
 import { TrustedContacts } from "@/ui/trusted-contacts";
@@ -49,7 +49,7 @@ function errorFor(err: unknown): Phrase {
     // to finish first, so each says what.
     case "trip_in_progress":
       return S.account.deleteAfterRide;
-    case "balance_held":
+    case "money_held":
       return S.account.deleteAfterCashOut;
     case "payment_in_flight":
       return S.account.deleteAfterPayment;
@@ -70,25 +70,9 @@ export default function Profile() {
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<Phrase | null>(null);
-  // The office number, when the server has one. The row is simply absent until
-  // then — "Call us" with nothing to call is what this replaces.
-  const [supportPhone, setSupportPhone] = useState<string | null>(null);
   // Its own line, beside the button at the foot of the page — the general
   // error sits a screen and a half above, where he would never see it.
   const [deleteError, setDeleteError] = useState<Phrase | null>(null);
-
-  useEffect(() => {
-    let gone = false;
-    void support
-      .get()
-      .then((s) => {
-        if (!gone) setSupportPhone(s.phone);
-      })
-      .catch(() => undefined);
-    return () => {
-      gone = true;
-    };
-  }, []);
 
   /**
    * Delete the account.
@@ -376,16 +360,15 @@ export default function Profile() {
         <Text style={styles.rowLinkHint}>{t(S.account.reportsWhy)}</Text>
       </Pressable>
 
-      {supportPhone ? (
-        <Pressable
-          onPress={() => void Linking.openURL(`tel:${supportPhone}`)}
-          accessibilityRole="button"
-          style={styles.rowLink}
-        >
-          <Text style={styles.rowLinkText}>{t(S.account.callUs)}</Text>
-          <Text style={styles.rowLinkHint}>{supportPhone}</Text>
-        </Pressable>
-      ) : null}
+      <Pressable onPress={() => router.push("/rides")} accessibilityRole="button" style={styles.rowLink}>
+        <Text style={styles.rowLinkText}>{t(S.rides.link)}</Text>
+        <Text style={styles.rowLinkHint}>{t(S.rides.linkWhy)}</Text>
+      </Pressable>
+
+      <Pressable onPress={() => router.push("/help")} accessibilityRole="button" style={styles.rowLink}>
+        <Text style={styles.rowLinkText}>{t(S.help.link)}</Text>
+        <Text style={styles.rowLinkHint}>{t(S.help.why)}</Text>
+      </Pressable>
 
       {/*
         Reachable after you have signed in, not only on the welcome screen you

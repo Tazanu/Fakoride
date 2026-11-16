@@ -11,7 +11,7 @@
  *   ACCEPTED           somebody is coming, and here is who
  *   ARRIVED            he is outside; the PIN becomes the whole screen
  *   IN_PROGRESS        moving
- *   COMPLETED          what it cost
+ *   COMPLETED          what it cost, and whether the money actually moved
  *   NO_DRIVER_FOUND    nobody took it — said plainly, with a way out
  *
  * The PIN is not in the artboard and is kept anyway, because it is the safety
@@ -82,6 +82,20 @@ function errorFor(err: unknown): Phrase {
   }
 }
 
+/** The words over the price. "You paid" only once the money has moved. */
+function payLine(trip: TripDetail): Phrase {
+  if (trip.status !== "COMPLETED") return S.trip.payOnArrival;
+  switch (trip.fare.state) {
+    case "WAITING":
+    case "FAILED":
+      return S.trip.toPay;
+    case "PAID_IN_CASH":
+      return S.trip.paidCash;
+    default:
+      return S.trip.youPaid;
+  }
+}
+
 /** The line in the pill over the map. */
 function stageLine(status: TripDetail["status"]): Phrase {
   switch (status) {
@@ -120,6 +134,7 @@ export default function Trip() {
   const [error, setError] = useState<Phrase | null>(null);
   const [busy, setBusy] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [paying, setPaying] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -153,19 +168,6 @@ export default function Trip() {
   }, [version, last, id, load]);
 
   /**
-   * While her phone has a payment prompt on it, keep asking how it went. The
-   * label under the fare says "approve it", then "you paid" — or that it failed
-   * and the fare is now cash, which she needs to know before she walks off.
-   */
-  const farePending =
-    trip?.status === "COMPLETED" && trip.paymentMethod !== "CASH" && (trip.mobileFare ?? "PENDING") === "PENDING";
-  useEffect(() => {
-    if (!farePending) return;
-    const timer = setInterval(() => void load(), 3000);
-    return () => clearInterval(timer);
-  }, [farePending, load]);
-
-  /**
    * A slow poll, and only while nobody has taken it.
    *
    * The socket is the real channel. This exists because "nobody came" is the
@@ -186,6 +188,35 @@ export default function Trip() {
       poll.current = null;
     };
   }, [searching, load]);
+
+  /**
+   * While a prompt is on her phone, look every few seconds.
+   *
+   * The socket says when it lands or fails; this is for the socket that was
+   * dropped while she was in the USSD menu, which is most of them.
+   */
+  const fareWaiting = trip?.status === "COMPLETED" && trip.fare.state === "WAITING";
+  useEffect(() => {
+    if (!fareWaiting) return;
+    const every = setInterval(() => void load(), 5_000);
+    return () => clearInterval(every);
+  }, [fareWaiting, load]);
+
+  async function payAgain() {
+    if (!id) return;
+    setPaying(true);
+    setError(null);
+    try {
+      const { fare } = await trips.payAgain(id);
+      setTrip((current) => (current ? { ...current, fare } : current));
+    } catch (err) {
+      // Already paid, by phone or in cash: the screen catches up and says so.
+      if (err instanceof ApiError && err.code === "already_paid") await load();
+      else setError(errorFor(err));
+    } finally {
+      setPaying(false);
+    }
+  }
 
   function confirmCancel() {
     if (!id) return;
@@ -265,8 +296,6 @@ export default function Trip() {
     trip.status === "CANCELLED_BY_DRIVER" ||
     trip.status === "CANCELLED_BY_OPS";
   const driver = trip.driver;
-  const mobileFare =
-    trip.status === "COMPLETED" && trip.paymentMethod !== "CASH" ? (trip.mobileFare ?? "PENDING") : null;
 
   return (
     <ScrollView
@@ -366,28 +395,37 @@ export default function Trip() {
 
         <View style={styles.payRow}>
           <View>
-            {/*
-              "You paid" only once she has. For a fare by phone that is when the
-              prompt has been approved and the money has landed — until then it
-              says what she still has to do, and if it fails, that it is cash.
-            */}
-            <Text style={[styles.payLabel, mobileFare === "FAILED" ? styles.payLabelFailed : null]}>
-              {t(
-                trip.status !== "COMPLETED"
-                  ? S.trip.payOnArrival
-                  : mobileFare === "PENDING"
-                    ? S.trip.approveOnPhone
-                    : mobileFare === "FAILED"
-                      ? S.trip.payFailed
-                      : S.trip.youPaid,
-              )}
-            </Text>
+            <Text style={styles.payLabel}>{t(payLine(trip))}</Text>
             <Text style={styles.payAmount}>{xaf(trip.priceXaf)} FCFA</Text>
           </View>
           <View style={styles.payChip}>
-            <Text style={styles.payChipText}>{t(PAYMENT_LABEL[trip.paymentMethod])}</Text>
+            <Text style={styles.payChipText}>
+              {t(trip.fare.state === "PAID_IN_CASH" ? S.trip.cash : PAYMENT_LABEL[trip.paymentMethod])}
+            </Text>
           </View>
         </View>
+
+        {trip.status === "COMPLETED" && trip.fare.state === "WAITING" ? (
+          <View style={styles.fareNote}>
+            <Text style={styles.fareNoteTitle}>{t(S.trip.payWaiting)}</Text>
+            <Text style={styles.fareNoteWhy}>{t(S.trip.payWaitingWhy, { amount: xaf(trip.priceXaf) })}</Text>
+          </View>
+        ) : null}
+
+        {trip.status === "COMPLETED" && trip.fare.state === "FAILED" ? (
+          <View style={[styles.fareNote, styles.fareNoteBad]}>
+            <Text style={[styles.fareNoteTitle, styles.fareNoteTitleBad]}>{t(S.trip.payFailed)}</Text>
+            <Text style={styles.fareNoteWhy}>{t(S.trip.payFailedWhy, { amount: xaf(trip.priceXaf) })}</Text>
+            <Pressable
+              onPress={() => void payAgain()}
+              disabled={paying}
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.ghost, styles.fareRetry, pressed && styles.pressed]}
+            >
+              <Text style={styles.ghostLabel}>{t(paying ? S.trip.payAgainBusy : S.trip.payAgain)}</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {error ? <Text style={styles.error}>{t(error)}</Text> : null}
 
@@ -693,7 +731,6 @@ const styles = StyleSheet.create({
     borderColor: c.actionTintEdge,
   },
   payLabel: { ...type.secondary, color: c.inkSoft },
-  payLabelFailed: { ...type.secondaryStrong, color: c.danger },
   payAmount: { ...type.fareSmall, color: c.action, marginTop: 2 },
   payChip: {
     paddingHorizontal: space.md,
@@ -705,6 +742,20 @@ const styles = StyleSheet.create({
     borderColor: c.actionTintEdge,
   },
   payChipText: { ...type.secondaryStrong, color: c.actionText },
+
+  fareNote: {
+    gap: space.xs,
+    padding: space.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: c.edge,
+    backgroundColor: c.card,
+  },
+  fareNoteBad: { borderColor: c.dangerEdge },
+  fareNoteTitle: { ...type.bodyStrong, color: c.ink },
+  fareNoteTitleBad: { color: c.danger },
+  fareNoteWhy: { ...type.secondary, color: c.inkSoft },
+  fareRetry: { flexGrow: 0, flexBasis: "auto", marginTop: space.sm },
 
   error: { ...type.secondary, color: c.danger },
   spacer: { flexGrow: 1, minHeight: space.lg },
