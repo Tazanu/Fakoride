@@ -38,6 +38,13 @@ export function apiBaseUrl(): string {
   const host = hostUri?.split(":")[0];
   if (host) return `http://${host}:4000`;
 
+  // In a laptop browser (press w in the Expo terminal) there is no bundler
+  // host to borrow, but the page itself was served from the laptop, so the API
+  // is on the same machine. Without this the browser asked the emulator's
+  // address below and every screen said "no connection".
+  const page = (globalThis as { location?: { hostname?: string } }).location?.hostname;
+  if (page) return `http://${page}:4000`;
+
   // Android emulator's alias for the host machine. Better than a blank screen.
   return "http://10.0.2.2:4000";
 }
