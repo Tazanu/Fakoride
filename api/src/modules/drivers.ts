@@ -12,9 +12,10 @@ import { ApiError, asyncHandler } from "../lib/http";
 import { driverDocumentsRouter } from "./documents/routes";
 import { requireAuth } from "../middleware/auth";
 import { setDriverPosition, clearDriverPosition } from "../lib/presence";
-import { driverBalance, ensureAccessFee, todaySummary, weeklyEarnings } from "./ledger";
+import { driverBalance, ensureAccessFee, overdueAccessFees, todaySummary, weeklyEarnings } from "./ledger";
 import { resolveZoneForPoint } from "./geo";
-import { redis, driverOfferKey, offerKey } from "../lib/redis";
+import { redis, driverActiveTripKey, driverOfferKey, offerKey } from "../lib/redis";
+import { emitToTrip } from "../realtime";
 
 const applySchema = z.object({
   name: z.string().trim().min(2).max(60),
@@ -135,12 +136,22 @@ export function driversRouter(): Router {
         throw new ApiError(403, "not_verified", "Your account is still being checked. We will call you.");
       }
 
+      // Old fees first. Checked before today's is raised, so being turned away
+      // does not also cost him a fee for a day he was not allowed to work.
+      const overdue = await overdueAccessFees(driver.id);
+      if (overdue.owedXaf > 0) {
+        throw new ApiError(402, "fees_overdue", `You owe ${overdue.owedXaf} XAF in access fees. Pay them to go online.`, overdue);
+      }
+
       await ensureAccessFee(driver.id);
+      // Position first. It is what marks him as heard from, and the watchdog
+      // takes offline any driver who is online and has not been: the other
+      // order leaves an instant in which he is exactly that.
+      await setDriverPosition(driver.id, driver.vehicleType, lat, lng);
       await prisma.driver.update({
         where: { id: driver.id },
         data: { online: true, lastSeenAt: new Date() },
       });
-      await setDriverPosition(driver.id, driver.vehicleType, lat, lng);
 
       const zone = await resolveZoneForPoint(lat, lng);
       res.json({ online: true, zone: { code: zone.code, name: zone.name } });
@@ -169,9 +180,28 @@ export function driversRouter(): Router {
     asyncHandler(async (req, res) => {
       const { lat, lng } = positionSchema.parse(req.body);
       const driver = await currentDriver(req.user!.sub);
-      await setDriverPosition(driver.id, driver.vehicleType, lat, lng);
-      await prisma.driver.update({ where: { id: driver.id }, data: { lastSeenAt: new Date() } });
-      res.json({ ok: true });
+      const online = driver.online && driver.status === "ACTIVE";
+      const tripId = await redis.get(driverActiveTripKey(driver.id));
+
+      // Kept only while it means something: he is available, or he is carrying
+      // somebody. A report from a phone that has been taken offline would
+      // otherwise put a dot back on the map for a driver nobody can book.
+      if (online || tripId) {
+        await setDriverPosition(driver.id, driver.vehicleType, lat, lng);
+        await prisma.driver.update({ where: { id: driver.id }, data: { lastSeenAt: new Date() } });
+      }
+
+      // The same thing the socket does with a position: move the taxi on the
+      // rider's map and on the share link. This route used to store it and tell
+      // nobody, which was harmless while it was only a fallback — but it is now
+      // how a phone with its screen off reports, and that is most of a ride.
+      if (tripId) emitToTrip(tripId, "trip:position", { lat, lng });
+
+      // His phone keeps reporting from a background service that cannot see the
+      // app's own state. Telling it he is no longer online — the watchdog took
+      // him off, or ops suspended him — is how that service knows to stop, and
+      // how the "you are online" notification comes down instead of lying.
+      res.json({ ok: true, online });
     }),
   );
 

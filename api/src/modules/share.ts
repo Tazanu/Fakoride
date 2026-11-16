@@ -45,6 +45,7 @@ const TERMINAL = [
   "CANCELLED_BY_RIDER",
   "CANCELLED_BY_DRIVER",
   "NO_DRIVER_FOUND",
+  "CANCELLED_BY_OPS",
 ] as const;
 
 function isTerminal(status: string): boolean {

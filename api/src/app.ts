@@ -18,6 +18,7 @@ import { demandRouter } from "./modules/demand";
 import { complaintsRouter } from "./modules/safety";
 import { publicShareRouter } from "./modules/share";
 import { driverPaymentsRouter, paymentsWebhookRouter } from "./modules/payments/routes";
+import { publicPagesRouter } from "./modules/public-pages";
 
 export function createApp(): express.Express {
   const app = express();
@@ -39,6 +40,9 @@ export function createApp(): express.Express {
   app.use("/payments", paymentsWebhookRouter());
 
   app.use(rateLimit(RULES.everything));
+
+  // The Terms, the Privacy policy, how to delete an account, the support number.
+  app.use(publicPagesRouter());
 
   app.use("/auth", authRouter());
   app.use("/geo", geoRouter());

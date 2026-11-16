@@ -33,6 +33,7 @@ import { requireAuth } from "../middleware/auth";
 import { rateLimit, RULES } from "../middleware/rateLimit";
 import { EXPO_TOKEN } from "../lib/push";
 import { assertAcceptable, documents, fingerprint } from "./documents/store";
+import { deleteAccount } from "./account";
 
 /**
  * Smaller than an ID document on purpose.
@@ -75,6 +76,24 @@ export function profileRouter(): Router {
       });
 
       res.json(user);
+    }),
+  );
+
+  /**
+   * Delete this account. What goes and what stays is set out in ./account.
+   *
+   * Not for ops accounts: the role is granted from a shell on purpose, and it
+   * leaves the same way (`npm run admin:grant -- <phone> --revoke`).
+   */
+  router.delete(
+    "/",
+    requireAuth(),
+    asyncHandler(async (req, res) => {
+      if (req.user!.role === "ADMIN") {
+        throw new ApiError(403, "ops_account", "An ops account is removed from the server, not from here.");
+      }
+      await deleteAccount(req.user!.sub);
+      res.status(204).end();
     }),
   );
 

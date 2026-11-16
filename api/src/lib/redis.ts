@@ -26,6 +26,13 @@ export const offerKey = (tripId: string) => `trip:${tripId}:offer`;
  */
 export const driverActiveTripKey = (driverId: string) => `driver:${driverId}:trip`;
 
+/**
+ * Renewed by every position ping, and gone on its own a few minutes after the
+ * last one. Its absence is how a driver whose phone died is told apart from
+ * one who is parked — see lib/presence.
+ */
+export const driverSeenKey = (driverId: string) => `driver:${driverId}:seen`;
+
 /** OTP codes, hashed, short-lived. */
 export const otpKey = (phone: string) => `otp:${phone}`;
 

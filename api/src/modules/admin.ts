@@ -22,6 +22,7 @@ import { clearDriverPosition } from "../lib/presence";
 import { FARE_ROUNDING_XAF, MIN_FARE_XAF } from "./fare-math";
 import { adminPaymentsRouter } from "./payments/routes";
 import { logger } from "../lib/logger";
+import { cancelTripFromOutside, completeTrip } from "./trips";
 
 // --- the verification queue ------------------------------------------------
 
@@ -438,6 +439,7 @@ export function adminRouter(): Router {
               "CANCELLED_BY_RIDER",
               "CANCELLED_BY_DRIVER",
               "NO_DRIVER_FOUND",
+              "CANCELLED_BY_OPS",
             ])
             .default("LIVE"),
           limit: z.coerce.number().int().min(1).max(100).default(50),
@@ -467,6 +469,8 @@ export function adminRouter(): Router {
           driver: t.driver?.user.name ?? null,
           plate: t.driver?.plate ?? null,
           requestedAt: t.requestedAt,
+          acceptedAt: t.acceptedAt,
+          startedAt: t.startedAt,
           /** How long this rider has been waiting, for the ones still unmatched. */
           waitingSeconds:
             t.acceptedAt || !LIVE_STATUSES.includes(t.status as (typeof LIVE_STATUSES)[number])
@@ -474,6 +478,45 @@ export function adminRouter(): Router {
               : Math.round((Date.now() - t.requestedAt.getTime()) / 1000),
         })),
       });
+    }),
+  );
+
+  /**
+   * End a ride from the console.
+   *
+   * The board could only watch. A ride whose driver's phone died stayed "in
+   * progress" for good, and because a rider may have one ride running, she
+   * could not book again — with nobody able to do anything about it.
+   *
+   * Two ways to end one, and the difference is money:
+   *
+   *   complete   the ride happened. The fare is written exactly as if the
+   *              driver had pressed Finish, and a mobile fare is charged.
+   *   cancel     it did not, or nobody can say. Nothing is written or charged.
+   *
+   * Both need a sentence saying why, kept on the ride with who typed it.
+   */
+  const endSchema = z.object({ reason: z.string().trim().min(5).max(500) });
+
+  router.post(
+    "/trips/:id/complete",
+    asyncHandler(async (req, res) => {
+      const { reason } = endSchema.parse(req.body);
+      const tripId = param(req, "id");
+      const fare = await completeTrip(tripId, req.user!.sub, { endedByOps: true, reason });
+      logger.info({ tripId, by: req.user!.sub }, "ops completed a ride");
+      res.json({ status: "COMPLETED", payment: fare ? { id: fare.id, status: fare.status } : null });
+    }),
+  );
+
+  router.post(
+    "/trips/:id/cancel",
+    asyncHandler(async (req, res) => {
+      const { reason } = endSchema.parse(req.body);
+      const tripId = param(req, "id");
+      await cancelTripFromOutside(tripId, req.user!.sub, reason);
+      logger.info({ tripId, by: req.user!.sub }, "ops cancelled a ride");
+      res.json({ status: "CANCELLED_BY_OPS" });
     }),
   );
 

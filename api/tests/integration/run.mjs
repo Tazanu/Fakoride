@@ -42,6 +42,7 @@ const SUITES = [
   "05-remaining-surface.mjs",
   "06-push.mjs",
   "07-two-servers.mjs",
+  "08-launch-fixes.mjs",
 ];
 
 /** Each run's own database. The prefix is what the drop below checks for. */
@@ -266,6 +267,13 @@ const server = spawn(process.execPath, [TSX, "src/server.ts"], {
     // As on Render: one proxy in front, so X-Forwarded-For names the caller.
     // The suites use it to arrive from addresses of their own.
     TRUST_PROXY: "1",
+    // The watchdog looks once a minute in production. The suites age a ride
+    // or silence a driver and then wait for it, so here it looks every second.
+    WATCHDOG_INTERVAL_SECONDS: "1",
+    // Who is texted when somebody presses Get help, and the number the app
+    // tells people to call. Read back out of the log like the sign-in codes.
+    OPS_ALERT_PHONES: "+237600000098",
+    SUPPORT_PHONE: "+237600000097",
     // Never Expo itself: a test run must not wake a real phone.
     EXPO_PUSH_URL: `${PUSH_STANDIN}/--/api/v2/push/send`,
   },

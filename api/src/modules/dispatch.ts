@@ -13,7 +13,7 @@ import { redis, driverOfferKey, offerKey, takeTick } from "../lib/redis";
 import { prisma } from "../lib/prisma";
 import { env } from "../env";
 import { logger } from "../lib/logger";
-import { clearDriverPosition, nearbyDriverIds } from "../lib/presence";
+import { clearDriverPosition, freshDriverIds, nearbyDriverIds } from "../lib/presence";
 import { emitToDriver, emitToRider } from "../realtime";
 import { francs, notify } from "../lib/push";
 
@@ -76,18 +76,51 @@ export async function findCandidates(opts: {
     logger.info({ count: ghosts.length }, "pruned stale drivers from the geo set");
   }
 
+  const vouched = nearby.filter((c) => liveById.has(c.driverId)).map((c) => c.driverId);
+  // Two more reasons not to offer, neither of which makes him a ghost: he has
+  // gone quiet, or he already has a passenger.
+  //
+  // A driver who is merely looking at another offer is NOT passed over. That
+  // was tried: with one taxi near her, the second rider was told "no driver"
+  // on the spot, when he would have been free twelve seconds later. Until a
+  // booking can wait for a driver to finish deciding, two offers overlapping
+  // on one screen is the lesser harm — and he can still only accept one.
+  const [fresh, occupied] = await Promise.all([freshDriverIds(vouched), driversOnATrip(vouched)]);
+
   // The rider's preferences narrow the pool but never make somebody a ghost —
   // a driver with no spare helmet is still a perfectly good driver.
   return nearby
     .filter((c) => {
       const driver = liveById.get(c.driverId);
       if (!driver) return false;
+      if (!fresh.has(c.driverId)) return false;
+      if (occupied.has(c.driverId)) return false;
       if (opts.requireSpareHelmet && !driver.hasSpareHelmet) return false;
       if (opts.requireWomanDriver && driver.gender !== "WOMAN") return false;
       return true;
     })
     .slice(0, limit);
 }
+
+/** The statuses in which a driver has somebody to pick up or somebody in the car. */
+export const CARRYING_STATUSES = ["ACCEPTED", "ARRIVED", "IN_PROGRESS"] as const;
+
+/**
+ * Which of these drivers are already on a ride.
+ *
+ * Nothing used to ask. A driver halfway up to Buea Town with a passenger was
+ * still the nearest dot to the next rider at Molyko, was offered her ride, and
+ * could accept it — two people each promised the same taxi.
+ */
+export async function driversOnATrip(driverIds: string[]): Promise<Set<string>> {
+  if (driverIds.length === 0) return new Set();
+  const rows = await prisma.trip.findMany({
+    where: { driverId: { in: driverIds }, status: { in: [...CARRYING_STATUSES] } },
+    select: { driverId: true },
+  });
+  return new Set(rows.flatMap((r) => (r.driverId ? [r.driverId] : [])));
+}
+
 
 /**
  * Offer a trip to the next nearest driver who has not already seen it.

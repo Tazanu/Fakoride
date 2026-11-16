@@ -5,6 +5,7 @@
 // there — Prisma's CLI loads .env on its own, so migrations mislead you.
 import "dotenv/config";
 import { z } from "zod";
+import { normalisePhone } from "./lib/phone";
 
 const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -95,6 +96,50 @@ const schema = z.object({
   /** Only if "enhanced push security" is switched on for the Expo project. */
   EXPO_ACCESS_TOKEN: z.string().optional(),
 
+  /**
+   * How long a driver may go without a position before we stop offering him
+   * rides, and soon after take him offline.
+   *
+   * His app pings every half minute while he is online, locked phone included.
+   * Five minutes of silence is not a dip in signal on the Soppo climb — it is a
+   * flat battery or a closed app, and every ride offered to it is twelve
+   * seconds of a rider's wait thrown away. Zero switches the check off.
+   */
+  DRIVER_STALE_AFTER_SECONDS: z.coerce.number().int().min(0).default(300),
+  /** How often the watchdog looks for quiet drivers and stuck rides. */
+  WATCHDOG_INTERVAL_SECONDS: z.coerce.number().int().min(1).default(60),
+  /**
+   * How long a ride may stay "in progress" before we finish it ourselves.
+   *
+   * The longest trip on the table is Mutengene to Buea Town, well under an
+   * hour. A ride still running after three has a driver who forgot to press
+   * Finish, and until it ends his rider cannot book another. Zero: never.
+   */
+  TRIP_AUTO_FINISH_AFTER_MINUTES: z.coerce.number().int().min(0).default(180),
+  /** How long a driver may hold an accepted ride without starting it. Zero: forever. */
+  TRIP_PICKUP_TIMEOUT_MINUTES: z.coerce.number().int().min(0).default(60),
+  /**
+   * How many days an unpaid access fee may age before he cannot go online.
+   *
+   * A fee for Monday is asked for on Tuesday morning and retried through the
+   * day. With three, he is stopped from Thursday — after every automatic
+   * attempt has had its chance, and before the debt is worth walking away
+   * from. Zero: never stop him.
+   */
+  ACCESS_FEE_BLOCK_AFTER_DAYS: z.coerce.number().int().min(0).default(3),
+
+  /**
+   * Who is texted the moment somebody presses Get help. Comma-separated
+   * Cameroon numbers. The ops console shows the alarm too, but a console is
+   * only watched while somebody has it open; a phone rings in a pocket.
+   */
+  OPS_ALERT_PHONES: z
+    .string()
+    .default("")
+    .transform((v) => v.split(",").map((p) => p.trim()).filter(Boolean)),
+  /** The number riders and drivers are told to call. Shown in the app. */
+  SUPPORT_PHONE: z.string().trim().optional(),
+
   ACCESS_FEE_XAF: z.coerce.number().int().default(500),
   MOBILE_PAYMENT_DISCOUNT_XAF: z.coerce.number().int().default(15),
   OFFER_TTL_SECONDS: z.coerce.number().int().default(12),
@@ -122,6 +167,18 @@ const checked = schema.superRefine((e, ctx) => {
   }
   if (!e.PUBLIC_API_URL.startsWith("https://")) {
     ctx.addIssue({ code: "custom", path: ["PUBLIC_API_URL"], message: "must be the https address in production — it goes into links people are texted" });
+  }
+  if (e.OPS_ALERT_PHONES.length === 0) {
+    ctx.addIssue({ code: "custom", path: ["OPS_ALERT_PHONES"], message: "is empty in production — nobody would be told when a rider presses Get help" });
+  }
+  // Found now, at start-up, rather than at eleven at night when the text to a
+  // mistyped number silently goes nowhere.
+  for (const entry of e.OPS_ALERT_PHONES) {
+    try {
+      normalisePhone(entry);
+    } catch {
+      ctx.addIssue({ code: "custom", path: ["OPS_ALERT_PHONES"], message: `holds "${entry}", which is not a Cameroon mobile number` });
+    }
   }
   if (e.JWT_SECRET.length < 32) {
     ctx.addIssue({ code: "custom", path: ["JWT_SECRET"], message: "must be at least 32 characters in production" });

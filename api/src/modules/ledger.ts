@@ -13,7 +13,14 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { env } from "../env";
 import { logger } from "../lib/logger";
-import { serviceDate, serviceDateKey, startOfServiceDay, startOfServiceWeek, WAT_OFFSET_MINUTES } from "../lib/time";
+import {
+  overdueFeeCutoff,
+  serviceDate,
+  serviceDateKey,
+  startOfServiceDay,
+  startOfServiceWeek,
+  WAT_OFFSET_MINUTES,
+} from "../lib/time";
 import { foldEarningsDays, type EarningsDay } from "./earnings-math";
 
 export { foldEarningsDays } from "./earnings-math";
@@ -87,6 +94,38 @@ export async function ensureAccessFee(driverId: string, when: Date = new Date())
   }
 }
 
+export type OverdueFees = {
+  /** Total of the fees old enough to stop him. Zero means he may go online. */
+  owedXaf: number;
+  /** The service days they are for, oldest first, as `YYYY-MM-DD`. */
+  days: string[];
+};
+
+/**
+ * The access fees a driver has left unpaid for too long.
+ *
+ * The fee is the only thing Fako Ride charges for. It was raised every day and
+ * asked for four times, and after the fourth refusal nothing happened at all:
+ * a driver who kept his MoMo empty drove for nothing, for as long as he liked.
+ * Now a fee that has aged past ACCESS_FEE_BLOCK_AFTER_DAYS stops him going
+ * online until it is paid. Fees still inside their grace are not counted —
+ * a man whose debit failed this morning must be able to earn the money today.
+ */
+export async function overdueAccessFees(driverId: string, now: Date = new Date()): Promise<OverdueFees> {
+  const cutoff = overdueFeeCutoff(now, env.ACCESS_FEE_BLOCK_AFTER_DAYS);
+  if (!cutoff) return { owedXaf: 0, days: [] };
+
+  const charges = await prisma.accessFeeCharge.findMany({
+    where: { driverId, paid: false, serviceDate: { lte: cutoff } },
+    orderBy: { serviceDate: "asc" },
+    select: { serviceDate: true, amountXaf: true },
+  });
+  return {
+    owedXaf: charges.reduce((sum, c) => sum + c.amountXaf, 0),
+    days: charges.map((c) => c.serviceDate.toISOString().slice(0, 10)),
+  };
+}
+
 export type DriverBalance = {
   earnedXaf: number;
   feesXaf: number;
@@ -109,7 +148,9 @@ export async function driverBalance(driverId: string, since: Date): Promise<Driv
       earnedXaf += e.amountXaf;
       tripCount += 1;
     } else if (e.type === "ACCESS_FEE") {
-      feesXaf += Math.abs(e.amountXaf);
+      // Negated, not made absolute: a fee is written negative, and a waived
+      // one is written back positive and has to cancel it rather than double it.
+      feesXaf += -e.amountXaf;
     }
     // A PAYOUT is money reaching him, not money taken from him: it moves what
     // we are holding into his own MoMo and must never read as a fee. An

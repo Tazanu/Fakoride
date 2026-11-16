@@ -56,6 +56,9 @@ enum TripStatus {
   CANCELLED_BY_RIDER
   CANCELLED_BY_DRIVER
   NO_DRIVER_FOUND
+  /// Ended from outside the ride: an operator at the console, or the watchdog
+  /// closing a ride whose driver accepted and then never moved. No fare.
+  CANCELLED_BY_OPS
 }
 
 enum PaymentMethod {
@@ -158,6 +161,11 @@ model User {
   /// go on receiving the first owner's rides. Registering it moves it.
   pushToken   String?   @unique
   pushTokenAt DateTime?
+  /// Set when the owner deleted the account. The row stays, because trips and
+  /// the ledger point at it and have to be kept, but everything that says who
+  /// it was is gone: the phone is replaced by a placeholder, the name, photo
+  /// and push token are cleared. The same number signing up again is a new row.
+  deletedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
