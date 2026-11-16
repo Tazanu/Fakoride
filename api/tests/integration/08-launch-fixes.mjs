@@ -148,6 +148,8 @@ async function newDriver(phone, plate, name, cni) {
 }
 
 const d1 = await newDriver(D1_PHONE, D1_PLATE, "Ngomba Elive", `7${nonce}0001`);
+const toldApproved = await eventually(() => readFileSync(LOG, "utf8").includes(`"to":"${D1_PHONE}","message":"Fako Ride: you are approved`));
+check("a driver is texted when he is approved, as the app promises", toldApproved);
 const d2 = await newDriver(D2_PHONE, D2_PLATE, "Mola Njoh", `7${nonce}0002`);
 const r1 = await signIn(R1_PHONE, "RIDER", "Limunga");
 const r2 = await signIn(R2_PHONE, "RIDER", "Ebude");
@@ -162,6 +164,15 @@ const first = await book(r1);
 check("the only driver at Muea is offered the ride", first.body.status === "OFFERED", JSON.stringify(first.body));
 await call("POST", `/trips/${first.body.id}/accept`, { token: d1.token });
 await call("POST", `/trips/${first.body.id}/start`, { token: d1.token, body: { pin: first.body.pin } });
+
+// Reopening the app in the middle of this ride: each side must be led back to it.
+const riderNow = await call("GET", "/trips/current", { token: r1 });
+check("a rider who reopens the app is told which ride she is on", riderNow.status === 200 && riderNow.body.riding?.id === first.body.id && riderNow.body.driving === null, JSON.stringify(riderNow.body));
+const driverNow = await call("GET", "/trips/current", { token: d1.token });
+check("and so is her driver", driverNow.body.driving?.id === first.body.id && driverNow.body.driving?.status === "IN_PROGRESS", JSON.stringify(driverNow.body));
+const nobodyNow = await call("GET", "/trips/current", { token: r3 });
+check("somebody with no ride is told there is none", nobodyNow.status === 200 && nobodyNow.body.riding === null && nobodyNow.body.driving === null, JSON.stringify(nobodyNow.body));
+check("it needs an account", (await call("GET", "/trips/current")).status === 401);
 
 const whileCarrying = await book(r2);
 check(
@@ -241,6 +252,7 @@ check(
 );
 const freeAgain = await book(r1);
 check("she can book again", freeAgain.status === 201, JSON.stringify(freeAgain.body));
+check("and a finished ride is no longer anybody's current one", (await call("GET", "/trips/current", { token: d1.token })).body.driving === null);
 await call("POST", `/trips/${freeAgain.body.id}/cancel`, { token: r1, body: { reason: "test over" } });
 
 // The same, one step earlier: accepted, and he never came.
@@ -508,8 +520,14 @@ await call("POST", `/trips/${paidRide.body.id}/start`, { token: d2.token, body: 
 const midDrive = await call("DELETE", "/me", { token: d2.token });
 check("a driver cannot delete his account with a passenger in the car", midDrive.status === 409 && midDrive.body.error?.code === "trip_in_progress", JSON.stringify(midDrive.body));
 
+const midRide2 = await call("GET", `/trips/${paidRide.body.id}`, { token: d2.token });
+check("a fare by phone has no state until the ride is over", midRide2.body.mobileFare === null, JSON.stringify(midRide2.body.mobileFare));
 const done = await call("POST", `/trips/${paidRide.body.id}/complete`, { token: d2.token });
+const justDone = await call("GET", `/trips/${paidRide.body.id}`, { token: d2.token });
+check("once finished, the driver's app can ask whether the fare has landed", ["PENDING", "PAID"].includes(justDone.body.mobileFare), JSON.stringify(justDone.body.mobileFare));
 await settled(done.body.payment.id, d2.token);
+check("and is told when it has", (await call("GET", `/trips/${paidRide.body.id}`, { token: d2.token })).body.mobileFare === "PAID");
+check("so is the rider's", (await call("GET", `/trips/${paidRide.body.id}`, { token: r2 })).body.mobileFare === "PAID");
 const holding = (await call("GET", "/drivers/me/balance", { token: d2.token })).body.payableXaf;
 const withMoney = await call("DELETE", "/me", { token: d2.token });
 check(
@@ -535,6 +553,29 @@ check("his ledger is kept", Number(sql(`SELECT count(*) FROM "LedgerEntry" WHERE
 check("he is out of the set dispatch searches", !inGeoSet(d2.id));
 const pastTrip = await call("GET", `/trips/${paidRide.body.id}`, { token: r2 });
 check("a rider looking back at that ride is not handed a placeholder to dial", pastTrip.status === 200 && pastTrip.body.driver?.phone === null, JSON.stringify(pastTrip.body.driver));
+
+// ---------------------------------------------------------------------------
+console.log("\n=== a fare by phone that does not go through ===");
+
+/*
+ * Her number ends in 00, so the fake provider refuses the charge. The server
+ * has always recorded that and told both phones over the socket; neither app
+ * listened, and both went on saying "paid". This is the question they now ask.
+ */
+const EMPTY_PHONE = `+23765${String(Date.now()).slice(-5)}00`;
+const emptyRider = await signIn(EMPTY_PHONE, "RIDER", "Ndolo");
+await call("POST", "/drivers/online", { token: d1.token, body: MUEA });
+const unpaid = await book(emptyRider, "MOMO");
+await call("POST", `/trips/${unpaid.body.id}/accept`, { token: d1.token });
+await call("POST", `/trips/${unpaid.body.id}/start`, { token: d1.token, body: { pin: unpaid.body.pin } });
+const unpaidDone = await call("POST", `/trips/${unpaid.body.id}/complete`, { token: d1.token });
+await settled(unpaidDone.body.payment.id, d1.token);
+const asDriverSees = await call("GET", `/trips/${unpaid.body.id}`, { token: d1.token });
+check("the driver is told the phone payment failed, so he takes cash", asDriverSees.body.mobileFare === "FAILED", JSON.stringify(asDriverSees.body.mobileFare));
+check("the rider is told the same", (await call("GET", `/trips/${unpaid.body.id}`, { token: emptyRider })).body.mobileFare === "FAILED");
+const cashRide = await call("GET", `/trips/${first.body.id}`, { token: r1 });
+check("a cash ride has no such state at all", cashRide.body.mobileFare === null, JSON.stringify(cashRide.body.mobileFare));
+await call("POST", "/drivers/offline", { token: d1.token });
 
 // ---------------------------------------------------------------------------
 console.log("\n=== becoming a driver the way the app does it ===");

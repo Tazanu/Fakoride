@@ -202,6 +202,12 @@ export type TripDetail = {
   status: TripStatus;
   priceXaf: number;
   paymentMethod: PaymentMethod;
+  /**
+   * A fare paid by phone, once the ride is over: PENDING while the prompt is
+   * unanswered, PAID when it lands, FAILED when it will not — then it is cash.
+   * Null for cash, and until the ride is finished.
+   */
+  mobileFare?: "PENDING" | "PAID" | "FAILED" | null;
   pickupLabel: string;
   dropLabel: string;
   from: { code: string; name: string };

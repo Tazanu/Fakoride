@@ -152,6 +152,39 @@ export async function completeTrip(
   return fare;
 }
 
+/**
+ * Where a fare paid by phone has got to, once the ride is over.
+ *
+ *   PENDING  the prompt is on her phone; he should not let her go yet
+ *   PAID     it landed
+ *   FAILED   it did not, and will not: the fare is now cash, to be taken
+ *            before she walks away
+ *
+ * Null for a cash ride, and for any ride not yet finished.
+ *
+ * The apps had no way to ask this. Both said "paid" the instant the driver
+ * pressed Finish — while the prompt was still unanswered, and after it had been
+ * refused. The server was already telling both phones about a failure over the
+ * socket, and neither was listening; a driver whose rider's MoMo was empty
+ * drove away believing the money was in his balance.
+ *
+ * No payment row at all on a finished mobile ride means the charge could not
+ * even be started. That is a failure too, and the answer is the same: cash.
+ */
+export type MobileFare = "PENDING" | "PAID" | "FAILED";
+async function mobileFareState(trip: { id: string; status: TripStatus; paymentMethod: string }): Promise<MobileFare | null> {
+  if (trip.paymentMethod === "CASH" || trip.status !== "COMPLETED") return null;
+  const latest = await prisma.payment.findFirst({
+    where: { tripId: trip.id, purpose: "TRIP_FARE" },
+    orderBy: { createdAt: "desc" },
+    select: { status: true },
+  });
+  if (!latest) return "FAILED";
+  if (latest.status === "SUCCESSFUL") return "PAID";
+  if (latest.status === "CREATED" || latest.status === "PENDING") return "PENDING";
+  return "FAILED";
+}
+
 /** Every status in which a ride is still going on. */
 export const LIVE_TRIP_STATUSES: TripStatus[] = ["REQUESTED", "OFFERED", "ACCEPTED", "ARRIVED", "IN_PROGRESS"];
 
@@ -383,6 +416,43 @@ export function tripsRouter(): Router {
     }),
   );
 
+  /**
+   * The ride this account is in the middle of, if there is one.
+   *
+   * The app knew which ride it was on only because it had just navigated to
+   * that screen. Close the app — a phone call, a flat battery, Android clearing
+   * memory — and on reopening it had no idea: a rider landed on "Where are you
+   * going?" with her driver outside and no PIN to read him, and a driver landed
+   * on his home screen with a passenger in the car and no FINISH button. Neither
+   * could get back, and the ride sat there until ops or the watchdog ended it.
+   *
+   * Both sides in one answer, because one account can be a driver who also
+   * rides. Declared before "/:id", or "current" would be read as a trip id.
+   */
+  router.get(
+    "/current",
+    requireAuth(),
+    asyncHandler(async (req, res) => {
+      const userId = req.user!.sub;
+      const [riding, driver] = await Promise.all([
+        prisma.trip.findFirst({
+          where: { riderId: userId, status: { in: LIVE_TRIP_STATUSES } },
+          orderBy: { requestedAt: "desc" },
+          select: { id: true, status: true },
+        }),
+        prisma.driver.findUnique({ where: { userId }, select: { id: true } }),
+      ]);
+      const driving = driver
+        ? await prisma.trip.findFirst({
+            where: { driverId: driver.id, status: { in: [...CARRYING_STATUSES] } },
+            orderBy: { requestedAt: "desc" },
+            select: { id: true, status: true },
+          })
+        : null;
+      res.json({ riding, driving });
+    }),
+  );
+
   router.get(
     "/:id",
     requireAuth(),
@@ -409,6 +479,7 @@ export function tripsRouter(): Router {
         status: trip.status,
         priceXaf: trip.priceXaf,
         paymentMethod: trip.paymentMethod,
+        mobileFare: await mobileFareState(trip),
         pickupLabel: trip.pickupLabel,
         dropLabel: trip.dropLabel,
         from: trip.fromZone,

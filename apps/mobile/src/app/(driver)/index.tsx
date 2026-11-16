@@ -42,6 +42,7 @@ import { useDriverRealtime } from "@/realtime/DriverRealtime";
 import { findMe, useWhereIAm } from "@/ui/position";
 import { MapPanel, Sheet } from "@/ui/map";
 import { ServiceNotice } from "@/ui/notice";
+import { LiveRide, rememberOpened } from "@/ui/live-ride";
 import { S } from "@/content/strings";
 import { useT, type Phrase } from "@/ui/i18n";
 import { palette, radius, space, touch, type, xaf } from "@/theme";
@@ -217,6 +218,8 @@ export default function Home() {
     try {
       await trips.accept(offer.tripId);
       const id = offer.tripId;
+      // He is going there himself; the home screen need not send him again.
+      rememberOpened(id);
       clearOffer();
       router.push({ pathname: "/(driver)/job/[id]", params: { id } });
     } catch (err) {
@@ -289,6 +292,7 @@ export default function Home() {
 
       <Sheet handle={false} style={styles.sheet}>
         <ServiceNotice />
+        <LiveRide side="driver" />
 
         <View style={styles.stats}>
           <Stat label={t(S.driver.today)} value={`${xaf(today?.earnedXaf ?? 0)} F`} />

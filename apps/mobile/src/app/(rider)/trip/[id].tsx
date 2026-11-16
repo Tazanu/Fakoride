@@ -153,6 +153,19 @@ export default function Trip() {
   }, [version, last, id, load]);
 
   /**
+   * While her phone has a payment prompt on it, keep asking how it went. The
+   * label under the fare says "approve it", then "you paid" — or that it failed
+   * and the fare is now cash, which she needs to know before she walks off.
+   */
+  const farePending =
+    trip?.status === "COMPLETED" && trip.paymentMethod !== "CASH" && (trip.mobileFare ?? "PENDING") === "PENDING";
+  useEffect(() => {
+    if (!farePending) return;
+    const timer = setInterval(() => void load(), 3000);
+    return () => clearInterval(timer);
+  }, [farePending, load]);
+
+  /**
    * A slow poll, and only while nobody has taken it.
    *
    * The socket is the real channel. This exists because "nobody came" is the
@@ -252,6 +265,8 @@ export default function Trip() {
     trip.status === "CANCELLED_BY_DRIVER" ||
     trip.status === "CANCELLED_BY_OPS";
   const driver = trip.driver;
+  const mobileFare =
+    trip.status === "COMPLETED" && trip.paymentMethod !== "CASH" ? (trip.mobileFare ?? "PENDING") : null;
 
   return (
     <ScrollView
@@ -351,8 +366,21 @@ export default function Trip() {
 
         <View style={styles.payRow}>
           <View>
-            <Text style={styles.payLabel}>
-              {t(trip.status === "COMPLETED" ? S.trip.youPaid : S.trip.payOnArrival)}
+            {/*
+              "You paid" only once she has. For a fare by phone that is when the
+              prompt has been approved and the money has landed — until then it
+              says what she still has to do, and if it fails, that it is cash.
+            */}
+            <Text style={[styles.payLabel, mobileFare === "FAILED" ? styles.payLabelFailed : null]}>
+              {t(
+                trip.status !== "COMPLETED"
+                  ? S.trip.payOnArrival
+                  : mobileFare === "PENDING"
+                    ? S.trip.approveOnPhone
+                    : mobileFare === "FAILED"
+                      ? S.trip.payFailed
+                      : S.trip.youPaid,
+              )}
             </Text>
             <Text style={styles.payAmount}>{xaf(trip.priceXaf)} FCFA</Text>
           </View>
@@ -403,15 +431,22 @@ export default function Trip() {
                 <ShareNetworkIcon size={18} color={c.inkSoft} />
                 <Text style={styles.ghostLabel}>{t(sharing ? S.trip.makingLink : S.trip.shareTrip)}</Text>
               </Pressable>
-              <Pressable
-                onPress={confirmCancel}
-                disabled={busy}
-                accessibilityRole="button"
-                accessibilityLabel={t(S.trip.cancelThisRide)}
-                style={({ pressed }) => [styles.ghost, styles.ghostDanger, pressed && styles.pressed]}
-              >
-                <Text style={styles.ghostDangerLabel}>{t(S.trip.cancelRide)}</Text>
-              </Pressable>
+              {/*
+                Not once the ride has started. The server refuses a cancel from
+                then on — she is in the car — and a button that only ever
+                produces an error should not be on the screen.
+              */}
+              {trip.status === "IN_PROGRESS" ? null : (
+                <Pressable
+                  onPress={confirmCancel}
+                  disabled={busy}
+                  accessibilityRole="button"
+                  accessibilityLabel={t(S.trip.cancelThisRide)}
+                  style={({ pressed }) => [styles.ghost, styles.ghostDanger, pressed && styles.pressed]}
+                >
+                  <Text style={styles.ghostDangerLabel}>{t(S.trip.cancelRide)}</Text>
+                </Pressable>
+              )}
             </View>
 
             <Pressable
@@ -658,6 +693,7 @@ const styles = StyleSheet.create({
     borderColor: c.actionTintEdge,
   },
   payLabel: { ...type.secondary, color: c.inkSoft },
+  payLabelFailed: { ...type.secondaryStrong, color: c.danger },
   payAmount: { ...type.fareSmall, color: c.action, marginTop: 2 },
   payChip: {
     paddingHorizontal: space.md,

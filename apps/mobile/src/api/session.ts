@@ -99,6 +99,16 @@ export const profile = {
 };
 
 /**
+ * The ride this account is in the middle of — as a rider, as a driver, or
+ * neither. Asked whenever a home screen comes into view, so that reopening the
+ * app in the middle of a ride leads back to it. See ui/live-ride.
+ */
+export type LiveTrip = { id: string; status: string };
+export const liveTrips = {
+  current: () => api.get<{ riding: LiveTrip | null; driving: LiveTrip | null }>("/trips/current"),
+};
+
+/**
  * The number to call. Asked of the server rather than built into the app, so
  * changing the office phone does not need a new release. Null until one is set.
  */

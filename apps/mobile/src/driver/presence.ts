@@ -108,6 +108,12 @@ function stopHeartbeat(): void {
  * shown; the timer covers for the service.
  */
 export async function startPresence(notice: { title: string; body: string }): Promise<void> {
+  // One position straight away, whichever way the rest then runs. A driver who
+  // opens the app already online from this morning has been silent since he
+  // closed it; without this he stays unbookable until the first timed report,
+  // half a minute of looking at a switch that says "online".
+  void findMe().then((fix) => (fix ? report(fix.lat, fix.lng) : undefined));
+
   try {
     if (!(await Location.hasStartedLocationUpdatesAsync(TASK))) {
       await Location.startLocationUpdatesAsync(TASK, {

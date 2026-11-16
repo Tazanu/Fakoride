@@ -1,6 +1,6 @@
 # Putting Fako Ride in front of real people
 
-Everything in the code is built and tested — 117 unit checks and 452 end-to-end
+Everything in the code is built and tested — 124 unit checks and 471 end-to-end
 checks pass. What is left needs accounts in your name. The steps are in the order
 they depend on each other, and the slow sign-ups come first so you are not
 waiting on them at the end. Each step says how you know it worked.

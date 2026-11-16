@@ -58,13 +58,13 @@ export const S = {
     codeLabel: p("6-digit code", "Code à 6 chiffres"),
     sixDigitCode: p("Six digit code", "Code à six chiffres"),
     yourName: p("Your name", "Votre nom"),
-    namePlaceholder: p("Tazanu Stanley", "Tazanu Stanley"),
+    namePlaceholder: p("Enanga Mofor", "Enanga Mofor"),
     nameHint: p(
       "A first name is enough. Drivers see this when they accept your ride.",
       "Un prénom suffit. Les chauffeurs le voient quand ils acceptent votre course.",
     ),
     verify: p("Verify and continue", "Vérifier et continuer"),
-    phonePlaceholder: p("6 72 48 84 17", "6 72 48 84 17"),
+    phonePlaceholder: p("6 70 00 00 00", "6 70 00 00 00"),
 
     /* Chosen from the API's `code`, never from its English message. */
     badPhone: p(
@@ -97,6 +97,14 @@ export const S = {
       "Pas de réseau. Vérifiez votre connexion et réessayez.",
     ),
     wentWrong: p("Something went wrong. Try again.", "Une erreur s'est produite. Réessayez."),
+  },
+
+  /** The card on a home screen that leads back to a ride still going on. */
+  live: {
+    riding: p("You have a ride in progress", "Vous avez une course en cours"),
+    driving: p("You are on a ride", "Vous êtes en course"),
+    tapToOpen: p("Tap to go back to it.", "Touchez pour y revenir."),
+    open: p("Open", "Ouvrir"),
   },
 
   home: {
@@ -430,6 +438,16 @@ export const S = {
       "Paid by phone. It lands in your balance.",
       "Payé par téléphone. Cela arrive dans votre solde.",
     ),
+    phoneWaiting: p("Waiting for the payment", "En attente du paiement"),
+    phoneWaitingWhy: p(
+      "The rider has a prompt on their phone to approve. Do not let them go until this says paid.",
+      "Le passager doit valider le paiement sur son téléphone. Ne le laissez pas partir avant que ceci indique payé.",
+    ),
+    phoneFailed: p("The phone payment did not go through", "Le paiement par téléphone a échoué"),
+    phoneFailedTakeCash: p(
+      "Take {amount} FCFA in cash now, before the rider leaves.",
+      "Prenez {amount} FCFA en espèces maintenant, avant que le passager ne parte.",
+    ),
 
     dropRide: p("Drop this ride", "Abandonner cette course"),
     getHelp: p("GET HELP", "DEMANDER DE L'AIDE"),
@@ -588,6 +606,8 @@ export const S = {
     ),
 
     youPaid: p("You paid", "Vous avez payé"),
+    approveOnPhone: p("Approve the payment on your phone", "Validez le paiement sur votre téléphone"),
+    payFailed: p("Payment failed — pay your driver in cash", "Paiement échoué — payez votre chauffeur en espèces"),
     payOnArrival: p("You pay on arrival", "Vous payez à l'arrivée"),
     cash: p("Cash", "Espèces"),
     momo: p("MTN MoMo", "MTN MoMo"),
