@@ -63,6 +63,8 @@ export class ApiError extends Error {
     message: string,
     readonly status: number,
     readonly offline = false,
+    /** Whatever the server attached: the numbers a message needs, mostly. */
+    readonly details?: unknown,
   ) {
     super(message);
     this.name = "ApiError";
@@ -144,13 +146,13 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   }
 
   if (!res.ok) {
-    const err = (payload as { error?: { code?: string; message?: string } } | null)?.error;
+    const err = (payload as { error?: { code?: string; message?: string; details?: unknown } } | null)?.error;
     const code = err?.code ?? `http_${res.status}`;
     if (res.status === 401 && code !== "wrong_code" && code !== "code_expired") {
       // The token is gone or stale. A failed sign-in attempt is not that.
       onUnauthorised?.();
     }
-    throw new ApiError(code, err?.message ?? `Request failed (${res.status})`, res.status);
+    throw new ApiError(code, err?.message ?? `Request failed (${res.status})`, res.status, false, err?.details);
   }
 
   return payload as T;

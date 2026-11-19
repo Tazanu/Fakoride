@@ -18,8 +18,11 @@ import { prisma } from "../lib/prisma";
 import { ApiError, asyncHandler, param } from "../lib/http";
 import { adminDocumentsRouter, REQUIRED_KINDS } from "./documents/routes";
 import { requireAuth } from "../middleware/auth";
-import { clearDriverPosition } from "../lib/presence";
-import { FARE_ROUNDING_XAF, MIN_FARE_XAF } from "./fare-math";
+import { clearDriverPosition, driverPosition } from "../lib/presence";
+import { redis, driverSeenKey } from "../lib/redis";
+import { driversOnATrip } from "./dispatch";
+import { resolveZoneForPoint } from "./geo";
+import { FARE_ROUNDING_XAF, MIN_FARE_XAF, haversineKm } from "./fare-math";
 import { adminPaymentsRouter } from "./payments/routes";
 import { logger } from "../lib/logger";
 import { cancelTripFromOutside, completeTrip } from "./trips";
@@ -111,6 +114,54 @@ export function adminRouter(): Router {
           hasDocuments: d._count.documents >= REQUIRED_KINDS.length,
         })),
       });
+    }),
+  );
+
+  /**
+   * Who is online right now, where, and whether a ride can reach him.
+   *
+   * The question ops gets asked first ("is anybody working in Molyko?") and the
+   * one a tester needs when a booking finds nobody: is the driver online, did
+   * his phone put him where he thinks it did, and has it been heard from
+   * lately. A driver silent for longer than DRIVER_STALE_AFTER_SECONDS is
+   * still listed, flagged, because that is exactly the one worth phoning.
+   */
+  router.get(
+    "/drivers/online",
+    asyncHandler(async (_req, res) => {
+      const drivers = await prisma.driver.findMany({
+        where: { online: true, status: "ACTIVE" },
+        include: { user: { select: { name: true, phone: true } } },
+        orderBy: { lastSeenAt: "desc" },
+        take: 200,
+      });
+      const ids = drivers.map((d) => d.id);
+      const [seen, carrying] = await Promise.all([
+        ids.length ? redis.mget(ids.map(driverSeenKey)) : Promise.resolve([] as (string | null)[]),
+        driversOnATrip(ids),
+      ]);
+
+      const rows = await Promise.all(
+        drivers.map(async (d, i) => {
+          const at = await driverPosition(d.id, d.vehicleType).catch(() => null);
+          const zone = at ? await resolveZoneForPoint(at.lat, at.lng).catch(() => null) : null;
+          const km = at && zone ? haversineKm(at, { lat: zone.centroidLat, lng: zone.centroidLng }) : null;
+          const heardAt = seen[i] ? Number(seen[i]) : null;
+          return {
+            id: d.id,
+            name: d.user.name,
+            phone: d.user.phone,
+            plate: d.plate,
+            near: zone?.name ?? null,
+            kmFromZone: km === null ? null : Math.round(km * 10) / 10,
+            /** Seconds since his phone last reported; null when it has gone quiet. */
+            heardSecondsAgo: heardAt ? Math.max(0, Math.round((Date.now() - heardAt) / 1000)) : null,
+            onARide: carrying.has(d.id),
+          };
+        }),
+      );
+
+      res.json({ drivers: rows });
     }),
   );
 

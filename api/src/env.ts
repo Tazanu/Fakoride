@@ -157,6 +157,17 @@ const schema = z.object({
   MOBILE_PAYMENT_DISCOUNT_XAF: z.coerce.number().int().default(15),
   OFFER_TTL_SECONDS: z.coerce.number().int().default(12),
   DISPATCH_RADIUS_M: z.coerce.number().int().default(2500),
+  /**
+   * How far from the nearest zone a driver may be and still go online.
+   *
+   * A phone that puts him in Douala — a laptop's network location usually
+   * does, and so can a phone with only a cell-tower fix — went online without
+   * a word. He sat there "online" while every rider in Buea was told nobody
+   * was around, and neither of them could tell why. Now he is told where his
+   * phone says he is. Measured to the nearest zone's centre, so it wants to be
+   * comfortably wider than any one zone.
+   */
+  SERVICE_AREA_KM: z.coerce.number().positive().default(8),
 });
 
 /**

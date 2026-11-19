@@ -65,6 +65,8 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<Phrase | null>(null);
+  /** Where the server placed him when he went online, so he can see it is right. */
+  const [near, setNear] = useState<string | null>(null);
   const [answering, setAnswering] = useState(false);
   /** Old access fees standing between him and going online, in francs. Zero: none. */
   const [owed, setOwed] = useState(0);
@@ -145,6 +147,7 @@ export default function Home() {
       if (online) {
         await shift.goOffline();
         setOnline(false);
+        setNear(null);
       } else {
         // Dispatch searches by position, so there is nothing to go online with
         // until he grants this. Asked here, at the moment it is needed.
@@ -158,8 +161,9 @@ export default function Home() {
           setError(S.driver.turnOnLocation);
           return;
         }
-        await shift.goOnline(fix.lat, fix.lng);
+        const went = await shift.goOnline(fix.lat, fix.lng);
         setOnline(true);
+        setNear(went.zone.name);
         setOwed(0);
         setFeeNote(null);
       }
@@ -175,6 +179,14 @@ export default function Home() {
         setOwed(balance?.overdueFeesXaf || balance?.unpaidFeesXaf || 0);
         setFeeNote(null);
         setError(S.driver.feesOverdue);
+        return;
+      }
+      if (err instanceof ApiError && err.code === "outside_service_area") {
+        // Filled here: the error line takes a phrase, and this one has numbers in it.
+        const d = (err.details ?? {}) as { km?: number; nearestZone?: string };
+        const vars = { km: d.km ?? "?", zone: d.nearestZone ?? "Buea" };
+        const fill = (s: string) => s.replace("{km}", String(vars.km)).replace("{zone}", vars.zone);
+        setError({ en: fill(S.driver.outsideArea.en), fr: fill(S.driver.outsideArea.fr) });
         return;
       }
       setError(
@@ -272,7 +284,10 @@ export default function Home() {
         <View style={[styles.statusBar, { top: insets.top + space.sm }]}>
           <View style={styles.statusLeft}>
             <View style={[styles.dot, online ? styles.dotOn : styles.dotOff]} />
-            <Text style={styles.statusText}>{t(online ? S.driver.online : S.driver.offline)}</Text>
+            <View>
+              <Text style={styles.statusText}>{t(online ? S.driver.online : S.driver.offline)}</Text>
+              {online && near ? <Text style={styles.statusNear}>{t(S.driver.onlineNear, { zone: near })}</Text> : null}
+            </View>
           </View>
           <Pressable
             onPress={toggleOnline}
@@ -508,6 +523,7 @@ const styles = StyleSheet.create({
   dotOn: { backgroundColor: c.actionBright },
   dotOff: { backgroundColor: c.lineStrong },
   statusText: { ...type.bodyStrong, fontSize: 15, color: c.ink },
+  statusNear: { ...type.secondary, color: c.inkSoft },
   switch: {
     width: 62,
     height: 34,

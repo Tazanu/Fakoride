@@ -110,6 +110,20 @@ export const api = {
 
 export type DriverStatus = "PENDING_REVIEW" | "ACTIVE" | "SUSPENDED" | "REJECTED";
 
+/** A driver who is online now, as dispatch sees him. */
+export type OnlineDriver = {
+  id: string;
+  name: string | null;
+  phone: string;
+  plate: string;
+  /** The zone his last position falls in or nearest to; null if none is held. */
+  near: string | null;
+  kmFromZone: number | null;
+  /** Seconds since his phone last reported; null once it has gone quiet. */
+  heardSecondsAgo: number | null;
+  onARide: boolean;
+};
+
 export type QueueDriver = {
   id: string;
   name: string | null;
@@ -274,6 +288,8 @@ export const ops = {
         { method: "POST", body: { phone, code }, anonymous: true },
       ),
   },
+
+  onlineDrivers: () => api.get<{ drivers: OnlineDriver[] }>("/admin/drivers/online"),
 
   drivers: (status: DriverStatus) =>
     api.get<{ status: DriverStatus; waiting: number; drivers: QueueDriver[] }>(

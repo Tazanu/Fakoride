@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { ApiError, ops, type DriverStatus, type QueueDriver } from "@/api";
+import { ApiError, ops, type DriverStatus, type OnlineDriver, type QueueDriver } from "@/api";
 import { Empty, ErrorLine, Panel, Section, Tabs } from "@/ui/Section";
 
 const TABS: { id: DriverStatus; label: string }[] = [
@@ -62,6 +62,8 @@ export function Drivers() {
       tabs={<Tabs value={tab} onChange={setTab} options={TABS} label="Driver status" />}
     >
       <ErrorLine>{error}</ErrorLine>
+
+      {tab === "ACTIVE" ? <OnlineNow /> : null}
 
       <Panel label="Drivers">
         <div className="ops-table-head" style={COLUMNS}>
@@ -307,6 +309,90 @@ function Act({
     </div>
   );
 }
+
+/**
+ * Who is online right now and where his phone puts him.
+ *
+ * The first thing to look at when a rider is told nobody is around: is anybody
+ * online at all, is he where he thinks he is (a phone with a poor fix can put
+ * a driver in Douala), and has his phone been heard from. Refreshed every
+ * fifteen seconds while the screen is open.
+ */
+function OnlineNow() {
+  const [rows, setRows] = useState<OnlineDriver[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let gone = false;
+    const load = () =>
+      ops.onlineDrivers().then(
+        (r) => {
+          if (!gone) {
+            setRows(r.drivers);
+            setError(null);
+          }
+        },
+        (err) => {
+          if (!gone) setError(err instanceof ApiError ? err.message : "Could not load who is online.");
+        },
+      );
+    void load();
+    const timer = setInterval(load, 15_000);
+    return () => {
+      gone = true;
+      clearInterval(timer);
+    };
+  }, []);
+
+  return (
+    <Panel label="Online now">
+      <div className="ops-table-head" style={ONLINE_COLUMNS}>
+        <span style={styles.th}>ONLINE NOW{rows ? ` (${rows.length})` : ""}</span>
+        <span style={styles.th}>PLATE</span>
+        <span style={styles.th}>WHERE HIS PHONE SAYS</span>
+        <span style={styles.th}>LAST HEARD</span>
+      </div>
+      <ErrorLine>{error}</ErrorLine>
+      {rows === null || rows.length === 0 ? (
+        <Empty loading={rows === null}>Nobody is online.</Empty>
+      ) : (
+        rows.map((d) => {
+          // More than a few km from the nearest zone's centre: outside Buea.
+          const far = d.kmFromZone !== null && d.kmFromZone > 5;
+          return (
+            <div key={d.id} className="ops-table-row" style={ONLINE_COLUMNS}>
+              <span style={styles.name}>
+                {d.name ?? "No name"}
+                <span style={styles.phone}>{d.phone}</span>
+              </span>
+              <span data-label="Plate" style={styles.plate}>
+                {d.plate}
+              </span>
+              <span data-label="Where" style={far ? styles.papersShort : styles.cell}>
+                {d.near === null
+                  ? "No position"
+                  : far
+                    ? `${d.kmFromZone} km from ${d.near} — outside Buea`
+                    : `Near ${d.near}`}
+                {d.onARide ? " · on a ride" : ""}
+              </span>
+              <span data-label="Last heard" style={d.heardSecondsAgo === null ? styles.papersShort : styles.cellMuted}>
+                {d.heardSecondsAgo === null ? "Gone quiet — gets no rides" : heard(d.heardSecondsAgo)}
+              </span>
+            </div>
+          );
+        })
+      )}
+    </Panel>
+  );
+}
+
+function heard(seconds: number): string {
+  if (seconds < 60) return `${seconds} s ago`;
+  return `${Math.round(seconds / 60)} min ago`;
+}
+
+const ONLINE_COLUMNS = { "--ops-cols": "1.8fr 1.1fr 2.2fr 1.4fr" } as React.CSSProperties;
 
 const COLUMNS = { "--ops-cols": "1.8fr 1.1fr 1.2fr 0.9fr 1.8fr" } as React.CSSProperties;
 

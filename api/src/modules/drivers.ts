@@ -14,6 +14,8 @@ import { requireAuth, signToken } from "../middleware/auth";
 import { setDriverPosition, clearDriverPosition } from "../lib/presence";
 import { driverBalance, ensureAccessFee, overdueAccessFees, todaySummary, weeklyEarnings } from "./ledger";
 import { resolveZoneForPoint } from "./geo";
+import { haversineKm } from "./fare-math";
+import { env } from "../env";
 import { redis, driverActiveTripKey, driverOfferKey, offerKey } from "../lib/redis";
 import { emitToTrip } from "../realtime";
 
@@ -157,6 +159,18 @@ export function driversRouter(): Router {
         throw new ApiError(402, "fees_overdue", `You owe ${overdue.owedXaf} XAF in access fees. Pay them to go online.`, overdue);
       }
 
+      // Where his phone says he is, before anything is charged or recorded.
+      const zone = await resolveZoneForPoint(lat, lng);
+      const km = haversineKm({ lat, lng }, { lat: zone.centroidLat, lng: zone.centroidLng });
+      if (km > env.SERVICE_AREA_KM) {
+        throw new ApiError(
+          409,
+          "outside_service_area",
+          `Your phone places you ${Math.round(km)} km from ${zone.name}. Rides only reach taxis in Buea.`,
+          { km: Math.round(km), nearestZone: zone.name },
+        );
+      }
+
       await ensureAccessFee(driver.id);
       // Position first. It is what marks him as heard from, and the watchdog
       // takes offline any driver who is online and has not been: the other
@@ -167,7 +181,6 @@ export function driversRouter(): Router {
         data: { online: true, lastSeenAt: new Date() },
       });
 
-      const zone = await resolveZoneForPoint(lat, lng);
       res.json({ online: true, zone: { code: zone.code, name: zone.name } });
     }),
   );

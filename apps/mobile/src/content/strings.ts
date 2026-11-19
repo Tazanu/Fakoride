@@ -341,6 +341,11 @@ export const S = {
    */
   driver: {
     online: p("You're online", "Vous êtes en ligne"),
+    onlineNear: p("Near {zone}", "Près de {zone}"),
+    outsideArea: p(
+      "Your phone places you {km} km from {zone}. Rides only come to taxis in Buea. If you are in Buea, turn on precise location and try again.",
+      "Votre téléphone vous situe à {km} km de {zone}. Les courses ne vont qu'aux taxis à Buea. Si vous êtes à Buea, activez la localisation précise et réessayez.",
+    ),
     offline: p("You're offline", "Vous êtes hors ligne"),
     goOnline: p("Go online", "Se mettre en ligne"),
     goOffline: p("Go offline", "Se mettre hors ligne"),

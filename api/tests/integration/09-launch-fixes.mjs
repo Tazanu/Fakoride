@@ -581,6 +581,40 @@ check("a cash ride is simply cash", cashRide.body.fare?.state === "CASH", JSON.s
 await call("POST", "/drivers/offline", { token: d1.token });
 
 // ---------------------------------------------------------------------------
+console.log("\n=== a driver whose phone puts him somewhere else ===");
+
+/*
+ * Tested from a laptop, the "driver" went online in Douala — a laptop's network
+ * location — and a rider in Buea was told nobody was around. Nothing said why.
+ */
+const DOUALA = { lat: 4.0511, lng: 9.7679 };
+await call("POST", "/drivers/offline", { token: d1.token });
+const farAway = await call("POST", "/drivers/online", { token: d1.token, body: DOUALA });
+check(
+  "going online in Douala is refused, and says how far",
+  farAway.status === 409 && farAway.body.error?.code === "outside_service_area" && farAway.body.error?.details?.km >= 40,
+  JSON.stringify(farAway.body),
+);
+check(
+  "so he is not left 'online' where no ride can reach him",
+  sql(`SELECT online::text FROM "Driver" WHERE id='${d1.id}'`) === "false",
+);
+
+const nearby = await call("POST", "/drivers/online", { token: d1.token, body: MUEA });
+check("in Buea he goes online, and is told where", nearby.status === 200 && nearby.body.zone?.name === "Muea", JSON.stringify(nearby.body));
+
+const onlineList = await call("GET", "/admin/drivers/online", { token: adminToken });
+const listed = onlineList.body.drivers?.find((d) => d.id === d1.id);
+check("ops can see who is online", onlineList.status === 200 && Boolean(listed), JSON.stringify(onlineList.body).slice(0, 300));
+check(
+  "where his phone put him, and that it was heard from just now",
+  listed?.near === "Muea" && listed.kmFromZone < 3 && listed.heardSecondsAgo !== null && listed.heardSecondsAgo < 30 && listed.onARide === false,
+  JSON.stringify(listed),
+);
+check("and nobody else can", (await call("GET", "/admin/drivers/online", { token: d1.token })).status === 403);
+await call("POST", "/drivers/offline", { token: d1.token });
+
+// ---------------------------------------------------------------------------
 console.log("\n=== becoming a driver the way the app does it ===");
 
 /*
